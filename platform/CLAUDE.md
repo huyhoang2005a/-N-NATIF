@@ -1,0 +1,74 @@
+# R2M — Research-to-Market Platform (V5)
+
+Đây là file ngữ cảnh cho Claude Code. Đọc file này trước mọi task. Không tự suy
+diễn schema/business rule — luôn tra `docs/spec/` trước khi viết code liên quan.
+
+## Bản đồ tài liệu (đọc đúng phần, không đọc hết một lúc)
+
+| Cần làm gì | Đọc file nào |
+|---|---|
+| Hiểu tổng quan kiến trúc, 8 bounded context, stack | `docs/spec/R2M_V5_ARCHITECTURE_AND_IMPLEMENTATION_PLAN.md` §2–§8 |
+| Viết/sửa 1 use case cụ thể | `docs/spec/R2M_SPEC_DESIGN_V5_COMPLETE.md` — tìm mã UC (vd `UC-CASE-01`) |
+| Kiểm tra entity, quan hệ, cột, enum | `docs/spec/schema_v5_production.dbml` |
+| Kiểm tra constraint/index/RLS production | `docs/spec/production_constraints_and_indexes.sql` |
+| Xác nhận đủ coverage / invariant của 1 use case | `docs/spec/USE_CASE_COVERAGE_MATRIX.md` |
+| So sánh với thiết kế cũ (nếu đụng code V4 cũ) | `docs/spec/V4_TO_V5_MIGRATION_PLAN.md` |
+| Biết đang ở Phase nào, task nào tiếp theo | `R2M_V5_ARCHITECTURE_AND_IMPLEMENTATION_PLAN.md` §14 Lộ trình triển khai |
+
+## Tech stack bắt buộc (không tự đổi)
+
+- Monorepo: pnpm + Turborepo (`apps/web`, `apps/api`, `apps/worker`, `packages/*`)
+- API: NestJS, modular monolith, 8 bounded context = 8 module độc lập
+- DB: PostgreSQL 16+, Drizzle ORM + raw SQL migration (không dùng Prisma cho bản V5 này)
+- Cache/Queue: Redis + BullMQ
+- Object storage: S3-compatible, chỉ truy cập qua signed URL
+- Web: Next.js App Router, Server Components mặc định
+- API contract: OpenAPI 3.1
+
+## Quy tắc bắt buộc — vi phạm là bug, không phải style
+
+1. **Không tự suy ra business rule.** Mọi use case đều có "Business invariant" +
+   "Acceptance criteria" trong spec — implement đúng theo đó, không tự thêm/bớt.
+2. **State transition luôn qua domain service**, không update `status` trực tiếp
+   từ controller/repository. Xem bảng state machine ở §8 spec chính.
+3. **Mọi transition ghi kèm**: `*_status_history` (nếu có) + `audit_log` +
+   `outbox_event` (nếu có tác động ngoài transaction).
+4. **Tenant scope là bắt buộc ở tầng application**, không tin `organizationId`
+   client gửi lên — luôn verify membership trước khi query. RLS chỉ là lớp
+   phòng vệ thứ 2, không thay thế authorization ở code.
+5. **Không tạo bảng "tổng hợp" kiểu `dashboard_data`.** Dashboard là read model
+   — query tối ưu hoặc materialized view, cập nhật qua outbox event.
+6. **Versioning**: sửa Resource/Annotation/RoadmapMilestone... không update đè —
+   tạo version/revision mới theo đúng entity tương ứng trong dbml.
+7. **Citation luôn trỏ tới `resource_version`**, không trỏ Resource trực tiếp.
+   Evidence "active" bắt buộc có ít nhất 1 citation.
+8. **Optimistic concurrency** (`version` hoặc `updated_at` compare) cho mọi
+   aggregate nhiều người có thể sửa cùng lúc (assessment, roadmap, case).
+9. **Error code ổn định** theo mẫu spec, ví dụ `CASE_INVALID_TRANSITION`,
+   `ROADMAP_CRITICAL_GAP_OPEN` — không trả message tự do cho lỗi nghiệp vụ.
+
+## Định nghĩa "xong" cho mỗi use case
+
+Trước khi coi 1 use case là hoàn thành, đối chiếu đủ 3 việc:
+- [ ] Domain service enforce đúng "Business invariant" trong spec
+- [ ] Unit test cho luồng chính + luồng thay thế/ngoại lệ liệt kê trong spec
+- [ ] Event/audit log được ghi đúng theo mục "API / Event / Audit" của use case đó
+
+## Thứ tự triển khai (theo Phase trong architecture plan)
+
+Không nhảy cóc module — mỗi Phase phụ thuộc Phase trước:
+
+0. Spec lock (đã xong — đây chính là bộ tài liệu này)
+1. Platform foundation — Identity & Organization, Verification
+2. Author & Resource — Resource Catalog & Evidence
+3. Technology Case & Evidence
+4. Assessment, Gap, Roadmap
+5. Company & Discovery (bao gồm AI recommendation)
+6. Transfer & Moderation
+7. Production hardening
+
+## Khi không chắc
+
+Nếu 1 yêu cầu (từ tôi hoặc từ task) mâu thuẫn với spec trong `docs/spec/`,
+**dừng lại và hỏi** thay vì tự quyết — spec là nguồn sự thật, không phải
+suy luận của bạn tại thời điểm code.

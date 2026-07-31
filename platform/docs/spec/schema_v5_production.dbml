@@ -1,0 +1,1449 @@
+Project ResearchToMarketV5 {
+  database_type: 'PostgreSQL'
+  Note: 'Production-oriented schema for the Research-to-Market platform. Constraints that DBML cannot express are defined in production_constraints_and_indexes.sql.'
+}
+
+// ============================================================
+// ENUMS — IDENTITY, TENANCY, VERIFICATION
+// ============================================================
+
+Enum PlatformRole {
+  USER
+  PLATFORM_REVIEWER
+  PLATFORM_ADMIN
+}
+
+Enum UserStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+  DEACTIVATED
+}
+
+Enum IdentityProvider {
+  LOCAL
+  GOOGLE
+  MICROSOFT
+  ORCID
+  SAML
+}
+
+Enum OrganizationType {
+  RESEARCH_UNIT
+  ENTERPRISE
+  GOVERNMENT
+  SUPPORT_ORGANIZATION
+}
+
+Enum OrganizationStatus {
+  PENDING_VERIFICATION
+  ACTIVE
+  REJECTED
+  SUSPENDED
+  ARCHIVED
+}
+
+Enum OrganizationMemberRole {
+  ORG_OWNER
+  ORG_ADMIN
+  MEMBER
+}
+
+Enum MembershipStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+  LEFT
+}
+
+Enum AuthorVerificationStatus {
+  UNVERIFIED
+  PENDING
+  VERIFIED
+  DECLINED
+  SUSPENDED
+}
+
+Enum VerificationRequestStatus {
+  PENDING
+  IN_REVIEW
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+Enum VerificationDocumentType {
+  IDENTITY_DOCUMENT
+  AFFILIATION_PROOF
+  ORGANIZATION_LETTER
+  TAX_DOCUMENT
+  OTHER
+}
+
+// ============================================================
+// ENUMS — DISCOVERY, RESOURCE, CASE
+// ============================================================
+
+Enum VisibilityLevel {
+  PUBLIC
+  ORGANIZATION_ONLY
+  PARTNERS_ONLY
+  PRIVATE
+}
+
+Enum ResearchNeedStatus {
+  DRAFT
+  OPEN
+  PAUSED
+  CLOSED
+  ARCHIVED
+}
+
+Enum ProposalStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
+}
+
+Enum ResourceType {
+  PAPER
+  REPORT
+  DATASET
+  MODEL
+  CHECKPOINT
+  SOURCE_CODE
+  PATENT
+  LICENSE
+  ARCHITECTURE_DOCUMENT
+  EXPERIMENT_RESULT
+  PILOT_EVIDENCE
+  VIDEO
+  OTHER
+}
+
+Enum ResourceStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+  WITHDRAWN
+}
+
+Enum ResourceVersionStatus {
+  DRAFT
+  PUBLISHED
+  SUPERSEDED
+  WITHDRAWN
+}
+
+Enum ResourceAccessLevel {
+  PUBLIC
+  ORGANIZATION
+  CASE_ONLY
+  APPROVAL_REQUIRED
+  PRIVATE
+}
+
+Enum AccessPermission {
+  VIEW
+  DOWNLOAD
+  MANAGE
+}
+
+Enum AccessGrantStatus {
+  ACTIVE
+  EXPIRED
+  REVOKED
+}
+
+Enum ContentModerationStatus {
+  ACTIVE
+  HIDDEN
+  REMOVED
+}
+
+Enum IngestionStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+Enum AnnotationStatus {
+  ACTIVE
+  DEPRECATED
+  REMOVED
+}
+
+Enum RecommendationRunStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+Enum RecommendationItemStatus {
+  ACTIVE
+  DISMISSED
+  SELECTED
+}
+
+Enum CaseInitiationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  CANCELLED
+  EXPIRED
+}
+
+Enum CaseOriginType {
+  MANUAL
+  DISCOVERY_RECOMMENDATION
+  RESEARCH_PROPOSAL
+  IMPORT
+}
+
+Enum TechnologyCaseStatus {
+  DRAFT
+  EVIDENCE_COLLECTION
+  UNDER_ASSESSMENT
+  GAP_IDENTIFIED
+  ROADMAP_DRAFT
+  ROADMAP_APPROVED
+  PILOT_READY
+  TRANSFER_READY
+  COMMERCIALIZED
+  ARCHIVED
+}
+
+Enum CaseOrganizationRole {
+  OWNING_ORGANIZATION
+  PARTNER_COMPANY
+  REVIEW_ORGANIZATION
+  SUPPORT_ORGANIZATION
+}
+
+Enum CaseMemberRole {
+  OWNER
+  TECHNICAL_MEMBER
+  CASE_REVIEWER
+  PARTNER_MEMBER
+  VIEWER
+}
+
+Enum EvidenceStatus {
+  ACTIVE
+  SUPERSEDED
+  REJECTED
+}
+
+// ============================================================
+// ENUMS — ASSESSMENT, GAP, ROADMAP, TRANSFER
+// ============================================================
+
+Enum AssessmentStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  SUPERSEDED
+}
+
+Enum FrameworkStatus {
+  DRAFT
+  ACTIVE
+  RETIRED
+}
+
+Enum GapSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+Enum GapStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  ACCEPTED_RISK
+  CLOSED
+}
+
+Enum RoadmapStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  ACTIVE
+  COMPLETED
+  REJECTED
+  SUPERSEDED
+}
+
+Enum RoadmapReviewDecision {
+  APPROVED
+  REJECTED
+  CHANGES_REQUESTED
+}
+
+Enum MilestoneStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  BLOCKED
+  COMPLETED
+  CANCELLED
+}
+
+Enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  BLOCKED
+  DONE
+  CANCELLED
+}
+
+Enum PriorityLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+Enum DependencyType {
+  FINISH_TO_START
+  START_TO_START
+  FINISH_TO_FINISH
+  START_TO_FINISH
+}
+
+Enum TransferManifestStatus {
+  DRAFT
+  READY
+  SHARED
+  EXPIRED
+  REVOKED
+}
+
+// ============================================================
+// ENUMS — PLATFORM OPERATIONS
+// ============================================================
+
+Enum ModerationTargetType {
+  RESOURCE
+  ANNOTATION
+  TECHNOLOGY_PROFILE
+}
+
+Enum ContentFlagStatus {
+  PENDING
+  IN_REVIEW
+  CLOSED
+  DISMISSED
+}
+
+Enum ModerationAction {
+  KEEP
+  HIDE
+  REMOVE
+  RESTRICT_AUTHOR
+  RESTORE
+}
+
+Enum NotificationStatus {
+  UNREAD
+  READ
+  ARCHIVED
+}
+
+Enum OutboxStatus {
+  PENDING
+  PROCESSING
+  PUBLISHED
+  FAILED
+  DEAD_LETTER
+}
+
+// ============================================================
+// 1. IDENTITY & ORGANIZATION
+// ============================================================
+
+Table user_account {
+  id uuid [pk, default: `gen_random_uuid()`]
+  primary_email citext [not null, unique]
+  platform_role PlatformRole [not null, default: 'USER']
+  status UserStatus [not null, default: 'ACTIVE']
+  email_verified_at timestamptz
+  last_login_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  deleted_at timestamptz
+
+  indexes {
+    status
+    platform_role
+  }
+}
+
+Table user_identity {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > user_account.id]
+  provider IdentityProvider [not null]
+  provider_subject varchar(255) [not null]
+  password_hash varchar(255)
+  created_at timestamptz [not null, default: `now()`]
+  last_used_at timestamptz
+
+  indexes {
+    (provider, provider_subject) [unique]
+    user_id
+  }
+
+  Note: 'password_hash is used only for LOCAL identities. External identity sessions should be managed by the auth provider.'
+}
+
+Table user_profile {
+  user_id uuid [pk, ref: - user_account.id]
+  display_name varchar(200) [not null]
+  first_name varchar(100)
+  last_name varchar(100)
+  phone varchar(30)
+  avatar_url text
+  job_title varchar(150)
+  locale varchar(20) [default: 'vi-VN']
+  timezone varchar(50) [default: 'Asia/Bangkok']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+}
+
+Table organization {
+  id uuid [pk, default: `gen_random_uuid()`]
+  name varchar(255) [not null]
+  slug varchar(160) [not null, unique]
+  type OrganizationType [not null]
+  status OrganizationStatus [not null, default: 'PENDING_VERIFICATION']
+  website text
+  tax_code varchar(100)
+  institution_identifier varchar(150)
+  description text
+  primary_contact_user_id uuid [ref: > user_account.id]
+  created_by_user_id uuid [not null, ref: > user_account.id]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  deleted_at timestamptz
+  version int [not null, default: 1]
+
+  indexes {
+    (name, type)
+    status
+    tax_code
+  }
+}
+
+Table organization_domain {
+  id uuid [pk, default: `gen_random_uuid()`]
+  organization_id uuid [not null, ref: > organization.id]
+  domain citext [not null, unique]
+  verification_token_hash varchar(255)
+  verified_at timestamptz
+  is_primary boolean [not null, default: false]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    organization_id
+  }
+}
+
+Table organization_verification_request {
+  id uuid [pk, default: `gen_random_uuid()`]
+  organization_id uuid [not null, ref: > organization.id]
+  submitted_by_user_id uuid [not null, ref: > user_account.id]
+  status VerificationRequestStatus [not null, default: 'PENDING']
+  reviewer_user_id uuid [ref: > user_account.id]
+  reviewer_note text
+  submitted_at timestamptz [not null, default: `now()`]
+  reviewed_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (organization_id, status)
+    (status, submitted_at)
+  }
+}
+
+Table organization_member {
+  id uuid [pk, default: `gen_random_uuid()`]
+  organization_id uuid [not null, ref: > organization.id]
+  user_id uuid [not null, ref: > user_account.id]
+  role OrganizationMemberRole [not null, default: 'MEMBER']
+  status MembershipStatus [not null, default: 'INVITED']
+  invited_by_user_id uuid [ref: > user_account.id]
+  invited_at timestamptz
+  joined_at timestamptz
+  left_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (organization_id, user_id) [unique]
+    (user_id, status)
+    (organization_id, role, status)
+  }
+}
+
+// ============================================================
+// 2. AUTHOR & VERIFICATION
+// ============================================================
+
+Table author_profile {
+  user_id uuid [pk, ref: - user_account.id]
+  current_affiliation_org_id uuid [ref: > organization.id]
+  orcid varchar(50) [unique]
+  bio text
+  expertise_tags text[]
+  verification_status AuthorVerificationStatus [not null, default: 'UNVERIFIED']
+  verified_at timestamptz
+  suspended_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+}
+
+Table author_verification_request {
+  id uuid [pk, default: `gen_random_uuid()`]
+  author_user_id uuid [not null, ref: > author_profile.user_id]
+  affiliation_org_id uuid [not null, ref: > organization.id]
+  status VerificationRequestStatus [not null, default: 'PENDING']
+  submitted_note text
+  reviewer_user_id uuid [ref: > user_account.id]
+  reviewer_note text
+  submitted_at timestamptz [not null, default: `now()`]
+  reviewed_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (author_user_id, status)
+    (status, submitted_at)
+  }
+}
+
+Table verification_document {
+  id uuid [pk, default: `gen_random_uuid()`]
+  organization_verification_request_id uuid [ref: > organization_verification_request.id]
+  author_verification_request_id uuid [ref: > author_verification_request.id]
+  document_type VerificationDocumentType [not null]
+  storage_object_key text [not null]
+  original_filename varchar(255)
+  mime_type varchar(100) [not null]
+  size_bytes bigint [not null]
+  checksum_sha256 varchar(64) [not null]
+  encrypted boolean [not null, default: true]
+  retention_until timestamptz
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    organization_verification_request_id
+    author_verification_request_id
+  }
+
+  Note: 'Exactly one verification request FK must be non-null. Enforced in SQL.'
+}
+
+// ============================================================
+// 3. COMPANY & RESEARCH NEEDS
+// ============================================================
+
+Table company_profile {
+  organization_id uuid [pk, ref: - organization.id]
+  public_slug varchar(160) [not null, unique]
+  industry_code varchar(100)
+  company_size varchar(50)
+  description text
+  contact_user_id uuid [ref: > user_account.id]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+}
+
+Table research_need {
+  id uuid [pk, default: `gen_random_uuid()`]
+  company_organization_id uuid [not null, ref: > organization.id]
+  created_by_user_id uuid [not null, ref: > user_account.id]
+  title varchar(200) [not null]
+  visibility VisibilityLevel [not null, default: 'PRIVATE']
+  status ResearchNeedStatus [not null, default: 'DRAFT']
+  published_at timestamptz
+  closed_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  deleted_at timestamptz
+  version int [not null, default: 1]
+
+  indexes {
+    (company_organization_id, status)
+    (visibility, status, published_at)
+  }
+}
+
+Table need_statement_version {
+  id uuid [pk, default: `gen_random_uuid()`]
+  research_need_id uuid [not null, ref: > research_need.id]
+  version_no int [not null]
+  problem_statement text [not null]
+  technical_field varchar(150) [not null]
+  desired_output_type varchar(100) [not null]
+  timeframe_months int
+  constraints text
+  success_criteria text
+  created_by_user_id uuid [not null, ref: > user_account.id]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (research_need_id, version_no) [unique]
+  }
+}
+
+Table research_proposal {
+  id uuid [pk, default: `gen_random_uuid()`]
+  research_need_id uuid [not null, ref: > research_need.id]
+  need_statement_version_id uuid [not null, ref: > need_statement_version.id]
+  proposer_author_user_id uuid [not null, ref: > author_profile.user_id]
+  proposer_organization_id uuid [not null, ref: > organization.id]
+  title varchar(200) [not null]
+  abstract text [not null]
+  methodology text [not null]
+  expected_outcome text [not null]
+  timeline_months int [not null]
+  status ProposalStatus [not null, default: 'DRAFT']
+  submitted_at timestamptz
+  decided_by_user_id uuid [ref: > user_account.id]
+  decision_reason text
+  decided_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  version int [not null, default: 1]
+
+  indexes {
+    (research_need_id, status)
+    (proposer_author_user_id, status)
+  }
+}
+
+// ============================================================
+// 4. RESOURCE CATALOG, VERSIONING, CITATION, ANNOTATION
+// ============================================================
+
+Table resource {
+  id uuid [pk, default: `gen_random_uuid()`]
+  owner_organization_id uuid [not null, ref: > organization.id]
+  created_by_user_id uuid [not null, ref: > user_account.id]
+  type ResourceType [not null]
+  title varchar(255) [not null]
+  description text
+  access_level ResourceAccessLevel [not null]
+  status ResourceStatus [not null, default: 'DRAFT']
+  moderation_status ContentModerationStatus [not null, default: 'ACTIVE']
+  external_identifier varchar(255)
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  deleted_at timestamptz
+  version int [not null, default: 1]
+
+  indexes {
+    (owner_organization_id, status)
+    (type, status)
+    external_identifier
+  }
+}
+
+Table resource_version {
+  id uuid [pk, default: `gen_random_uuid()`]
+  resource_id uuid [not null, ref: > resource.id]
+  version_no int [not null]
+  version_label varchar(100)
+  source_url text
+  storage_object_key text
+  content_hash_sha256 varchar(64)
+  metadata jsonb
+  published_at timestamptz
+  status ResourceVersionStatus [not null, default: 'DRAFT']
+  created_by_user_id uuid [not null, ref: > user_account.id]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (resource_id, version_no) [unique]
+    (resource_id, status)
+    content_hash_sha256
+  }
+}
+
+Table paper_metadata {
+  resource_id uuid [pk, ref: - resource.id]
+  doi citext [unique]
+  abstract text
+  publisher varchar(255)
+  venue varchar(255)
+  publication_date date
+  language varchar(20)
+}
+
+Table resource_ingestion_job {
+  id uuid [pk, default: `gen_random_uuid()`]
+  resource_version_id uuid [not null, ref: > resource_version.id]
+  status IngestionStatus [not null, default: 'QUEUED']
+  extractor_version varchar(100)
+  started_at timestamptz
+  completed_at timestamptz
+  error_code varchar(100)
+  error_message text
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (status, created_at)
+    resource_version_id
+  }
+}
+
+Table resource_chunk {
+  id uuid [pk, default: `gen_random_uuid()`]
+  resource_version_id uuid [not null, ref: > resource_version.id]
+  chunk_index int [not null]
+  content text [not null]
+  page_number int
+  section_label varchar(255)
+  offset_start int
+  offset_end int
+  token_count int
+  embedding vector(1536)
+  metadata jsonb
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (resource_version_id, chunk_index) [unique]
+    resource_version_id
+  }
+}
+
+Table citation {
+  id uuid [pk, default: `gen_random_uuid()`]
+  resource_version_id uuid [not null, ref: > resource_version.id]
+  resource_chunk_id uuid [ref: > resource_chunk.id]
+  snippet text [not null]
+  page_number int
+  section_label varchar(255)
+  offset_start int
+  offset_end int
+  locator_metadata jsonb
+  created_by_user_id uuid [not null, ref: > user_account.id]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    resource_version_id
+    resource_chunk_id
+  }
+}
+
+Table annotation {
+  id uuid [pk, default: `gen_random_uuid()`]
+  resource_version_id uuid [not null, ref: > resource_version.id]
+  created_by_user_id uuid [not null, ref: > user_account.id]
+  status AnnotationStatus [not null, default: 'ACTIVE']
+  moderation_status ContentModerationStatus [not null, default: 'ACTIVE']
+  latest_revision_no int [not null, default: 1]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  deleted_at timestamptz
+
+  indexes {
+    (resource_version_id, status)
+    created_by_user_id
+  }
+}
+
+Table annotation_revision {
+  id uuid [pk, default: `gen_random_uuid()`]
+  annotation_id uuid [not null, ref: > annotation.id]
+  revision_no int [not null]
+  content text [not null]
+  target_snippet text [not null]
+  page_number int
+  section_label varchar(255)
+  offset_start int
+  offset_end int
+  created_by_user_id uuid [not null, ref: > user_account.id]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (annotation_id, revision_no) [unique]
+  }
+}
+
+// ============================================================
+// 5. DISCOVERY & RECOMMENDATION
+// ============================================================
+
+Table recommendation_run {
+  id uuid [pk, default: `gen_random_uuid()`]
+  research_need_id uuid [not null, ref: > research_need.id]
+  need_statement_version_id uuid [not null, ref: > need_statement_version.id]
+  requested_by_user_id uuid [not null, ref: > user_account.id]
+  status RecommendationRunStatus [not null, default: 'QUEUED']
+  model_provider varchar(100)
+  model_name varchar(150)
+  prompt_version varchar(100)
+  model_parameters jsonb
+  started_at timestamptz
+  completed_at timestamptz
+  error_code varchar(100)
+  error_message text
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (research_need_id, created_at)
+    (status, created_at)
+  }
+}
+
+Table recommendation_item {
+  id uuid [pk, default: `gen_random_uuid()`]
+  recommendation_run_id uuid [not null, ref: > recommendation_run.id]
+  resource_version_id uuid [not null, ref: > resource_version.id]
+  rank int [not null]
+  match_score decimal(6,5) [not null]
+  rationale text [not null]
+  status RecommendationItemStatus [not null, default: 'ACTIVE']
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (recommendation_run_id, rank) [unique]
+    (recommendation_run_id, resource_version_id) [unique]
+  }
+}
+
+Table recommendation_citation {
+  id uuid [pk, default: `gen_random_uuid()`]
+  recommendation_item_id uuid [not null, ref: > recommendation_item.id]
+  citation_id uuid [not null, ref: > citation.id]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (recommendation_item_id, citation_id) [unique]
+  }
+}
+
+Table case_initiation_request {
+  id uuid [pk, default: `gen_random_uuid()`]
+  recommendation_item_id uuid [not null, ref: > recommendation_item.id]
+  requesting_organization_id uuid [not null, ref: > organization.id]
+  requested_by_user_id uuid [not null, ref: > user_account.id]
+  target_author_user_id uuid [not null, ref: > author_profile.user_id]
+  target_organization_id uuid [not null, ref: > organization.id]
+  status CaseInitiationStatus [not null, default: 'PENDING']
+  message text
+  response_note text
+  responded_by_user_id uuid [ref: > user_account.id]
+  responded_at timestamptz
+  expires_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  version int [not null, default: 1]
+
+  indexes {
+    (target_author_user_id, status)
+    (requesting_organization_id, status)
+  }
+}
+
+// ============================================================
+// 6. TECHNOLOGY CASE & EVIDENCE
+// ============================================================
+
+Table technology_case {
+  id uuid [pk, default: `gen_random_uuid()`]
+  owning_organization_id uuid [not null, ref: > organization.id]
+  title varchar(255) [not null]
+  slug varchar(180) [not null]
+  description text
+  lifecycle_status TechnologyCaseStatus [not null, default: 'DRAFT']
+  created_by_user_id uuid [not null, ref: > user_account.id]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  archived_at timestamptz
+  version int [not null, default: 1]
+
+  indexes {
+    (owning_organization_id, slug) [unique]
+    (owning_organization_id, lifecycle_status)
+  }
+}
+
+Table case_origin {
+  technology_case_id uuid [pk, ref: - technology_case.id]
+  origin_type CaseOriginType [not null]
+  recommendation_item_id uuid [ref: > recommendation_item.id]
+  research_proposal_id uuid [ref: > research_proposal.id]
+  case_initiation_request_id uuid [ref: > case_initiation_request.id]
+  imported_source_reference text
+  created_at timestamptz [not null, default: `now()`]
+
+  Note: 'Origin fields must match origin_type. Enforced in SQL.'
+}
+
+Table technology_profile {
+  id uuid [pk, default: `gen_random_uuid()`]
+  technology_case_id uuid [not null, unique, ref: - technology_case.id]
+  summary text
+  value_proposition text
+  target_market text
+  maturity_level varchar(100)
+  deployment_context text
+  licensing_notes text
+  visibility VisibilityLevel [not null, default: 'PRIVATE']
+  moderation_status ContentModerationStatus [not null, default: 'ACTIVE']
+  updated_by_user_id uuid [not null, ref: > user_account.id]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  version int [not null, default: 1]
+}
+
+Table case_organization {
+  id uuid [pk, default: `gen_random_uuid()`]
+  technology_case_id uuid [not null, ref: > technology_case.id]
+  organization_id uuid [not null, ref: > organization.id]
+  role CaseOrganizationRole [not null]
+  joined_at timestamptz [not null, default: `now()`]
+  left_at timestamptz
+
+  indexes {
+    (technology_case_id, organization_id, role) [unique]
+    (organization_id, role)
+  }
+}
+
+Table case_member {
+  id uuid [pk, default: `gen_random_uuid()`]
+  technology_case_id uuid [not null, ref: > technology_case.id]
+  user_id uuid [not null, ref: > user_account.id]
+  organization_id uuid [not null, ref: > organization.id]
+  role CaseMemberRole [not null]
+  status MembershipStatus [not null, default: 'ACTIVE']
+  invited_by_user_id uuid [ref: > user_account.id]
+  joined_at timestamptz [not null, default: `now()`]
+  left_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (technology_case_id, user_id) [unique]
+    (technology_case_id, role, status)
+    (user_id, status)
+  }
+}
+
+Table case_status_history {
+  id uuid [pk, default: `gen_random_uuid()`]
+  technology_case_id uuid [not null, ref: > technology_case.id]
+  from_status TechnologyCaseStatus
+  to_status TechnologyCaseStatus [not null]
+  changed_by_user_id uuid [not null, ref: > user_account.id]
+  reason text
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (technology_case_id, created_at)
+  }
+}
+
+Table evidence {
+  id uuid [pk, default: `gen_random_uuid()`]
+  technology_case_id uuid [not null, ref: > technology_case.id]
+  resource_version_id uuid [not null, ref: > resource_version.id]
+  annotation_id uuid [ref: > annotation.id]
+  title varchar(255) [not null]
+  claim text [not null]
+  relevance_note text [not null]
+  status EvidenceStatus [not null, default: 'ACTIVE']
+  created_by_user_id uuid [not null, ref: > user_account.id]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  version int [not null, default: 1]
+
+  indexes {
+    (technology_case_id, status)
+    resource_version_id
+  }
+}
+
+Table evidence_citation {
+  id uuid [pk, default: `gen_random_uuid()`]
+  evidence_id uuid [not null, ref: > evidence.id]
+  citation_id uuid [not null, ref: > citation.id]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (evidence_id, citation_id) [unique]
+  }
+}
+
+// ============================================================
+// 7. ASSESSMENT & GAP
+// ============================================================
+
+Table assessment_framework {
+  id uuid [pk, default: `gen_random_uuid()`]
+  code varchar(100) [not null]
+  name varchar(255) [not null]
+  version_no int [not null]
+  description text
+  status FrameworkStatus [not null, default: 'DRAFT']
+  created_by_user_id uuid [not null, ref: > user_account.id]
+  created_at timestamptz [not null, default: `now()`]
+  activated_at timestamptz
+  retired_at timestamptz
+
+  indexes {
+    (code, version_no) [unique]
+    status
+  }
+}
+
+Table assessment_criterion {
+  id uuid [pk, default: `gen_random_uuid()`]
+  framework_id uuid [not null, ref: > assessment_framework.id]
+  category_code varchar(100) [not null]
+  criterion_code varchar(100) [not null]
+  title varchar(255) [not null]
+  description text [not null]
+  guidance text
+  min_score decimal(8,2) [not null, default: 0]
+  max_score decimal(8,2) [not null]
+  weight decimal(8,4) [not null, default: 1]
+  requires_evidence boolean [not null, default: true]
+  requires_citation boolean [not null, default: true]
+  sort_order int [not null, default: 0]
+
+  indexes {
+    (framework_id, criterion_code) [unique]
+    (framework_id, category_code, sort_order)
+  }
+}
+
+Table readiness_assessment {
+  id uuid [pk, default: `gen_random_uuid()`]
+  technology_case_id uuid [not null, ref: > technology_case.id]
+  framework_id uuid [not null, ref: > assessment_framework.id]
+  status AssessmentStatus [not null, default: 'DRAFT']
+  composite_score decimal(10,4)
+  created_by_user_id uuid [not null, ref: > user_account.id]
+  submitted_by_user_id uuid [ref: > user_account.id]
+  approved_by_user_id uuid [ref: > user_account.id]
+  submitted_at timestamptz
+  approved_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  version int [not null, default: 1]
+
+  indexes {
+    (technology_case_id, status)
+    framework_id
+  }
+}
+
+Table assessment_score {
+  id uuid [pk, default: `gen_random_uuid()`]
+  assessment_id uuid [not null, ref: > readiness_assessment.id]
+  criterion_id uuid [not null, ref: > assessment_criterion.id]
+  score decimal(8,2) [not null]
+  rationale text [not null]
+  created_by_user_id uuid [not null, ref: > user_account.id]
+  updated_by_user_id uuid [not null, ref: > user_account.id]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (assessment_id, criterion_id) [unique]
+  }
+}
+
+Table assessment_score_evidence {
+  id uuid [pk, default: `gen_random_uuid()`]
+  assessment_score_id uuid [not null, ref: > assessment_score.id]
+  evidence_id uuid [not null, ref: > evidence.id]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (assessment_score_id, evidence_id) [unique]
+  }
+}
+
+Table assessment_score_citation {
+  id uuid [pk, default: `gen_random_uuid()`]
+  assessment_score_id uuid [not null, ref: > assessment_score.id]
+  citation_id uuid [not null, ref: > citation.id]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (assessment_score_id, citation_id) [unique]
+  }
+}
+
+Table gap_record {
+  id uuid [pk, default: `gen_random_uuid()`]
+  technology_case_id uuid [not null, ref: > technology_case.id]
+  source_assessment_id uuid [ref: > readiness_assessment.id]
+  source_assessment_score_id uuid [ref: > assessment_score.id]
+  title varchar(255) [not null]
+  description text [not null]
+  category varchar(120)
+  severity GapSeverity [not null]
+  status GapStatus [not null, default: 'OPEN']
+  owner_user_id uuid [ref: > user_account.id]
+  due_date date
+  created_by_user_id uuid [not null, ref: > user_account.id]
+  resolved_by_user_id uuid [ref: > user_account.id]
+  resolved_at timestamptz
+  resolution_note text
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  version int [not null, default: 1]
+
+  indexes {
+    (technology_case_id, status, severity)
+    owner_user_id
+  }
+}
+
+Table gap_evidence {
+  id uuid [pk, default: `gen_random_uuid()`]
+  gap_record_id uuid [not null, ref: > gap_record.id]
+  evidence_id uuid [not null, ref: > evidence.id]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (gap_record_id, evidence_id) [unique]
+  }
+}
+
+Table gap_citation {
+  id uuid [pk, default: `gen_random_uuid()`]
+  gap_record_id uuid [not null, ref: > gap_record.id]
+  citation_id uuid [not null, ref: > citation.id]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (gap_record_id, citation_id) [unique]
+  }
+}
+
+// ============================================================
+// 8. ROADMAP
+// ============================================================
+
+Table roadmap {
+  id uuid [pk, default: `gen_random_uuid()`]
+  technology_case_id uuid [not null, ref: > technology_case.id]
+  version_no int [not null]
+  title varchar(255) [not null]
+  objective text
+  status RoadmapStatus [not null, default: 'DRAFT']
+  created_by_user_id uuid [not null, ref: > user_account.id]
+  submitted_by_user_id uuid [ref: > user_account.id]
+  approved_by_user_id uuid [ref: > user_account.id]
+  submitted_at timestamptz
+  approved_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  version int [not null, default: 1]
+
+  indexes {
+    (technology_case_id, version_no) [unique]
+    (technology_case_id, status)
+  }
+}
+
+Table roadmap_milestone {
+  id uuid [pk, default: `gen_random_uuid()`]
+  roadmap_id uuid [not null, ref: > roadmap.id]
+  title varchar(255) [not null]
+  description text
+  status MilestoneStatus [not null, default: 'NOT_STARTED']
+  priority PriorityLevel [not null, default: 'MEDIUM']
+  start_date date
+  due_date date
+  owner_user_id uuid [ref: > user_account.id]
+  sort_order int [not null, default: 0]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  version int [not null, default: 1]
+
+  indexes {
+    (roadmap_id, sort_order)
+    (roadmap_id, status)
+  }
+}
+
+Table roadmap_task {
+  id uuid [pk, default: `gen_random_uuid()`]
+  milestone_id uuid [not null, ref: > roadmap_milestone.id]
+  title varchar(255) [not null]
+  description text
+  status TaskStatus [not null, default: 'TODO']
+  priority PriorityLevel [not null, default: 'MEDIUM']
+  assignee_user_id uuid [ref: > user_account.id]
+  start_date date
+  due_date date
+  completed_at timestamptz
+  sort_order int [not null, default: 0]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  version int [not null, default: 1]
+
+  indexes {
+    (milestone_id, sort_order)
+    (assignee_user_id, status)
+  }
+}
+
+Table milestone_dependency {
+  id uuid [pk, default: `gen_random_uuid()`]
+  predecessor_milestone_id uuid [not null, ref: > roadmap_milestone.id]
+  successor_milestone_id uuid [not null, ref: > roadmap_milestone.id]
+  dependency_type DependencyType [not null, default: 'FINISH_TO_START']
+  lag_days int [not null, default: 0]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (predecessor_milestone_id, successor_milestone_id) [unique]
+    successor_milestone_id
+  }
+}
+
+Table milestone_gap {
+  id uuid [pk, default: `gen_random_uuid()`]
+  milestone_id uuid [not null, ref: > roadmap_milestone.id]
+  gap_record_id uuid [not null, ref: > gap_record.id]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (milestone_id, gap_record_id) [unique]
+  }
+}
+
+Table roadmap_review {
+  id uuid [pk, default: `gen_random_uuid()`]
+  roadmap_id uuid [not null, ref: > roadmap.id]
+  reviewer_user_id uuid [not null, ref: > user_account.id]
+  decision RoadmapReviewDecision [not null]
+  comment text
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (roadmap_id, created_at)
+  }
+}
+
+// ============================================================
+// 9. TRANSFER & ACCESS
+// ============================================================
+
+Table transfer_manifest {
+  id uuid [pk, default: `gen_random_uuid()`]
+  technology_case_id uuid [not null, ref: > technology_case.id]
+  version_no int [not null]
+  title varchar(255) [not null]
+  status TransferManifestStatus [not null, default: 'DRAFT']
+  created_by_user_id uuid [not null, ref: > user_account.id]
+  generated_at timestamptz
+  shared_at timestamptz
+  expires_at timestamptz
+  revoked_at timestamptz
+  note text
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  version int [not null, default: 1]
+
+  indexes {
+    (technology_case_id, version_no) [unique]
+    (technology_case_id, status)
+  }
+}
+
+Table transfer_manifest_item {
+  id uuid [pk, default: `gen_random_uuid()`]
+  transfer_manifest_id uuid [not null, ref: > transfer_manifest.id]
+  resource_version_id uuid [not null, ref: > resource_version.id]
+  location_url_snapshot text [not null]
+  checksum_sha256 varchar(64)
+  permission AccessPermission [not null, default: 'VIEW']
+  metadata_snapshot jsonb
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (transfer_manifest_id, resource_version_id) [unique]
+  }
+}
+
+Table transfer_recipient {
+  id uuid [pk, default: `gen_random_uuid()`]
+  transfer_manifest_id uuid [not null, ref: > transfer_manifest.id]
+  recipient_organization_id uuid [ref: > organization.id]
+  recipient_user_id uuid [ref: > user_account.id]
+  permission AccessPermission [not null, default: 'VIEW']
+  expires_at timestamptz
+  accepted_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    transfer_manifest_id
+    recipient_organization_id
+    recipient_user_id
+  }
+
+  Note: 'Exactly one recipient FK must be non-null. Enforced in SQL.'
+}
+
+Table resource_access_grant {
+  id uuid [pk, default: `gen_random_uuid()`]
+  resource_id uuid [not null, ref: > resource.id]
+  recipient_organization_id uuid [ref: > organization.id]
+  recipient_user_id uuid [ref: > user_account.id]
+  permission AccessPermission [not null]
+  status AccessGrantStatus [not null, default: 'ACTIVE']
+  granted_by_user_id uuid [not null, ref: > user_account.id]
+  source_transfer_manifest_id uuid [ref: > transfer_manifest.id]
+  expires_at timestamptz
+  revoked_at timestamptz
+  revoked_by_user_id uuid [ref: > user_account.id]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (resource_id, status)
+    recipient_organization_id
+    recipient_user_id
+    source_transfer_manifest_id
+  }
+
+  Note: 'Exactly one recipient FK must be non-null. Enforced in SQL.'
+}
+
+// ============================================================
+// 10. MODERATION, NOTIFICATION, AUDIT, RELIABILITY
+// ============================================================
+
+Table content_flag {
+  id uuid [pk, default: `gen_random_uuid()`]
+  reporter_user_id uuid [not null, ref: > user_account.id]
+  target_type ModerationTargetType [not null]
+  target_resource_id uuid [ref: > resource.id]
+  target_annotation_id uuid [ref: > annotation.id]
+  target_technology_profile_id uuid [ref: > technology_profile.id]
+  reason_code varchar(100) [not null]
+  details text [not null]
+  status ContentFlagStatus [not null, default: 'PENDING']
+  assigned_reviewer_user_id uuid [ref: > user_account.id]
+  hidden_at timestamptz
+  closed_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (status, created_at)
+    assigned_reviewer_user_id
+  }
+
+  Note: 'Exactly one target FK must be non-null and must match target_type. Enforced in SQL.'
+}
+
+Table moderation_decision {
+  id uuid [pk, default: `gen_random_uuid()`]
+  content_flag_id uuid [not null, ref: > content_flag.id]
+  reviewer_user_id uuid [not null, ref: > user_account.id]
+  action ModerationAction [not null]
+  rationale text [not null]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (content_flag_id, created_at)
+  }
+}
+
+Table notification {
+  id uuid [pk, default: `gen_random_uuid()`]
+  recipient_user_id uuid [not null, ref: > user_account.id]
+  scope_organization_id uuid [ref: > organization.id]
+  type varchar(100) [not null]
+  title varchar(255) [not null]
+  message text [not null]
+  payload jsonb
+  status NotificationStatus [not null, default: 'UNREAD']
+  dedupe_key varchar(255)
+  read_at timestamptz
+  archived_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (recipient_user_id, status, created_at)
+    (scope_organization_id, created_at)
+    dedupe_key
+  }
+}
+
+Table audit_log {
+  id bigint [pk, increment]
+  actor_user_id uuid [ref: > user_account.id]
+  scope_organization_id uuid [ref: > organization.id]
+  request_id uuid
+  action varchar(150) [not null]
+  entity_type varchar(100) [not null]
+  entity_id varchar(100) [not null]
+  before_data jsonb
+  after_data jsonb
+  ip_hash varchar(128)
+  user_agent text
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (entity_type, entity_id, created_at)
+    (actor_user_id, created_at)
+    request_id
+  }
+}
+
+Table outbox_event {
+  id uuid [pk, default: `gen_random_uuid()`]
+  aggregate_type varchar(100) [not null]
+  aggregate_id varchar(100) [not null]
+  event_type varchar(150) [not null]
+  payload jsonb [not null]
+  status OutboxStatus [not null, default: 'PENDING']
+  available_at timestamptz [not null, default: `now()`]
+  published_at timestamptz
+  attempt_count int [not null, default: 0]
+  last_error text
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (status, available_at)
+    (aggregate_type, aggregate_id)
+  }
+}
+
+Table idempotency_key {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > user_account.id]
+  key varchar(255) [not null]
+  request_hash varchar(128) [not null]
+  response_status int
+  response_body jsonb
+  locked_at timestamptz
+  expires_at timestamptz [not null]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (user_id, key) [unique]
+    expires_at
+  }
+}
