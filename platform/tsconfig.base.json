@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "lib": ["ES2022"],
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "composite": false,
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "baseUrl": ".",
+    "paths": {
+      "@r2m/config": ["packages/config/dist"],
+      "@r2m/domain": ["packages/domain/dist"],
+      "@r2m/authz": ["packages/authz/dist"],
+      "@r2m/contracts": ["packages/contracts/dist"],
+      "@r2m/db": ["packages/db/dist"],
+      "@r2m/testkit": ["packages/testkit/dist"]
+    }
+  }
+}

@@ -1,0 +1,17 @@
+import "reflect-metadata";
+import { loadEnv } from "@r2m/config";
+import { NestFactory } from "@nestjs/core";
+import { AppModule } from "./app.module";
+
+async function bootstrap(): Promise<void> {
+  const env = loadEnv();
+  const app = await NestFactory.create(AppModule);
+  app.setGlobalPrefix("v1");
+  await app.listen(env.API_PORT);
+  console.log(`[api] listening on :${env.API_PORT} (v1)`);
+}
+
+bootstrap().catch((error) => {
+  console.error("[api] failed to start", error);
+  process.exit(1);
+});
