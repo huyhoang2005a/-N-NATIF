@@ -5,7 +5,7 @@ import { Body, Controller, Get, Patch, Req, UsePipes } from "@nestjs/common";
 import type { Request } from "express";
 import { CurrentActor } from "../../common/decorators/current-actor.decorator";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
-import type { UsersService } from "./users.service";
+import { UsersService } from "./users.service";
 
 @Controller("me/profile")
 export class UsersController {

@@ -5,7 +5,7 @@ import { Body, Controller, Get, Param, Post, Req, UsePipes } from "@nestjs/commo
 import type { Request } from "express";
 import { CurrentActor } from "../../common/decorators/current-actor.decorator";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
-import type { VerificationService } from "./verification.service";
+import { VerificationService } from "./verification.service";
 
 function requestId(req: Request): string | null {
   return (req.headers["x-request-id"] as string) ?? null;

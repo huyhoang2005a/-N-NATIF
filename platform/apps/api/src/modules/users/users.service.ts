@@ -3,9 +3,9 @@ import type { ActorContext } from "@r2m/authz";
 import type { Database } from "@r2m/db";
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { DATABASE } from "../../database/database.module";
-import type { AuditService } from "../audit/audit.service";
-import type { OutboxService } from "../jobs/outbox.service";
-import type { UsersRepository } from "./users.repository";
+import { AuditService } from "../audit/audit.service";
+import { OutboxService } from "../jobs/outbox.service";
+import { UsersRepository } from "./users.repository";
 
 function toResponse(profile: {
   userId: string;

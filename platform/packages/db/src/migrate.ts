@@ -31,7 +31,16 @@ async function applyManualMigrations(): Promise<void> {
   }
 }
 
+async function ensureExtensions(): Promise<void> {
+  const pool = getPool();
+  await pool.query("CREATE EXTENSION IF NOT EXISTS pgcrypto;");
+  await pool.query("CREATE EXTENSION IF NOT EXISTS citext;");
+}
+
 async function main(): Promise<void> {
+  console.log("[migrate] ensuring required extensions");
+  await ensureExtensions();
+
   console.log("[migrate] applying drizzle-kit baseline migrations");
   await migrate(getDb(), { migrationsFolder: join(__dirname, "..", "migrations") });
 

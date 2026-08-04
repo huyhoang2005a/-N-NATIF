@@ -5,10 +5,11 @@ import { userAccount, userIdentity, userProfile } from "../schema/identity";
 import { organization, organizationMember } from "../schema/organization";
 
 /**
- * Dev-only seed: one platform admin (for reviewing organization verification requests)
- * and one already-ACTIVE sample organization with its owner. Safe to re-run — every
- * insert is guarded by an existence check instead of relying on ON CONFLICT DO NOTHING,
- * so partial re-runs after a failure still converge.
+ * Dev-only seed: one platform admin and one platform reviewer (for reviewing
+ * organization verification requests as two distinct roles) and one already-ACTIVE
+ * sample organization with its owner. Safe to re-run — every insert is guarded by an
+ * existence check instead of relying on ON CONFLICT DO NOTHING, so partial re-runs
+ * after a failure still converge.
  */
 async function main(): Promise<void> {
   const db = getDb();
@@ -45,6 +46,40 @@ async function main(): Promise<void> {
     console.log(`[seed] created platform admin ${adminEmail}`);
   } else {
     console.log(`[seed] platform admin ${adminEmail} already exists, skipping`);
+  }
+
+  const reviewerEmail = "reviewer@r2m.local";
+  const existingReviewer = await db.query.userAccount.findFirst({
+    where: eq(userAccount.primaryEmail, reviewerEmail),
+  });
+
+  let reviewerId = existingReviewer?.id;
+  if (!reviewerId) {
+    const passwordHash = await bcrypt.hash("ChangeMe123!", 10);
+    const [reviewer] = await db
+      .insert(userAccount)
+      .values({
+        primaryEmail: reviewerEmail,
+        platformRole: "PLATFORM_REVIEWER",
+        status: "ACTIVE",
+        emailVerifiedAt: new Date(),
+      })
+      .returning();
+    if (!reviewer) throw new Error("[seed] reviewer insert returned no row");
+    reviewerId = reviewer.id;
+    await db.insert(userIdentity).values({
+      userId: reviewerId,
+      provider: "LOCAL",
+      providerSubject: reviewerEmail,
+      passwordHash,
+    });
+    await db.insert(userProfile).values({
+      userId: reviewerId,
+      displayName: "R2M Platform Reviewer",
+    });
+    console.log(`[seed] created platform reviewer ${reviewerEmail}`);
+  } else {
+    console.log(`[seed] platform reviewer ${reviewerEmail} already exists, skipping`);
   }
 
   const ownerEmail = "owner@sample-research-unit.local";

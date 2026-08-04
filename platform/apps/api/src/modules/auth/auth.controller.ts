@@ -9,7 +9,7 @@ import { CurrentActor } from "../../common/decorators/current-actor.decorator";
 import { Public } from "../../common/decorators/public.decorator";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
 import type { ActorContext } from "@r2m/authz";
-import type { AuthService } from "./auth.service";
+import { AuthService } from "./auth.service";
 
 @Controller()
 export class AuthController {

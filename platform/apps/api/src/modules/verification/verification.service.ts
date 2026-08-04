@@ -13,11 +13,11 @@ import {
   NotFoundError,
 } from "@r2m/domain";
 import { Inject, Injectable } from "@nestjs/common";
-import type { OrganizationsRepository } from "../organizations/organizations.repository";
+import { OrganizationsRepository } from "../organizations/organizations.repository";
 import { DATABASE } from "../../database/database.module";
-import type { AuditService } from "../audit/audit.service";
-import type { OutboxService } from "../jobs/outbox.service";
-import type { VerificationRepository } from "./verification.repository";
+import { AuditService } from "../audit/audit.service";
+import { OutboxService } from "../jobs/outbox.service";
+import { VerificationRepository } from "./verification.repository";
 
 function toResponse(request: {
   id: string;

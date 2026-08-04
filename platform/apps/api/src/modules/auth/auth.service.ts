@@ -3,8 +3,8 @@ import { ErrorCode, UnauthenticatedError } from "@r2m/domain";
 import { Injectable } from "@nestjs/common";
 import * as bcrypt from "bcryptjs";
 import { v4 as uuidv4 } from "uuid";
-import type { AuthRepository } from "./auth.repository";
-import type { TokenService } from "./token.service";
+import { AuthRepository } from "./auth.repository";
+import { TokenService } from "./token.service";
 
 @Injectable()
 export class AuthService {

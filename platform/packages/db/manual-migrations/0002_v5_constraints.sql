@@ -9,8 +9,8 @@
 
 BEGIN;
 
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
-CREATE EXTENSION IF NOT EXISTS citext;
+-- pgcrypto/citext are created in src/migrate.ts before the drizzle-kit baseline runs,
+-- since the baseline migration's citext columns need the extension to already exist.
 
 -- ============================================================
 -- GENERIC updated_at + optimistic version trigger

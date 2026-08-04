@@ -12,10 +12,10 @@ import { ConflictError, ErrorCode, ForbiddenError, NotFoundError } from "@r2m/do
 import { Inject, Injectable } from "@nestjs/common";
 import * as bcrypt from "bcryptjs";
 import { DATABASE } from "../../database/database.module";
-import type { AuditService } from "../audit/audit.service";
-import type { OutboxService } from "../jobs/outbox.service";
+import { AuditService } from "../audit/audit.service";
+import { OutboxService } from "../jobs/outbox.service";
 import { assertNotRemovingLastActiveOwner } from "./organizations.policy";
-import type { OrganizationsRepository } from "./organizations.repository";
+import { OrganizationsRepository } from "./organizations.repository";
 import { emailDomain, slugify } from "./slug.util";
 
 function isUniqueViolation(error: unknown): boolean {

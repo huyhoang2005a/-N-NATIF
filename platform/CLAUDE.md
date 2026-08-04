@@ -14,6 +14,9 @@ diễn schema/business rule — luôn tra `docs/spec/` trước khi viết code 
 | Xác nhận đủ coverage / invariant của 1 use case | `docs/spec/USE_CASE_COVERAGE_MATRIX.md` |
 | So sánh với thiết kế cũ (nếu đụng code V4 cũ) | `docs/spec/V4_TO_V5_MIGRATION_PLAN.md` |
 | Biết đang ở Phase nào, task nào tiếp theo | `R2M_V5_ARCHITECTURE_AND_IMPLEMENTATION_PLAN.md` §14 Lộ trình triển khai |
+| Biết chi tiết workflow của 1 Phase cụ thể (breakdown sprint, danh sách API/endpoint, business rule, error code, testing checklist, Definition of Done) | `docs/spec/01_workflow_theo_phase.md` — tìm đúng mục "Phase N" |
+| Xem sơ đồ Use Case tổng thể hoặc theo từng bounded context (actor nào gọi UC nào, quan hệ include/extend) | `docs/spec/02_usecase_diagram.md` |
+| Xem Activity Diagram (luồng nghiệp vụ từng bước, actor nào làm gì, decision point nào) của 1 Phase trước khi code | `docs/spec/03_activity_diagrams.md` — tìm đúng mục "Phase N" |
 
 ## Tech stack bắt buộc (không tự đổi)
 
@@ -46,6 +49,12 @@ diễn schema/business rule — luôn tra `docs/spec/` trước khi viết code 
    aggregate nhiều người có thể sửa cùng lúc (assessment, roadmap, case).
 9. **Error code ổn định** theo mẫu spec, ví dụ `CASE_INVALID_TRANSITION`,
    `ROADMAP_CRITICAL_GAP_OPEN` — không trả message tự do cho lỗi nghiệp vụ.
+10. **Trước khi code 1 Phase**, đọc đúng 3 nguồn cho Phase đó theo thứ tự:
+    mục "Phase N" trong `01_workflow_theo_phase.md` (breakdown sprint + API +
+    invariant) → sơ đồ tương ứng trong `03_activity_diagrams.md` (luồng thực
+    thi từng bước) → `02_usecase_diagram.md` nếu cần xem actor/quan hệ
+    include-extend. Không tự chia nhỏ task khác đi với breakdown đã có sẵn
+    trong `01_workflow_theo_phase.md`.
 
 ## Định nghĩa "xong" cho mỗi use case
 
@@ -54,9 +63,16 @@ Trước khi coi 1 use case là hoàn thành, đối chiếu đủ 3 việc:
 - [ ] Unit test cho luồng chính + luồng thay thế/ngoại lệ liệt kê trong spec
 - [ ] Event/audit log được ghi đúng theo mục "API / Event / Audit" của use case đó
 
+Với 1 **Phase** (không chỉ 1 use case đơn lẻ), đối chiếu thêm Definition of Done
+của Phase đó ở cuối mục tương ứng trong `docs/spec/01_workflow_theo_phase.md`
+trước khi coi Phase là hoàn thành.
+
 ## Thứ tự triển khai (theo Phase trong architecture plan)
 
-Không nhảy cóc module — mỗi Phase phụ thuộc Phase trước:
+Không nhảy cóc module — mỗi Phase phụ thuộc Phase trước. Chi tiết breakdown,
+API endpoint, business rule, error code, testing checklist và DoD của từng
+Phase nằm trong `docs/spec/01_workflow_theo_phase.md`; activity diagram tương
+ứng nằm trong `docs/spec/03_activity_diagrams.md`.
 
 0. Spec lock (đã xong — đây chính là bộ tài liệu này)
 1. Platform foundation — Identity & Organization, Verification
