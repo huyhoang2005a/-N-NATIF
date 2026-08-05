@@ -19,11 +19,11 @@
     "emitDecoratorMetadata": true,
     "baseUrl": ".",
     "paths": {
-      "@r2m/config": ["packages/config/dist"],
+      "@r2m/env": ["packages/env/dist"],
       "@r2m/domain": ["packages/domain/dist"],
       "@r2m/authz": ["packages/authz/dist"],
       "@r2m/contracts": ["packages/contracts/dist"],
-      "@r2m/db": ["packages/db/dist"],
+      "@r2m/database": ["packages/database/dist"],
       "@r2m/testkit": ["packages/testkit/dist"]
     }
   }

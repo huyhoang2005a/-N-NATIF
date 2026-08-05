@@ -1,5 +1,5 @@
 import "reflect-metadata";
-import { loadEnv } from "@r2m/config";
+import { loadEnv } from "@r2m/env";
 import { NestFactory } from "@nestjs/core";
 import { AppModule } from "./app.module";
 

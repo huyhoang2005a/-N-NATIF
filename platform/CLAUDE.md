@@ -88,3 +88,91 @@ Phase nằm trong `docs/spec/01_workflow_theo_phase.md`; activity diagram tươn
 Nếu 1 yêu cầu (từ tôi hoặc từ task) mâu thuẫn với spec trong `docs/spec/`,
 **dừng lại và hỏi** thay vì tự quyết — spec là nguồn sự thật, không phải
 suy luận của bạn tại thời điểm code.
+## Cấu trúc thư mục dự án (tham khảo)
+
+r2m-v5/
+├── apps/
+│   ├── web/                          # Next.js App Router
+│   │   ├── app/
+│   │   │   ├── (auth)/
+│   │   │   ├── (dashboard)/
+│   │   │   ├── organizations/
+│   │   │   ├── cases/
+│   │   │   ├── resources/
+│   │   │   └── layout.tsx
+│   │   ├── components/               # UI riêng của web, không share
+│   │   ├── lib/                      # api client, auth helper
+│   │   └── hooks/
+│   │
+│   ├── api/                          # NestJS modular monolith
+│   │   └── src/
+│   │       ├── modules/              # đúng 8 bounded context — không gộp/tách thêm
+│   │       │   ├── identity-organization/
+│   │       │   ├── verification/
+│   │       │   ├── resource-catalog/
+│   │       │   ├── technology-case/
+│   │       │   ├── assessment-gap/
+│   │       │   ├── roadmap-transfer/
+│   │       │   ├── company-discovery/
+│   │       │   └── platform-operations/
+│   │       ├── common/                # guard, interceptor, filter dùng chung
+│   │       ├── config/
+│   │       └── main.ts
+│   │
+│   └── worker/                        # BullMQ processors — tách riêng khỏi api
+│       └── src/processors/
+│           ├── resource-ingestion.processor.ts
+│           ├── embedding.processor.ts
+│           ├── recommendation.processor.ts
+│           ├── notification.processor.ts
+│           └── transfer-expiration.processor.ts
+│
+├── packages/
+│   ├── database/                      # Drizzle — nguồn sự thật duy nhất về schema
+│   │   ├── schema/                    # chia file theo đúng 8 bounded context, khớp dbml
+│   │   ├── migrations/                # raw SQL, đánh số thứ tự
+│   │   └── seeds/
+│   │
+│   ├── contracts/                     # DTO/type dùng chung web ⇄ api ⇄ worker
+│   │   ├── openapi/                   # OpenAPI 3.1 spec + generated client
+│   │   └── events/                    # type cho outbox_event/domain event
+│   │
+│   ├── domain/                        # shared kernel: DomainError, ErrorCode,
+│   │                                  #   StateMachine generic — KHÔNG chứa business
+│   │                                  #   rule của 1 bounded context cụ thể (xem
+│   │                                  #   packages/domain/README.md)
+│   ├── env/                           # load biến môi trường .env runtime cho
+│   │                                  #   api/worker/database (Zod-validate process.env)
+│   ├── ui/                            # component dùng chung
+│   ├── config/                        # eslint, tsconfig, tailwind base
+│   └── utils/                         # helper thuần (date, money, error code map...)
+│
+├── docs/spec/                         # đã có sẵn — nguồn spec duy nhất, không đổi
+│
+├── infra/
+│   ├── docker-compose.yml             # postgres, redis, minio (S3-compatible) local
+│   └── docker/
+│
+├── .github/workflows/                 # CI: lint, test, build, migration check
+├── CLAUDE.md
+├── turbo.json
+├── pnpm-workspace.yaml
+└── package.json
+
+### Nguyên tắc bắt buộc theo cấu trúc trên
+
+- `apps/api/src/modules/` phải khớp chính xác 8 bounded context trong architecture
+  plan. Hai module không import chéo trực tiếp — giao tiếp qua event (outbox) hoặc
+  qua `packages/contracts`.
+- `packages/database/schema/` chia theo đúng 8 bounded context, tên file khớp
+  `schema_v5_production.dbml` — tra 1 entity chỉ đọc đúng 1 file, không load cả schema.
+- `packages/contracts/` là nơi DUY NHẤT định nghĩa DTO/type dùng chung — không tự
+  đoán lại shape response giữa `web` và `api`.
+- Domain service nằm trong `apps/api/src/modules/<context>/domain/` — không đặt
+  business logic ở controller hay repository (khớp Quy tắc 2 ở trên).
+- `apps/worker` chạy tách process khỏi `apps/api`, dù cùng đọc `packages/database`.
+- Mỗi bounded context ở `apps/api/src/modules/<context>/` có thể chứa nhiều NestJS
+  module con, nhưng luôn có 1 module tổng hợp `<context>.module.ts` để `app.module.ts`
+  chỉ import đúng số bounded context đang tồn tại — không import lẻ module con.
+- Logic dùng chung nhiều bounded context nằm ở `packages/domain` (shared kernel).
+  Logic đặc thù 1 bounded context nằm ở `modules/<context>/domain/`.

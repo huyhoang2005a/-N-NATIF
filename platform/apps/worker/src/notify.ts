@@ -1,5 +1,5 @@
-import type { Database } from "@r2m/db";
-import { schema } from "@r2m/db";
+import type { Database } from "@r2m/database";
+import { schema } from "@r2m/database";
 import { and, eq } from "drizzle-orm";
 
 export async function notify(

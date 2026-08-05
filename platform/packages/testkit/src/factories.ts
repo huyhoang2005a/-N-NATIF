@@ -1,5 +1,5 @@
-import type { Database } from "@r2m/db";
-import { schema } from "@r2m/db";
+import type { Database } from "@r2m/database";
+import { schema } from "@r2m/database";
 
 let emailCounter = 0;
 let slugCounter = 0;

@@ -2,9 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ActorContext } from "@r2m/authz";
 import { VerificationService } from "./verification.service";
 import type { VerificationRepository } from "./verification.repository";
-import type { OrganizationsRepository } from "../organizations/organizations.repository";
-import type { AuditService } from "../audit/audit.service";
-import type { OutboxService } from "../jobs/outbox.service";
+import type { OrganizationsRepository } from "../identity-organization/organizations/organizations.repository";
+import type { AuditService } from "../platform-operations/audit/audit.service";
+import type { OutboxService } from "../platform-operations/jobs/outbox.service";
 
 const reviewer: ActorContext = {
   userId: "reviewer-1",

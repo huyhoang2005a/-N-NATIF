@@ -1,5 +1,5 @@
-import type { Database } from "@r2m/db";
-import { schema } from "@r2m/db";
+import type { Database } from "@r2m/database";
+import { schema } from "@r2m/database";
 import { Inject, Injectable } from "@nestjs/common";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { DATABASE } from "../../database/database.module";

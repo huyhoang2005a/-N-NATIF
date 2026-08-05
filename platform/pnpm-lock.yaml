@@ -44,18 +44,18 @@ importers:
       '@r2m/authz':
         specifier: workspace:*
         version: link:../../packages/authz
-      '@r2m/config':
-        specifier: workspace:*
-        version: link:../../packages/config
       '@r2m/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@r2m/db':
+      '@r2m/database':
         specifier: workspace:*
-        version: link:../../packages/db
+        version: link:../../packages/database
       '@r2m/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@r2m/env':
+        specifier: workspace:*
+        version: link:../../packages/env
       bcryptjs:
         specifier: ^2.4.3
         version: 2.4.3
@@ -130,15 +130,15 @@ importers:
 
   apps/worker:
     dependencies:
-      '@r2m/config':
-        specifier: workspace:*
-        version: link:../../packages/config
       '@r2m/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@r2m/db':
+      '@r2m/database':
         specifier: workspace:*
-        version: link:../../packages/db
+        version: link:../../packages/database
+      '@r2m/env':
+        specifier: workspace:*
+        version: link:../../packages/env
       drizzle-orm:
         specifier: ^0.38.3
         version: 0.38.4(@types/pg@8.20.0)(@types/react@19.2.18)(pg@8.22.0)(react@19.2.8)
@@ -166,19 +166,6 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.20.1)
 
-  packages/config:
-    dependencies:
-      zod:
-        specifier: ^3.24.1
-        version: 3.25.76
-    devDependencies:
-      typescript:
-        specifier: ^5.7.3
-        version: 5.9.3
-      vitest:
-        specifier: ^2.1.8
-        version: 2.1.9(@types/node@22.20.1)
-
   packages/contracts:
     dependencies:
       '@r2m/domain':
@@ -195,11 +182,11 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.20.1)
 
-  packages/db:
+  packages/database:
     dependencies:
-      '@r2m/config':
+      '@r2m/env':
         specifier: workspace:*
-        version: link:../config
+        version: link:../env
       bcryptjs:
         specifier: ^2.4.3
         version: 2.4.3
@@ -238,11 +225,24 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.20.1)
 
+  packages/env:
+    dependencies:
+      zod:
+        specifier: ^3.24.1
+        version: 3.25.76
+    devDependencies:
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.20.1)
+
   packages/testkit:
     dependencies:
-      '@r2m/db':
+      '@r2m/database':
         specifier: workspace:*
-        version: link:../db
+        version: link:../database
       drizzle-orm:
         specifier: ^0.38.3
         version: 0.38.4(@types/pg@8.20.0)(@types/react@19.2.18)(pg@8.22.0)(react@19.2.8)

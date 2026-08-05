@@ -7,8 +7,8 @@
   },
   "include": ["src"],
   "references": [
-    { "path": "../../packages/config" },
+    { "path": "../../packages/env" },
     { "path": "../../packages/contracts" },
-    { "path": "../../packages/db" }
+    { "path": "../../packages/database" }
   ]
 }

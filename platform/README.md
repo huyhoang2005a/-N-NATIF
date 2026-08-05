@@ -33,8 +33,8 @@ platform/                       pnpm + Turborepo workspace
 │   ├── domain/                 Enum, error code, DomainError, state machine (không phụ thuộc framework)
 │   ├── authz/                  ActorContext + policy kiểm tra quyền (platform role, org membership)
 │   ├── contracts/               Zod DTO (request/response) + domain event payload — dùng chung web+api
-│   ├── config/                 Zod-validate biến môi trường (process.env), không tự load .env
-│   ├── db/                     Drizzle schema + migration + seed — nguồn sự thật của DB
+│   ├── env/                     Zod-validate biến môi trường (process.env), không tự load .env
+│   ├── database/                Drizzle schema + migration + seed — nguồn sự thật của DB
 │   └── testkit/                resetDatabase() + factory dữ liệu test
 ├── infra/docker/                docker-compose.yml: postgres (pgvector), redis, minio
 └── docs/spec/                   Spec gốc: kiến trúc, dbml, use case, error code...
@@ -72,7 +72,7 @@ apps/api Controller  →  Zod validate (packages/contracts)
    ▼
 apps/api Service     →  domain invariant + state machine (packages/domain)
    ▼                     policy check (packages/authz)
-apps/api Repository   →  Drizzle (packages/db) → Postgres
+apps/api Repository   →  Drizzle (packages/database) → Postgres
    ▼
    ├─ audit_log (mọi transition)
    └─ outbox_event (nếu có tác động ngoài transaction)
@@ -80,7 +80,7 @@ apps/api Repository   →  Drizzle (packages/db) → Postgres
    apps/worker (poll mỗi 2s) → notification row
 ```
 
-### 2.4 `packages/db` — 2 lớp migration
+### 2.4 `packages/database` — 2 lớp migration
 
 1. `migrations/` — sinh tự động bởi `drizzle-kit generate` từ `src/schema/*.ts`.
 2. `manual-migrations/` — tay viết cho phần Drizzle không sinh được: trigger
@@ -136,7 +136,7 @@ pnpm db:seed                      # tạo 3 tài khoản mẫu, xem bảng bên 
 | `reviewer@r2m.local` | `ChangeMe123!` | `PLATFORM_REVIEWER` | Xét duyệt tổ chức (vai trò chuyên viên riêng, không phải admin) |
 | `owner@sample-research-unit.local` | `ChangeMe123!` | `USER` (chủ 1 tổ chức mẫu đã `ACTIVE`) | Xem `/dashboard` với tư cách người dùng thường |
 
-> **`packages/config/src/env.ts` không tự load `.env`** (không dùng `dotenv`). Mỗi
+> **`packages/env/src/env.ts` không tự load `.env`** (không dùng `dotenv`). Mỗi
 > terminal PowerShell mới phải nạp biến môi trường thủ công trước khi chạy `api`/`db:*`:
 > ```powershell
 > Get-Content .env | ForEach-Object {
@@ -268,7 +268,7 @@ pnpm --filter @r2m/worker dev
   `ErrorCode` trong `packages/domain/src/errors/error-codes.ts`); mã nào chưa map sẽ rơi
   vào thông báo chung chung.
 - **`.env` không tự động nạp** — mỗi terminal mới phải export tay (xem §3.2). Nên thêm
-  `dotenv`/`dotenv-cli` vào `apps/api`, `apps/worker`, `packages/db` nếu muốn bớt bước
+  `dotenv`/`dotenv-cli` vào `apps/api`, `apps/worker`, `packages/database` nếu muốn bớt bước
   thủ công này.
 
 ### Khoảng trống spec chưa có quyết định chính thức
@@ -310,4 +310,4 @@ Resource (Resource Catalog & Evidence). Thêm `schema/<bounded-context>.ts` mớ
 migration mới, **không** ALTER bảng Phase 1 đã có dữ liệu (đặc biệt
 `verification_document` sẽ cần thêm `author_verification_request_id` + check constraint
 "exactly one non-null" — additive migration, xem ghi chú trong
-`packages/db/src/schema/verification.ts`).
+`packages/database/src/schema/verification.ts`).

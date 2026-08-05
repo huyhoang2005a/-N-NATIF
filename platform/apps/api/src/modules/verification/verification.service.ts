@@ -4,7 +4,7 @@ import type {
 } from "@r2m/contracts";
 import type { ActorContext } from "@r2m/authz";
 import { assertPlatformReviewerOrAdmin } from "@r2m/authz";
-import type { Database } from "@r2m/db";
+import type { Database } from "@r2m/database";
 import {
   assertOrganizationTransition,
   ConflictError,
@@ -13,10 +13,10 @@ import {
   NotFoundError,
 } from "@r2m/domain";
 import { Inject, Injectable } from "@nestjs/common";
-import { OrganizationsRepository } from "../organizations/organizations.repository";
+import { OrganizationsRepository } from "../identity-organization/organizations/organizations.repository";
 import { DATABASE } from "../../database/database.module";
-import { AuditService } from "../audit/audit.service";
-import { OutboxService } from "../jobs/outbox.service";
+import { AuditService } from "../platform-operations/audit/audit.service";
+import { OutboxService } from "../platform-operations/jobs/outbox.service";
 import { VerificationRepository } from "./verification.repository";
 
 function toResponse(request: {

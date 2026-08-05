@@ -1,5 +1,5 @@
-import { loadEnv } from "@r2m/config";
-import { closeDb, getDb } from "@r2m/db";
+import { loadEnv } from "@r2m/env";
+import { closeDb, getDb } from "@r2m/database";
 import { dispatchPendingEvents } from "./outbox-dispatcher";
 
 const POLL_INTERVAL_MS = 2000;

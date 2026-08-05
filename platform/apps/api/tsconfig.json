@@ -11,7 +11,7 @@
     { "path": "../../packages/domain" },
     { "path": "../../packages/authz" },
     { "path": "../../packages/contracts" },
-    { "path": "../../packages/db" },
-    { "path": "../../packages/config" }
+    { "path": "../../packages/database" },
+    { "path": "../../packages/env" }
   ]
 }

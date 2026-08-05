@@ -1,6 +1,6 @@
 import type { DomainEvent } from "@r2m/contracts";
-import type { Database } from "@r2m/db";
-import { schema } from "@r2m/db";
+import type { Database } from "@r2m/database";
+import { schema } from "@r2m/database";
 import { and, eq, inArray, lte } from "drizzle-orm";
 import { findActiveOrgOwnerUserId, listActivePlatformReviewerIds, notify } from "./notify";
 

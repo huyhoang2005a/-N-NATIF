@@ -1,4 +1,4 @@
-import type { Database } from "@r2m/db";
+import type { Database } from "@r2m/database";
 import { sql } from "drizzle-orm";
 
 const PHASE1_TABLES = [

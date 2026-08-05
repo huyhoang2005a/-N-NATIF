@@ -4,21 +4,15 @@ import { DomainErrorFilter } from "./common/filters/domain-error.filter";
 import { JwtAuthGuard } from "./common/guards/jwt-auth.guard";
 import { RequestIdMiddleware } from "./common/middleware/request-id.middleware";
 import { DatabaseModule } from "./database/database.module";
-import { AuditModule } from "./modules/audit/audit.module";
-import { AuthModule } from "./modules/auth/auth.module";
-import { JobsModule } from "./modules/jobs/jobs.module";
-import { OrganizationsModule } from "./modules/organizations/organizations.module";
-import { UsersModule } from "./modules/users/users.module";
+import { IdentityOrganizationModule } from "./modules/identity-organization/identity-organization.module";
+import { PlatformOperationsModule } from "./modules/platform-operations/platform-operations.module";
 import { VerificationModule } from "./modules/verification/verification.module";
 
 @Module({
   imports: [
     DatabaseModule,
-    AuditModule,
-    JobsModule,
-    AuthModule,
-    UsersModule,
-    OrganizationsModule,
+    PlatformOperationsModule,
+    IdentityOrganizationModule,
     VerificationModule,
   ],
   providers: [

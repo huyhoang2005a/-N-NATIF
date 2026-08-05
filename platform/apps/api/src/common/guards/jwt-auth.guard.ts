@@ -1,12 +1,12 @@
 import { ErrorCode, UnauthenticatedError } from "@r2m/domain";
-import type { Database } from "@r2m/db";
-import { schema } from "@r2m/db";
+import type { Database } from "@r2m/database";
+import { schema } from "@r2m/database";
 import { type CanActivate, type ExecutionContext, Inject, Injectable } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import { eq } from "drizzle-orm";
 import type { Request } from "express";
 import { DATABASE } from "../../database/database.module";
-import { TokenService } from "../../modules/auth/token.service";
+import { TokenService } from "../../modules/identity-organization/auth/token.service";
 import { IS_PUBLIC_KEY } from "../decorators/public.decorator";
 
 /**

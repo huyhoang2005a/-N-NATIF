@@ -10,9 +10,9 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@r2m/config": "workspace:*",
+    "@r2m/env": "workspace:*",
     "@r2m/contracts": "workspace:*",
-    "@r2m/db": "workspace:*",
+    "@r2m/database": "workspace:*",
     "drizzle-orm": "^0.38.3"
   },
   "devDependencies": {
