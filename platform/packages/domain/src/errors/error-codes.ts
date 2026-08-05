@@ -73,6 +73,7 @@ export const ErrorCode = {
   // EVIDENCE_* (UC-EVD-01)
   EVIDENCE_NOT_FOUND: "EVIDENCE_NOT_FOUND",
   CASE_EVIDENCE_REQUIRES_CITATION: "CASE_EVIDENCE_REQUIRES_CITATION",
+  CASE_EVIDENCE_ROLE_NOT_ALLOWED: "CASE_EVIDENCE_ROLE_NOT_ALLOWED",
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];

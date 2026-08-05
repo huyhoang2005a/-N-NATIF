@@ -108,11 +108,12 @@ export class TechnologyCaseService {
     @Inject(DATABASE) private readonly db: Database,
   ) {}
 
-  /** ĐỀ XUẤT — CẦN REVIEW (đã chốt sau nghiên cứu, xem plan PHẦN C quyết định 6): bảng
-   * endpoint (§3.4 01_workflow_theo_phase.md) ghi actor "Author VERIFIED / Org member"
-   * nhưng UC-CASE-01 (nguồn 15-mục chính thức) ghi "Actor: Verified Author", tiền điều
-   * kiện "Author VERIFIED. Owning organization ACTIVE." — chọn theo UC-CASE-01 (nghiêm
-   * hơn): actor phải là verified author VÀ active member của owning organization. */
+  /** Đã chốt sau review (2026-08-05): actor phải VỪA là verified author VỪA active
+   * member của owning organization (AND, không phải OR). "Author VERIFIED / Organization
+   * ACTIVE" ở §3.4 01_workflow_theo_phase.md là cách viết tắt AND, không phải lựa chọn
+   * lỏng hơn UC-CASE-01 — nếu đọc là OR sẽ tạo lỗ hổng bảo mật thật (bất kỳ verified
+   * author nào cũng tự khai owning organization là tổ chức họ không có quan hệ gì),
+   * vi phạm rule 4 CLAUDE.md (tenant scope bắt buộc ở application layer). */
   async register(
     actor: ActorContext,
     input: RegisterTechnologyCaseRequest,

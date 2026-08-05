@@ -1082,10 +1082,13 @@ paths:
       operationId: createEvidence
       summary: UC-EVD-01 — link a resource version as evidence
       description: |
-        ĐỀ XUẤT — CẦN REVIEW (đã chốt sau nghiên cứu, xem plan PHẦN C quyết
-        định 5): "case member có quyền ghi" — chọn mọi active case_member trừ
-        VIEWER. Actor phải có quyền đọc `resourceVersionId` (PUBLIC / owner org
-        / active `resource_access_grant`, tái dùng
+        Đã chốt sau review (2026-08-05): chỉ `OWNER`/`TECHNICAL_MEMBER`/
+        `PARTNER_MEMBER` được link evidence — `CASE_REVIEWER` và `VIEWER`
+        KHÔNG được (separation of duties: CASE_REVIEWER duyệt assessment/
+        roadmap ở Phase 4 dựa trên evidence đã link, không được tự đưa bằng
+        chứng vào rồi tự duyệt). Sai role trả `CASE_EVIDENCE_ROLE_NOT_ALLOWED`.
+        Actor phải có quyền đọc `resourceVersionId` (PUBLIC / owner org /
+        active `resource_access_grant`, tái dùng
         `ResourcesService.assertVisible`). Tạo citation + evidence(ACTIVE) +
         evidence_citation trong 1 transaction — citation luôn tạo mới, không
         dedupe (Phase 3 simplification). Evidence đầu tiên của case tự động
@@ -1257,6 +1260,7 @@ components:
                 - CASE_INVALID_TRANSITION
                 - EVIDENCE_NOT_FOUND
                 - CASE_EVIDENCE_REQUIRES_CITATION
+                - CASE_EVIDENCE_ROLE_NOT_ALLOWED
             message:
               type: string
             details:

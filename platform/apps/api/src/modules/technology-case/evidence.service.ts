@@ -62,9 +62,20 @@ export class EvidenceService {
     @Inject(DATABASE) private readonly db: Database,
   ) {}
 
-  /** ĐỀ XUẤT — CẦN REVIEW (đã chốt sau nghiên cứu, xem plan PHẦN C quyết định 5): spec
-   * chỉ nói "Case member có quyền ghi" (1 dòng, không rõ role nào) — chọn: mọi
-   * case_member ACTIVE trừ VIEWER (đúng nghĩa "chỉ xem"). */
+  /** Đã chốt sau review (2026-08-05): chỉ OWNER/TECHNICAL_MEMBER/PARTNER_MEMBER được
+   * link evidence — CASE_REVIEWER bị loại khỏi danh sách (siết lại so với đề xuất ban
+   * đầu "mọi member trừ VIEWER"). Lý do: separation of duties — CASE_REVIEWER là người
+   * duyệt assessment/roadmap ở Phase 4 dựa trên evidence đã link ở Phase 3 (§4.4
+   * 01_workflow_theo_phase.md); nếu CASE_REVIEWER cũng tự link được evidence, họ có thể
+   * tự đưa bằng chứng vào rồi tự duyệt dựa trên chính bằng chứng đó, phá vỡ mục đích của
+   * bước review độc lập. OWNER/TECHNICAL_MEMBER/PARTNER_MEMBER là người "làm", CASE_
+   * REVIEWER thuần tuý là người "soát". */
+  private static readonly ROLES_ALLOWED_TO_LINK_EVIDENCE: readonly string[] = [
+    CaseMemberRole.OWNER,
+    CaseMemberRole.TECHNICAL_MEMBER,
+    CaseMemberRole.PARTNER_MEMBER,
+  ];
+
   async create(
     actor: ActorContext,
     technologyCaseId: string,
@@ -77,10 +88,17 @@ export class EvidenceService {
     }
 
     const membership = await this.caseRepository.findActiveMembership(technologyCaseId, actor.userId);
-    if (!membership || membership.role === CaseMemberRole.VIEWER) {
+    if (!membership) {
       throw new ForbiddenError(
         ErrorCode.AUTH_FORBIDDEN,
-        "Only an active case member (other than VIEWER) may add evidence.",
+        "Only an active case member may add evidence.",
+      );
+    }
+    if (!EvidenceService.ROLES_ALLOWED_TO_LINK_EVIDENCE.includes(membership.role)) {
+      throw new ForbiddenError(
+        ErrorCode.CASE_EVIDENCE_ROLE_NOT_ALLOWED,
+        "Only OWNER, TECHNICAL_MEMBER or PARTNER_MEMBER may add evidence — CASE_REVIEWER and VIEWER cannot (separation of duties: reviewers approve evidence-based decisions in Phase 4, they don't supply the evidence).",
+        { role: membership.role },
       );
     }
 

@@ -347,7 +347,8 @@ pnpm --filter @r2m/worker dev
   organizations,transitions,evidence}`) + 9 schema mới, mở rộng `Error.code`. Validate
   bằng script `js-yaml`: 191/191 `$ref` resolve đúng. Tiện sửa luôn 1 lỗi có sẵn từ
   Phase 2: endpoint search resource bị ghi nhầm tag "SUC-04" (đúng ra SUC-05).
-- 2 điểm **tự đề xuất business rule** cần user review — xem §5.
+- 2 điểm **tự đề xuất business rule** đã được user review và chốt ngày 2026-08-05 — chi
+  tiết quyết định + lý do ở §5 "Phase 3 — business rule đã chốt sau review".
 
 ### Bug thật đã tìm và sửa trong phiên này (đáng nhớ cho phiên sau)
 
@@ -512,24 +513,29 @@ mô tả (không đủ 15 mục như UC chính) hoặc hoàn toàn không đề 
      nhận** để áp dụng đúng khi tính năng archive/withdraw thực sự được xây (thường đi
      cùng luồng quản lý resource ở phase sau), chưa cần code thêm ở Phase 2.
 
-### Phase 3 — business rule tự đề xuất, cần user review trước khi khoá
+### Phase 3 — business rule đã chốt sau review (2026-08-05)
 
-2 điểm dưới đây đánh dấu `// ĐỀ XUẤT — CẦN REVIEW` trong code vì spec mô tả không đủ chi
-tiết hoặc có 2 nguồn hơi lệch nhau — đã chọn cách đọc hợp lý nhất, chưa được user duyệt:
+2 điểm dưới đây từng đánh dấu `// ĐỀ XUẤT — CẦN REVIEW` trong code vì spec mô tả không đủ
+chi tiết hoặc có 2 nguồn hơi lệch nhau. User đã review và chốt — code/OpenAPI/
+`docs/spec/01_workflow_theo_phase.md` §3.5-3.6 đã cập nhật để phản ánh đúng quyết định
+cuối, không còn đánh dấu "cần review" nữa:
 
-1. **Actor tạo Technology Case** (`technology-case.service.ts#register`) — bảng endpoint
-   §3.4 `01_workflow_theo_phase.md` ghi actor "Author VERIFIED / Org member" (lỏng hơn,
-   ngụ ý OR) nhưng UC-CASE-01 (nguồn 15-mục chính thức, §10
-   `R2M_SPEC_DESIGN_V5_COMPLETE.md`) ghi rõ "Actor: Verified Author", tiền điều kiện
-   "Author VERIFIED. Owning organization ACTIVE." — đã chọn theo UC-CASE-01 (nghiêm hơn):
-   actor phải **vừa** là verified author **vừa** là active member của
-   `owningOrganizationId`. Nếu ý định thật là OR (verified author HOẶC bất kỳ active org
-   member nào), cần nới lỏng lại điều kiện.
-2. **Vai trò được phép link evidence** (`evidence.service.ts#create`) — spec chỉ nói
-   "Case member có quyền ghi" (1 dòng, không liệt kê role cụ thể) — đã chọn: mọi
-   `case_member` `ACTIVE` **trừ** `VIEWER` (`OWNER`/`TECHNICAL_MEMBER`/`CASE_REVIEWER`/
-   `PARTNER_MEMBER`) được tạo evidence, dựa trên tên gọi "VIEWER" ngụ ý chỉ xem. Nếu ý
-   định thật hẹp hơn (vd chỉ `OWNER`/`TECHNICAL_MEMBER`), cần siết lại.
+1. **Actor tạo Technology Case** (`technology-case.service.ts#register`) — xác nhận
+   **AND**, giữ nguyên implementation: actor phải **vừa** là verified author **vừa**
+   active member của `owningOrganizationId`. "Author VERIFIED / Organization ACTIVE" ở
+   §3.4 `01_workflow_theo_phase.md` là cách viết tắt AND, không phải OR — đọc là OR sẽ
+   tạo lỗ hổng bảo mật thật (bất kỳ verified author nào cũng tự khai owning organization
+   là tổ chức họ không có quan hệ gì), vi phạm rule 4 CLAUDE.md (tenant scope bắt buộc ở
+   application layer).
+2. **Vai trò được phép link evidence** (`evidence.service.ts#create`) — **siết lại** so
+   với đề xuất ban đầu: chỉ `OWNER`/`TECHNICAL_MEMBER`/`PARTNER_MEMBER`, **loại
+   `CASE_REVIEWER`** khỏi danh sách (VIEWER vẫn bị chặn như cũ). Lý do: separation of
+   duties — CASE_REVIEWER là người duyệt assessment/roadmap ở Phase 4 (§4.4) dựa trên
+   evidence đã link ở Phase 3; nếu CASE_REVIEWER cũng tự link được evidence, họ có thể tự
+   đưa bằng chứng vào rồi tự duyệt dựa trên chính bằng chứng đó, phá vỡ mục đích của bước
+   review độc lập. Sai role trả mã lỗi mới `CASE_EVIDENCE_ROLE_NOT_ALLOWED` (tách khỏi
+   `AUTH_FORBIDDEN` chung — dùng khi actor có membership nhưng role không đủ quyền, khác
+   với không phải case member nào cả).
 
 ### Phạm vi cố tình chưa làm ở Phase 3
 

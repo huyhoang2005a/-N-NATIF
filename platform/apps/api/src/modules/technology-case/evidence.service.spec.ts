@@ -101,7 +101,17 @@ describe("EvidenceService.create (UC-EVD-01)", () => {
     vi.mocked(caseRepository.findActiveMembership).mockResolvedValue({ role: "VIEWER" } as never);
 
     await expect(service.create(owner, "case-1", createInput, null)).rejects.toMatchObject({
-      code: "AUTH_FORBIDDEN",
+      code: "CASE_EVIDENCE_ROLE_NOT_ALLOWED",
+    });
+  });
+
+  it("refuses a CASE_REVIEWER — separation of duties: reviewer duyệt evidence ở Phase 4, không được tự link", async () => {
+    const { service, caseRepository } = buildService();
+    vi.mocked(caseRepository.findById).mockResolvedValue(draftCase as never);
+    vi.mocked(caseRepository.findActiveMembership).mockResolvedValue({ role: "CASE_REVIEWER" } as never);
+
+    await expect(service.create(owner, "case-1", createInput, null)).rejects.toMatchObject({
+      code: "CASE_EVIDENCE_ROLE_NOT_ALLOWED",
     });
   });
 
@@ -212,5 +222,39 @@ describe("EvidenceService.create (UC-EVD-01)", () => {
     await service.create(owner, "case-1", createInput, null);
 
     expect(caseService.applyTransition).not.toHaveBeenCalled();
+  });
+
+  it("allows a PARTNER_MEMBER to link evidence", async () => {
+    const { service, evidenceRepository, caseRepository, resourcesRepository } = buildService();
+    vi.mocked(caseRepository.findById).mockResolvedValue(evidenceCollectionCase as never);
+    vi.mocked(caseRepository.findActiveMembership).mockResolvedValue({ role: "PARTNER_MEMBER" } as never);
+    vi.mocked(resourcesRepository.findVersionById).mockResolvedValue({
+      id: "ver-1",
+      resourceId: "res-1",
+    } as never);
+    vi.mocked(resourcesRepository.findById).mockResolvedValue({
+      id: "res-1",
+      accessLevel: "PUBLIC",
+      ownerOrganizationId: "org-1",
+    } as never);
+    vi.mocked(evidenceRepository.hasAnyEvidence).mockResolvedValue(true);
+    vi.mocked(evidenceRepository.createCitation).mockResolvedValue({ id: "citation-3" } as never);
+    vi.mocked(evidenceRepository.createEvidence).mockResolvedValue({
+      id: "evidence-3",
+      technologyCaseId: "case-1",
+      resourceVersionId: "ver-1",
+      annotationId: null,
+      title: createInput.title,
+      claim: createInput.claim,
+      relevanceNote: createInput.relevanceNote,
+      status: "ACTIVE",
+      createdByUserId: owner.userId,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as never);
+
+    const result = await service.create(owner, "case-1", createInput, null);
+
+    expect(result.id).toBe("evidence-3");
   });
 });

@@ -301,9 +301,16 @@ Hình thành Technology Case — trung tâm nghiệp vụ của toàn hệ thố
 - PARTNER_MEMBER phải thuộc một organization đang có role PARTNER_COMPANY trong case đó — không cho thêm partner member từ tổ chức chưa được gắn vào case.
 - Mọi transition status phải qua bảng state machine đã khóa ở Phase 0 (không cho nhảy state tùy ý, vd không thể DRAFT → ROADMAP_APPROVED trực tiếp).
 - Evidence active luôn có ≥1 citation; citation phải có locator cụ thể (page/section/offset), không chấp nhận text tự do thay citation.
+- **Chỉ OWNER/TECHNICAL_MEMBER/PARTNER_MEMBER được link evidence** — CASE_REVIEWER và
+  VIEWER không được (chốt 2026-08-05, sau review Phase 3). Lý do: separation of duties —
+  CASE_REVIEWER là người duyệt readiness assessment và roadmap ở Phase 4 (§4.4) dựa trên
+  evidence đã link ở Phase 3; nếu CASE_REVIEWER cũng tự link được evidence, họ có thể tự
+  đưa bằng chứng vào rồi tự duyệt dựa trên chính bằng chứng đó, phá vỡ mục đích của bước
+  review độc lập. OWNER/TECHNICAL_MEMBER/PARTNER_MEMBER là người "làm" (đưa bằng chứng
+  vào), CASE_REVIEWER thuần tuý là người "soát".
 
 ### 3.6 Error code liên quan
-`CASE_OWNER_ALREADY_EXISTS`, `CASE_OWNER_NOT_IN_OWNING_ORG`, `CASE_PARTNER_MEMBER_ORG_NOT_LINKED`, `CASE_INVALID_TRANSITION`, `CASE_EVIDENCE_REQUIRES_CITATION`, `RESOURCE_ACCESS_DENIED`.
+`CASE_OWNER_ALREADY_EXISTS`, `CASE_OWNER_NOT_IN_OWNING_ORG`, `CASE_PARTNER_MEMBER_ORG_NOT_LINKED`, `CASE_INVALID_TRANSITION`, `CASE_EVIDENCE_REQUIRES_CITATION`, `CASE_EVIDENCE_ROLE_NOT_ALLOWED`, `RESOURCE_ACCESS_DENIED`.
 
 ### 3.7 Testing checklist
 - Unit: state machine Technology Case — test toàn bộ transition hợp lệ/không hợp lệ.

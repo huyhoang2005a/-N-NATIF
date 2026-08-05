@@ -55,6 +55,22 @@ diễn schema/business rule — luôn tra `docs/spec/` trước khi viết code 
     thi từng bước) → `02_usecase_diagram.md` nếu cần xem actor/quan hệ
     include-extend. Không tự chia nhỏ task khác đi với breakdown đã có sẵn
     trong `01_workflow_theo_phase.md`.
+11. **Khi actor/quyền được mô tả không khớp hoàn toàn giữa 2 nguồn spec**
+    (vd `01_workflow_theo_phase.md` mô tả lỏng hơn UC 15-mục chính thức trong
+    `R2M_SPEC_DESIGN_V5_COMPLETE.md`), ưu tiên đọc theo UC 15-mục chính thức.
+    Nhiều điều kiện actor liệt kê ở các nguồn khác nhau mặc định cộng dồn
+    (AND) — vd "Verified Author" + "thuộc owning organization" nghĩa là actor
+    phải thỏa mãn cả hai, không phải một trong hai — trừ khi có 1 nguồn nói rõ
+    "hoặc". Không tự nới lỏng điều kiện actor để đơn giản hóa code; điều kiện
+    lỏng hơn thường tương đương một lỗ hổng tenant/authorization thật (xem rule 4).
+
+12. **Tách bạch trách nhiệm giữa vai trò "làm" và vai trò "soát" trong 1 case.**
+    Một case role có chức năng phê duyệt/đánh giá (vd CASE_REVIEWER — duyệt
+    assessment, duyệt roadmap) không được đồng thời là actor hợp lệ cho hành
+    động tạo ra chính dữ liệu mà vai trò đó sẽ phê duyệt (vd link evidence,
+    nhập assessment score). Áp dụng nguyên tắc này khi định nghĩa quyền nhập
+    liệu ở Phase 4 (assessment score) và các bước approve khác — CASE_REVIEWER
+    chỉ approve/reject, không tự tạo input cho chính bước mình duyệt.
 
 ## Định nghĩa "xong" cho mỗi use case
 
@@ -79,6 +95,18 @@ Phase nằm trong `docs/spec/01_workflow_theo_phase.md`; activity diagram tươn
 2. Author & Resource — Resource Catalog & Evidence
 3. Technology Case & Evidence
 4. Assessment, Gap, Roadmap
+### Lưu ý riêng khi bắt đầu Phase 4
+
+- Composite score luôn tính lại phía server từ `assessment_score` đã lưu —
+  không bao giờ nhận điểm tổng từ client (UC-ASM-01).
+- Áp dụng đúng rule 12 ở trên: TECHNICAL_MEMBER/OWNER nhập assessment score,
+  CASE_REVIEWER chỉ approve/reject, không tự nhập score cho chính bước mình duyệt.
+- Viết unit test cho cycle detection (`milestone_dependency`) và composite
+  score TRƯỚC khi viết endpoint gọi tới — đây là logic thuần, test độc lập
+  được mà không cần DB thật.
+- Trước khi merge bất kỳ phần nào của Phase 4, đảm bảo đã có: (1) CI chạy
+  typecheck/lint/test tự động, (2) ít nhất 1 integration test qua NestJS DI
+  container thật cho module tổng hợp mới thêm.
 5. Company & Discovery (bao gồm AI recommendation)
 6. Transfer & Moderation
 7. Production hardening
@@ -176,3 +204,4 @@ r2m-v5/
   chỉ import đúng số bounded context đang tồn tại — không import lẻ module con.
 - Logic dùng chung nhiều bounded context nằm ở `packages/domain` (shared kernel).
   Logic đặc thù 1 bounded context nằm ở `modules/<context>/domain/`.
+
