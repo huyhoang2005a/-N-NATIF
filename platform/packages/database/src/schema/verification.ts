@@ -1,21 +1,24 @@
 import { bigint, boolean, index, pgTable, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
 import { organizationVerificationRequest } from "./organization";
+import { authorVerificationRequest } from "./author";
 import { verificationDocumentTypeEnum } from "./enums";
 
 /**
- * Phase 1 scope: only the Organization verification workflow is implemented, so this table
- * is wired to `organization_verification_request` only. The dbml's full shape also has a
- * nullable `author_verification_request_id` FK plus a "exactly one of the two is non-null"
- * check constraint — those are added in Phase 2 alongside `author_verification_request`
- * (additive migration, not an ALTER of existing business columns).
+ * Shared by both verification workflows (organization and author). Exactly one of the
+ * two request FKs must be non-null — enforced by `chk_verification_document_exactly_one_request`
+ * in manual-migrations/0003_phase2_resource_constraints.sql (Drizzle has no cross-column
+ * CHECK builder). Both FKs are nullable at the schema level for that reason.
  */
 export const verificationDocument = pgTable(
   "verification_document",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    organizationVerificationRequestId: uuid("organization_verification_request_id")
-      .notNull()
-      .references(() => organizationVerificationRequest.id),
+    organizationVerificationRequestId: uuid("organization_verification_request_id").references(
+      () => organizationVerificationRequest.id,
+    ),
+    authorVerificationRequestId: uuid("author_verification_request_id").references(
+      () => authorVerificationRequest.id,
+    ),
     documentType: verificationDocumentTypeEnum("document_type").notNull(),
     storageObjectKey: text("storage_object_key").notNull(),
     originalFilename: varchar("original_filename", { length: 255 }),
@@ -28,5 +31,6 @@ export const verificationDocument = pgTable(
   },
   (table) => [
     index("idx_verification_document_org_request").on(table.organizationVerificationRequestId),
+    index("idx_verification_document_author_request").on(table.authorVerificationRequestId),
   ],
 );

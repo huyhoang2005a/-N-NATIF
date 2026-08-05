@@ -35,6 +35,7 @@ async function ensureExtensions(): Promise<void> {
   const pool = getPool();
   await pool.query("CREATE EXTENSION IF NOT EXISTS pgcrypto;");
   await pool.query("CREATE EXTENSION IF NOT EXISTS citext;");
+  await pool.query("CREATE EXTENSION IF NOT EXISTS vector;");
 }
 
 async function main(): Promise<void> {

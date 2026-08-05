@@ -10,8 +10,14 @@ const reviewer: ActorContext = {
   userId: "reviewer-1",
   platformRole: "PLATFORM_REVIEWER",
   memberships: [],
+  authorVerificationStatus: "UNVERIFIED",
 };
-const plainUser: ActorContext = { userId: "user-1", platformRole: "USER", memberships: [] };
+const plainUser: ActorContext = {
+  userId: "user-1",
+  platformRole: "USER",
+  memberships: [],
+  authorVerificationStatus: "UNVERIFIED",
+};
 
 function buildService() {
   const verificationRepository = {

@@ -7,6 +7,7 @@ import { DatabaseModule } from "./database/database.module";
 import { IdentityOrganizationModule } from "./modules/identity-organization/identity-organization.module";
 import { PlatformOperationsModule } from "./modules/platform-operations/platform-operations.module";
 import { VerificationModule } from "./modules/verification/verification.module";
+import { ResourceCatalogModule } from "./modules/resource-catalog/resource-catalog.module";
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { VerificationModule } from "./modules/verification/verification.module";
     PlatformOperationsModule,
     IdentityOrganizationModule,
     VerificationModule,
+    ResourceCatalogModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

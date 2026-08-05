@@ -83,9 +83,54 @@ async function handleEvent(db: Database, event: DomainEvent): Promise<void> {
       }
       return;
     }
+    case "AuthorVerificationSubmitted": {
+      const reviewerIds = await listActivePlatformReviewerIds(db);
+      await Promise.all(
+        reviewerIds.map((recipientUserId) =>
+          notify(db, {
+            recipientUserId,
+            type: "author_verification.requested",
+            title: "New author verification request",
+            message: `Author ${event.authorUserId} submitted a verification request.`,
+            dedupeKey: `author-verification-requested:${event.verificationRequestId}`,
+          }),
+        ),
+      );
+      return;
+    }
+    case "AuthorVerified": {
+      await notify(db, {
+        recipientUserId: event.authorUserId,
+        type: "author_verification.approved",
+        title: "You are now a verified author",
+        message: "Your author verification request was approved.",
+        dedupeKey: `author-verification-decided:${event.verificationRequestId}`,
+      });
+      return;
+    }
+    case "AuthorVerificationRejected": {
+      await notify(db, {
+        recipientUserId: event.authorUserId,
+        type: "author_verification.rejected",
+        title: "Author verification was rejected",
+        message: event.reason,
+        dedupeKey: `author-verification-decided:${event.verificationRequestId}`,
+      });
+      return;
+    }
     case "OrganizationRegistered":
     case "UserProfileUpdated":
-      return; // intentionally no notification
+    case "ResourceRegistered":
+    case "ResourceVersionPublished":
+    case "ResourceIngestionQueued":
+    case "AnnotationCreated":
+    case "AnnotationRevised":
+    case "AnnotationRemoved":
+    case "ResourceAccessGranted":
+    case "ResourceAccessRevoked":
+      // Phase 2 simplification (see plan B.0): no notification recipient/UI depends on
+      // these yet — same "no reader-facing meaning" treatment as OrganizationRegistered.
+      return;
     default: {
       const _exhaustive: never = event;
       throw new Error(`Unhandled domain event type: ${JSON.stringify(_exhaustive)}`);

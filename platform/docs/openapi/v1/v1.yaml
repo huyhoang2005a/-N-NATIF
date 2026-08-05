@@ -1,0 +1,1716 @@
+openapi: 3.1.0
+info:
+  title: R2M Platform API
+  version: "1.1.0"
+  description: |
+    Living document for the `/v1` API surface, versioned by API version — not by
+    internal phase name (see B.0 in the Phase 2 implementation plan). Currently
+    covers Identity & Organization, Verification (organization + author), and
+    Resource Catalog & Evidence (Phase 1 + Phase 2). Endpoints for Technology
+    Case, Assessment/Gap/Roadmap, Company & Discovery, and Transfer (architecture
+    plan §9) land here as those phases are implemented — do not fork this file
+    per phase.
+
+    Error responses always use the unified envelope from architecture plan §10,
+    with a stable `code` from `packages/domain/src/errors/error-codes.ts` — see
+    the shared `Error` schema below.
+servers:
+  - url: /v1
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: auth
+  - name: me
+  - name: organizations
+  - name: organization-verifications
+  - name: author-verifications
+  - name: resources
+  - name: annotations
+  - name: resource-access-grants
+
+paths:
+  /auth/login:
+    post:
+      operationId: login
+      summary: Log in with email + password
+      tags: [auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Issued token pair
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenResponse"
+        "401":
+          description: Invalid credentials or suspended account
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /auth/refresh:
+    post:
+      operationId: refreshToken
+      summary: Exchange a refresh token for a new token pair
+      tags: [auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshRequest"
+      responses:
+        "200":
+          description: Issued token pair
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenResponse"
+        "401":
+          description: Invalid or expired refresh token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      summary: |
+        Client-side token discard. No session table exists in the locked V5
+        schema yet (see PHASE1_IMPLEMENTATION_NOTES.md §3), so this is a
+        no-op on the server — it exists only to match the API catalogue and
+        gives a stable place to add server-side revocation later.
+      tags: [auth]
+      security: []
+      responses:
+        "204":
+          description: Always succeeds; no response body
+
+  /me:
+    get:
+      operationId: getMe
+      summary: Current authenticated user identity + platform role
+      tags: [me]
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+
+  /me/profile:
+    get:
+      operationId: getMyProfile
+      summary: Current user's profile
+      tags: [me]
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfileResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+    patch:
+      operationId: updateMyProfile
+      summary: Update current user's profile fields
+      tags: [me]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileRequest"
+      responses:
+        "200":
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfileResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "422":
+          $ref: "#/components/responses/DomainError"
+
+  /organizations/register:
+    post:
+      operationId: registerOrganization
+      summary: UC-ORG-01 — register a new organization + its owner account
+      description: |
+        Guest-only endpoint (no authenticated actor yet). Idempotency for this
+        route does not go through the shared IdempotencyService (its
+        `idempotency_key.user_id` column is NOT NULL and there is no user yet
+        for a Guest actor) — a repeat request instead surfaces
+        `ORG_ALREADY_EXISTS` / `AUTH_EMAIL_ALREADY_REGISTERED` from the unique
+        constraint. See PHASE1_IMPLEMENTATION_NOTES.md §3 for why this is a
+        known spec gap, not an oversight.
+      tags: [organizations]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterOrganizationRequest"
+      responses:
+        "201":
+          description: Organization created, PENDING_VERIFICATION
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationResponse"
+        "409":
+          description: Organization name/slug or owner email already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          $ref: "#/components/responses/DomainError"
+
+  /organizations:
+    get:
+      operationId: listMyOrganizations
+      summary: Organizations the current user is a member of
+      tags: [organizations]
+      responses:
+        "200":
+          description: List of organizations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OrganizationResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+
+  /organizations/{id}:
+    get:
+      operationId: getOrganizationById
+      summary: Get one organization (caller must be a member, or PLATFORM_ADMIN/REVIEWER)
+      tags: [organizations]
+      parameters:
+        - $ref: "#/components/parameters/OrganizationId"
+      responses:
+        "200":
+          description: Organization
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/DomainError"
+
+  /organizations/{id}/verification-requests:
+    post:
+      operationId: resubmitOrganizationVerification
+      summary: Re-submit a new verification request for a REJECTED organization
+      tags: [organization-verifications]
+      parameters:
+        - $ref: "#/components/parameters/OrganizationId"
+      responses:
+        "201":
+          description: New verification request, PENDING
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationVerificationRequestResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: A verification request is already pending for this organization
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          $ref: "#/components/responses/DomainError"
+
+  /organizations/{id}/members/invitations:
+    post:
+      operationId: inviteOrganizationMember
+      summary: SUC-02 — invite a member (ORG_ADMIN/ORG_ADMIN role only, never ORG_OWNER)
+      tags: [organizations]
+      parameters:
+        - $ref: "#/components/parameters/OrganizationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InviteMemberRequest"
+      responses:
+        "201":
+          description: Invited member
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationMemberResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: User is already a member of this organization
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          $ref: "#/components/responses/DomainError"
+
+  /organizations/{id}/members/{memberId}:
+    patch:
+      operationId: updateOrganizationMember
+      summary: Change a member's role and/or status
+      description: |
+        `role` can never be set to ORG_OWNER here — ownership only changes via
+        the dedicated transfer flow (not yet implemented in Phase 1).
+      tags: [organizations]
+      parameters:
+        - $ref: "#/components/parameters/OrganizationId"
+        - name: memberId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMemberRequest"
+      responses:
+        "200":
+          description: Updated member
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationMemberResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/DomainError"
+        "422":
+          $ref: "#/components/responses/DomainError"
+
+  /platform/organization-verifications:
+    get:
+      operationId: listPendingOrganizationVerifications
+      summary: List pending organization verification requests (PLATFORM_REVIEWER/ADMIN)
+      tags: [organization-verifications]
+      responses:
+        "200":
+          description: Pending verification requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OrganizationVerificationRequestResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /platform/organization-verifications/{id}/claim:
+    post:
+      operationId: claimOrganizationVerification
+      summary: Reviewer claims a pending request (PENDING -> IN_REVIEW)
+      tags: [organization-verifications]
+      parameters:
+        - $ref: "#/components/parameters/VerificationRequestId"
+      responses:
+        "200":
+          description: Claimed request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationVerificationRequestResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: Request already claimed or not in a claimable state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          $ref: "#/components/responses/DomainError"
+
+  /platform/organization-verifications/{id}/decision:
+    post:
+      operationId: decideOrganizationVerification
+      summary: Approve or reject a claimed verification request
+      description: |
+        `reviewerNote` is required when `decision` is REJECT (enforced by the
+        request schema before it reaches the domain service). The reviewer
+        must not be the same user who submitted the request
+        (VERIFICATION_REVIEWER_IS_SUBMITTER).
+      tags: [organization-verifications]
+      parameters:
+        - $ref: "#/components/parameters/VerificationRequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrganizationVerificationDecisionRequest"
+      responses:
+        "200":
+          description: Decided request (APPROVED or REJECTED)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationVerificationRequestResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          $ref: "#/components/responses/DomainError"
+
+  /author-verifications/uploads:
+    post:
+      operationId: requestAuthorVerificationUpload
+      summary: UC-VER-01 step 1 — get a presigned URL to upload a verification document
+      description: |
+        Client PUTs the file directly to the returned `uploadUrl`, then calls
+        `POST /author-verifications` with the same `storageObjectKey`. Only
+        PDF/JPG/PNG up to 20 MB (operational cap, not spec-mandated).
+      tags: [author-verifications]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RequestAuthorVerificationUploadRequest"
+      responses:
+        "200":
+          description: Presigned upload URL + object key to reference on submit
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthorVerificationUploadResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "422":
+          $ref: "#/components/responses/DomainError"
+
+  /author-verifications:
+    post:
+      operationId: submitAuthorVerification
+      summary: UC-VER-01 step 2 — submit the author verification request
+      description: |
+        Creates `author_profile` (if missing), the request, and the
+        `verification_document` row in one transaction. The document's
+        `checksum_sha256` is computed server-side by re-reading the object
+        from S3 — a client-supplied checksum is never trusted.
+      tags: [author-verifications]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitAuthorVerificationRequest"
+      responses:
+        "201":
+          description: Created request, PENDING
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthorVerificationRequestResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "409":
+          description: Already verified, or a request is already open
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          $ref: "#/components/responses/DomainError"
+
+  /platform/author-verifications:
+    get:
+      operationId: listPendingAuthorVerifications
+      summary: List pending author verification requests (PLATFORM_REVIEWER/ADMIN)
+      tags: [author-verifications]
+      responses:
+        "200":
+          description: Pending verification requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AuthorVerificationRequestResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /platform/author-verifications/{id}/claim:
+    post:
+      operationId: claimAuthorVerification
+      summary: Reviewer claims a pending request (PENDING -> IN_REVIEW)
+      tags: [author-verifications]
+      parameters:
+        - $ref: "#/components/parameters/VerificationRequestId"
+      responses:
+        "200":
+          description: Claimed request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthorVerificationRequestResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: Request already claimed or not in a claimable state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          $ref: "#/components/responses/DomainError"
+
+  /platform/author-verifications/{id}/document-url:
+    get:
+      operationId: getAuthorVerificationDocumentUrl
+      summary: UC-VER-02 step 3 — presigned URL (TTL) to review the attached document
+      description: |
+        Path not listed in R2M_SPEC_DESIGN_V5_COMPLETE.md §13.2 — self-defined
+        to satisfy the UC-VER-02 main flow (see Phase 2 plan B.0.1).
+      tags: [author-verifications]
+      parameters:
+        - $ref: "#/components/parameters/VerificationRequestId"
+      responses:
+        "200":
+          description: Short-lived signed GET URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PresignedUrlResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/DomainError"
+
+  /platform/author-verifications/{id}/decision:
+    post:
+      operationId: decideAuthorVerification
+      summary: Approve or reject a claimed author verification request
+      description: |
+        `reviewerNote` is required when `decision` is REJECT. The reviewer
+        must not be the same user who submitted the request
+        (VERIFICATION_REVIEWER_IS_SUBMITTER).
+      tags: [author-verifications]
+      parameters:
+        - $ref: "#/components/parameters/VerificationRequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthorVerificationDecisionRequest"
+      responses:
+        "200":
+          description: Decided request (APPROVED or REJECTED)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthorVerificationRequestResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          $ref: "#/components/responses/DomainError"
+
+  /resources/uploads:
+    post:
+      operationId: requestResourceUpload
+      summary: Get a presigned URL to upload a resource file
+      description: |
+        Not listed explicitly in §13.2 (UC-RES-01 input allows "external URL
+        hoặc upload" but the catalogue only lists URL-oriented endpoints) —
+        path mirrors `/author-verifications/uploads` (see Phase 2 plan B.0.1).
+      tags: [resources]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RequestResourceUploadRequest"
+      responses:
+        "200":
+          description: Presigned upload URL + object key to reference on register/version
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResourceUploadResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+
+  /resources:
+    post:
+      operationId: registerResource
+      summary: UC-RES-01 — register a resource + its first (DRAFT) version
+      description: |
+        Requires a VERIFIED author who is also an active member of
+        `ownerOrganizationId`. Content location is exactly one of `sourceUrl`
+        or `storageObjectKey`. Paper metadata fields are only valid when
+        `type` is PAPER. Does not publish — call
+        `POST /resource-versions/{id}/publish` separately.
+      tags: [resources]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterResourceRequest"
+      responses:
+        "201":
+          description: Created resource, status DRAFT
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResourceResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          $ref: "#/components/responses/DomainError"
+    get:
+      operationId: listResources
+      summary: SUC-04 — full-text search, permission-filtered before returning results
+      description: |
+        ĐỀ XUẤT — CẦN REVIEW (xem Phase 2 plan B.0.1): `?q=` searches
+        title/description via Postgres full-text (GIN index); vector/semantic
+        search is deferred until a real embedding pipeline exists. A resource
+        is only returned if it is PUBLIC, owned by one of the caller's active
+        organizations, or explicitly granted via `resource_access_grant`.
+      tags: [resources]
+      parameters:
+        - name: q
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Visible resources, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ResourceResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+
+  /resources/{id}:
+    get:
+      operationId: getResourceById
+      summary: Get one resource (subject to the same visibility rule as list)
+      tags: [resources]
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      responses:
+        "200":
+          description: Resource
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResourceResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/DomainError"
+
+  /resources/{id}/versions:
+    post:
+      operationId: createResourceVersion
+      summary: Add a new DRAFT version to an existing resource
+      description: Requires MANAGE (active ORG_OWNER/ORG_ADMIN of the owning organization).
+      tags: [resources]
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateResourceVersionRequest"
+      responses:
+        "201":
+          description: Created version, status DRAFT
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResourceVersionResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/DomainError"
+        "422":
+          $ref: "#/components/responses/DomainError"
+
+  /resource-versions/{id}/publish:
+    post:
+      operationId: publishResourceVersion
+      summary: UC-RES-01 step 5 — publish a DRAFT version
+      description: |
+        Publishing the resource's first version activates the resource
+        (DRAFT -> ACTIVE). Publishing any later version supersedes the
+        previously PUBLISHED one (ĐỀ XUẤT — CẦN REVIEW, xem Phase 2 plan
+        B.0.1 — Resource/ResourceVersion không nằm trong 10 state machine
+        chính thức ở §8).
+      tags: [resources]
+      parameters:
+        - $ref: "#/components/parameters/ResourceVersionId"
+      responses:
+        "200":
+          description: Published version
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResourceVersionResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/DomainError"
+        "409":
+          description: Version cannot be published from its current state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /resource-versions/{id}/annotations:
+    post:
+      operationId: createAnnotation
+      summary: UC-RES-02 — add an annotation to a resource version
+      description: Requires MANAGE. Content must not be empty; version must not be WITHDRAWN.
+      tags: [annotations]
+      parameters:
+        - $ref: "#/components/parameters/ResourceVersionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAnnotationRequest"
+      responses:
+        "201":
+          description: Created annotation (revision 1)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnnotationResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/DomainError"
+        "422":
+          $ref: "#/components/responses/DomainError"
+
+  /annotations/{id}/revisions:
+    post:
+      operationId: reviseAnnotation
+      summary: UC-RES-02 — edit an annotation by inserting a new revision
+      description: Never updates the previous revision in place — old revisions stay readable.
+      tags: [annotations]
+      parameters:
+        - $ref: "#/components/parameters/AnnotationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReviseAnnotationRequest"
+      responses:
+        "201":
+          description: New revision, annotation's latestRevisionNo bumped
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnnotationResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/DomainError"
+        "422":
+          $ref: "#/components/responses/DomainError"
+
+  /annotations/{id}:
+    delete:
+      operationId: removeAnnotation
+      summary: Soft-delete an annotation
+      description: Sets `status = REMOVED` — does not delete the row (see `AnnotationStatus`).
+      tags: [annotations]
+      parameters:
+        - $ref: "#/components/parameters/AnnotationId"
+      responses:
+        "204":
+          description: Annotation removed
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/DomainError"
+
+  /resources/{id}/access-requests:
+    post:
+      operationId: createResourceAccessGrant
+      summary: SUC-04 — grant access to a resource (ĐỀ XUẤT — CẦN REVIEW)
+      description: |
+        Endpoint name matches §13.2 (`access-requests`), but creates a
+        `resource_access_grant` with status ACTIVE immediately — the locked
+        schema has no PENDING state or request entity for this flow (see
+        Phase 2 plan B.0.1). Recipient is exactly one of `recipientUserId` or
+        `recipientOrganizationId`. Requires MANAGE on the resource.
+      tags: [resource-access-grants]
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateResourceAccessRequest"
+      responses:
+        "201":
+          description: Created grant, status ACTIVE
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResourceAccessGrantResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/DomainError"
+        "409":
+          description: An active grant with this recipient and permission already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /resources/{id}/access-grants:
+    get:
+      operationId: listResourceAccessGrants
+      summary: List access grants for a resource (ĐỀ XUẤT — CẦN REVIEW, path tự đặt)
+      description: Path not listed in §13.2 — self-defined (see Phase 2 plan B.0.1). Requires MANAGE.
+      tags: [resource-access-grants]
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      responses:
+        "200":
+          description: Grants for this resource
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ResourceAccessGrantResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/DomainError"
+
+  /access-grants/{id}/revoke:
+    post:
+      operationId: revokeResourceAccessGrant
+      summary: Revoke an ACTIVE resource access grant (ĐỀ XUẤT — CẦN REVIEW, path tự đặt)
+      description: Path not listed in §13.2 — self-defined (see Phase 2 plan B.0.1). Requires MANAGE.
+      tags: [resource-access-grants]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Revoked grant
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResourceAccessGrantResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/DomainError"
+        "409":
+          description: Grant is no longer active
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Stateless access token (short-lived). ActorContext (platform role +
+        org memberships) is re-derived from the database on every request —
+        the token only carries the user id (architecture plan §7.3).
+
+  parameters:
+    OrganizationId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    VerificationRequestId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ResourceId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ResourceVersionId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    AnnotationId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    Unauthenticated:
+      description: Missing, invalid, or expired access token
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Forbidden:
+      description: Authenticated but not authorized for this resource/action
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    DomainError:
+      description: Business-rule violation (see `code` for the exact reason)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+  schemas:
+    Error:
+      type: object
+      description: |
+        Unified error envelope (architecture plan §10). `code` is one of the
+        stable values in `packages/domain/src/errors/error-codes.ts` — never a
+        free-form message. `traceId` echoes the inbound `X-Request-Id` header
+        when present.
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum:
+                - AUTH_INVALID_CREDENTIALS
+                - AUTH_ACCOUNT_SUSPENDED
+                - AUTH_INVALID_REFRESH_TOKEN
+                - AUTH_UNAUTHENTICATED
+                - AUTH_FORBIDDEN
+                - AUTH_EMAIL_ALREADY_REGISTERED
+                - ORG_ALREADY_EXISTS
+                - ORG_NOT_FOUND
+                - ORG_NOT_ACTIVE
+                - ORG_INVALID_TRANSITION
+                - ORG_VERSION_CONFLICT
+                - ORG_CANNOT_REMOVE_LAST_OWNER
+                - ORG_MEMBER_ALREADY_EXISTS
+                - ORG_MEMBER_NOT_FOUND
+                - ORG_NOT_MEMBER
+                - VERIFICATION_ALREADY_PENDING
+                - VERIFICATION_REQUEST_NOT_FOUND
+                - VERIFICATION_REQUEST_CONFLICT
+                - VERIFICATION_REVIEWER_IS_SUBMITTER
+                - VERIFICATION_REASON_REQUIRED
+                - VERIFICATION_INVALID_TRANSITION
+                - SYSTEM_IDEMPOTENCY_KEY_REUSED
+                - AUTHOR_ALREADY_VERIFIED
+                - AUTHOR_VERIFICATION_DOCUMENT_INVALID
+                - AUTHOR_INVALID_TRANSITION
+                - RESOURCE_NOT_FOUND
+                - RESOURCE_VERSION_NOT_FOUND
+                - RESOURCE_VERSION_IMMUTABLE
+                - RESOURCE_INVALID_TYPE_FOR_PAPER_METADATA
+                - RESOURCE_CONTENT_NOT_FOUND
+                - RESOURCE_INVALID_TRANSITION
+                - RESOURCE_ACCESS_DENIED
+                - RESOURCE_AUTHOR_NOT_VERIFIED
+                - ANNOTATION_NOT_FOUND
+                - ANNOTATION_EMPTY_CONTENT
+                - ANNOTATION_TARGET_LOCATOR_INVALID
+                - ACCESS_GRANT_NOT_FOUND
+                - ACCESS_GRANT_DUPLICATE
+                - ACCESS_GRANT_ALREADY_REVOKED
+            message:
+              type: string
+            details:
+              type: object
+              additionalProperties: true
+            traceId:
+              type: [string, "null"]
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 1
+
+    RefreshRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+          minLength: 1
+
+    TokenResponse:
+      type: object
+      required: [accessToken, refreshToken, tokenType, expiresIn]
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        tokenType:
+          type: string
+          enum: [Bearer]
+        expiresIn:
+          type: integer
+          description: Access token lifetime in seconds
+
+    MeResponse:
+      type: object
+      required: [userId, primaryEmail, platformRole, displayName]
+      properties:
+        userId:
+          type: string
+          format: uuid
+        primaryEmail:
+          type: string
+          format: email
+        platformRole:
+          type: string
+          enum: [USER, PLATFORM_REVIEWER, PLATFORM_ADMIN]
+        displayName:
+          type: string
+
+    UserProfileResponse:
+      type: object
+      required: [userId, displayName, firstName, lastName, phone, jobTitle, locale, timezone]
+      properties:
+        userId:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+        firstName:
+          type: [string, "null"]
+        lastName:
+          type: [string, "null"]
+        phone:
+          type: [string, "null"]
+        jobTitle:
+          type: [string, "null"]
+        locale:
+          type: string
+        timezone:
+          type: string
+
+    UpdateProfileRequest:
+      type: object
+      description: All fields optional; only provided fields are updated.
+      properties:
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 200
+        firstName:
+          type: string
+          maxLength: 100
+        lastName:
+          type: string
+          maxLength: 100
+        phone:
+          type: string
+          maxLength: 30
+        jobTitle:
+          type: string
+          maxLength: 150
+        locale:
+          type: string
+          maxLength: 20
+        timezone:
+          type: string
+          maxLength: 50
+
+    RegisterOrganizationRequest:
+      type: object
+      required:
+        [organizationName, organizationType, ownerEmail, ownerPassword, ownerDisplayName]
+      properties:
+        organizationName:
+          type: string
+          minLength: 2
+          maxLength: 255
+        organizationType:
+          type: string
+          enum: [RESEARCH_UNIT, ENTERPRISE, GOVERNMENT, SUPPORT_ORGANIZATION]
+        website:
+          type: string
+          format: uri
+        taxCode:
+          type: string
+          maxLength: 100
+        institutionIdentifier:
+          type: string
+          maxLength: 150
+        ownerEmail:
+          type: string
+          format: email
+        ownerPassword:
+          type: string
+          minLength: 8
+          maxLength: 255
+        ownerDisplayName:
+          type: string
+          minLength: 1
+          maxLength: 200
+
+    OrganizationResponse:
+      type: object
+      required: [id, name, slug, type, status, website, taxCode, createdAt, updatedAt, version]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        type:
+          type: string
+          enum: [RESEARCH_UNIT, ENTERPRISE, GOVERNMENT, SUPPORT_ORGANIZATION]
+        status:
+          type: string
+          enum: [PENDING_VERIFICATION, ACTIVE, REJECTED, SUSPENDED, ARCHIVED]
+        website:
+          type: [string, "null"]
+        taxCode:
+          type: [string, "null"]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        version:
+          type: integer
+          description: Optimistic-concurrency version (architecture plan §7 rule 8)
+
+    InviteMemberRequest:
+      type: object
+      required: [email, role]
+      properties:
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [ORG_ADMIN, MEMBER]
+
+    UpdateMemberRequest:
+      type: object
+      description: At least one of `role` or `status` must be provided.
+      properties:
+        role:
+          type: string
+          enum: [ORG_ADMIN, MEMBER]
+        status:
+          type: string
+          enum: [ACTIVE, SUSPENDED, LEFT]
+
+    OrganizationMemberResponse:
+      type: object
+      required: [id, organizationId, userId, role, status, invitedAt, joinedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        organizationId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum: [ORG_OWNER, ORG_ADMIN, MEMBER]
+        status:
+          type: string
+          enum: [INVITED, ACTIVE, SUSPENDED, LEFT]
+        invitedAt:
+          type: [string, "null"]
+          format: date-time
+        joinedAt:
+          type: [string, "null"]
+          format: date-time
+
+    OrganizationVerificationDecisionRequest:
+      type: object
+      required: [decision]
+      description: reviewerNote is required when decision is REJECT.
+      properties:
+        decision:
+          type: string
+          enum: [APPROVE, REJECT]
+        reviewerNote:
+          type: string
+          maxLength: 2000
+
+    OrganizationVerificationRequestResponse:
+      type: object
+      required:
+        [id, organizationId, status, submittedByUserId, reviewerUserId, reviewerNote, submittedAt, reviewedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        organizationId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [PENDING, IN_REVIEW, APPROVED, REJECTED, CANCELLED]
+        submittedByUserId:
+          type: string
+          format: uuid
+        reviewerUserId:
+          type: [string, "null"]
+          format: uuid
+        reviewerNote:
+          type: [string, "null"]
+        submittedAt:
+          type: string
+          format: date-time
+        reviewedAt:
+          type: [string, "null"]
+          format: date-time
+
+    RequestAuthorVerificationUploadRequest:
+      type: object
+      required: [documentType, originalFilename, mimeType, sizeBytes]
+      properties:
+        documentType:
+          type: string
+          enum: [IDENTITY_DOCUMENT, AFFILIATION_PROOF, ORGANIZATION_LETTER, TAX_DOCUMENT, OTHER]
+        originalFilename:
+          type: string
+          minLength: 1
+          maxLength: 255
+        mimeType:
+          type: string
+          enum: [application/pdf, image/jpeg, image/png]
+        sizeBytes:
+          type: integer
+          minimum: 1
+          maximum: 20971520
+
+    AuthorVerificationUploadResponse:
+      type: object
+      required: [uploadUrl, storageObjectKey, expiresIn]
+      properties:
+        uploadUrl:
+          type: string
+          format: uri
+        storageObjectKey:
+          type: string
+        expiresIn:
+          type: integer
+          description: Seconds until uploadUrl expires
+
+    SubmitAuthorVerificationRequest:
+      type: object
+      required:
+        [affiliationOrgId, documentStorageObjectKey, documentType, originalFilename, mimeType, sizeBytes]
+      properties:
+        affiliationOrgId:
+          type: string
+          format: uuid
+        submittedNote:
+          type: string
+          maxLength: 2000
+        documentStorageObjectKey:
+          type: string
+          minLength: 1
+        documentType:
+          type: string
+          enum: [IDENTITY_DOCUMENT, AFFILIATION_PROOF, ORGANIZATION_LETTER, TAX_DOCUMENT, OTHER]
+        originalFilename:
+          type: string
+          minLength: 1
+          maxLength: 255
+        mimeType:
+          type: string
+          enum: [application/pdf, image/jpeg, image/png]
+        sizeBytes:
+          type: integer
+          minimum: 1
+          maximum: 20971520
+
+    AuthorVerificationDecisionRequest:
+      type: object
+      required: [decision]
+      description: reviewerNote is required when decision is REJECT.
+      properties:
+        decision:
+          type: string
+          enum: [APPROVE, REJECT]
+        reviewerNote:
+          type: string
+          maxLength: 2000
+
+    AuthorVerificationRequestResponse:
+      type: object
+      required:
+        [id, authorUserId, affiliationOrgId, status, submittedNote, reviewerUserId, reviewerNote, submittedAt, reviewedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        authorUserId:
+          type: string
+          format: uuid
+        affiliationOrgId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [PENDING, IN_REVIEW, APPROVED, REJECTED, CANCELLED]
+        submittedNote:
+          type: [string, "null"]
+        reviewerUserId:
+          type: [string, "null"]
+          format: uuid
+        reviewerNote:
+          type: [string, "null"]
+        submittedAt:
+          type: string
+          format: date-time
+        reviewedAt:
+          type: [string, "null"]
+          format: date-time
+
+    PresignedUrlResponse:
+      type: object
+      required: [url, expiresIn]
+      properties:
+        url:
+          type: string
+          format: uri
+        expiresIn:
+          type: integer
+
+    RequestResourceUploadRequest:
+      type: object
+      required: [originalFilename, mimeType, sizeBytes]
+      properties:
+        originalFilename:
+          type: string
+          minLength: 1
+          maxLength: 255
+        mimeType:
+          type: string
+          minLength: 1
+          maxLength: 150
+        sizeBytes:
+          type: integer
+          minimum: 1
+          maximum: 209715200
+
+    ResourceUploadResponse:
+      type: object
+      required: [uploadUrl, storageObjectKey, expiresIn]
+      properties:
+        uploadUrl:
+          type: string
+          format: uri
+        storageObjectKey:
+          type: string
+        expiresIn:
+          type: integer
+
+    RegisterResourceRequest:
+      type: object
+      required: [ownerOrganizationId, type, title, accessLevel]
+      description: |
+        Exactly one of `sourceUrl` or `storageObjectKey` is required. Paper
+        metadata fields (doi/abstract/publisher/venue/publicationDate/language)
+        are only valid when `type` is PAPER.
+      properties:
+        ownerOrganizationId:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum:
+            [PAPER, REPORT, DATASET, MODEL, CHECKPOINT, SOURCE_CODE, PATENT, LICENSE,
+             ARCHITECTURE_DOCUMENT, EXPERIMENT_RESULT, PILOT_EVIDENCE, VIDEO, OTHER]
+        title:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+        accessLevel:
+          type: string
+          enum: [PUBLIC, ORGANIZATION, CASE_ONLY, APPROVAL_REQUIRED, PRIVATE]
+        externalIdentifier:
+          type: string
+          maxLength: 255
+        sourceUrl:
+          type: string
+          format: uri
+        storageObjectKey:
+          type: string
+        doi:
+          type: string
+          maxLength: 255
+        abstract:
+          type: string
+        publisher:
+          type: string
+          maxLength: 255
+        venue:
+          type: string
+          maxLength: 255
+        publicationDate:
+          type: string
+          format: date
+        language:
+          type: string
+          maxLength: 20
+
+    ResourceResponse:
+      type: object
+      required:
+        [id, ownerOrganizationId, createdByUserId, type, title, description, accessLevel,
+         status, moderationStatus, externalIdentifier, createdAt, updatedAt, version]
+      properties:
+        id:
+          type: string
+          format: uuid
+        ownerOrganizationId:
+          type: string
+          format: uuid
+        createdByUserId:
+          type: string
+          format: uuid
+        type:
+          type: string
+        title:
+          type: string
+        description:
+          type: [string, "null"]
+        accessLevel:
+          type: string
+          enum: [PUBLIC, ORGANIZATION, CASE_ONLY, APPROVAL_REQUIRED, PRIVATE]
+        status:
+          type: string
+          description: "ĐỀ XUẤT — CẦN REVIEW (xem Phase 2 plan B.0.1)"
+          enum: [DRAFT, ACTIVE, ARCHIVED, WITHDRAWN]
+        moderationStatus:
+          type: string
+          enum: [ACTIVE, HIDDEN, REMOVED]
+        externalIdentifier:
+          type: [string, "null"]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        version:
+          type: integer
+
+    CreateResourceVersionRequest:
+      type: object
+      description: Exactly one of `sourceUrl` or `storageObjectKey` is required.
+      properties:
+        versionLabel:
+          type: string
+          maxLength: 100
+        sourceUrl:
+          type: string
+          format: uri
+        storageObjectKey:
+          type: string
+
+    ResourceVersionResponse:
+      type: object
+      required:
+        [id, resourceId, versionNo, versionLabel, sourceUrl, storageObjectKey,
+         contentHashSha256, publishedAt, status, createdByUserId, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        resourceId:
+          type: string
+          format: uuid
+        versionNo:
+          type: integer
+        versionLabel:
+          type: [string, "null"]
+        sourceUrl:
+          type: [string, "null"]
+        storageObjectKey:
+          type: [string, "null"]
+        contentHashSha256:
+          type: [string, "null"]
+        publishedAt:
+          type: [string, "null"]
+          format: date-time
+        status:
+          type: string
+          description: "ĐỀ XUẤT — CẦN REVIEW (xem Phase 2 plan B.0.1)"
+          enum: [DRAFT, PUBLISHED, SUPERSEDED, WITHDRAWN]
+        createdByUserId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateAnnotationRequest:
+      type: object
+      required: [content, targetSnippet]
+      properties:
+        content:
+          type: string
+          minLength: 1
+        targetSnippet:
+          type: string
+          minLength: 1
+        pageNumber:
+          type: integer
+          minimum: 0
+        sectionLabel:
+          type: string
+          maxLength: 255
+        offsetStart:
+          type: integer
+          minimum: 0
+        offsetEnd:
+          type: integer
+          minimum: 0
+
+    ReviseAnnotationRequest:
+      type: object
+      required: [content, targetSnippet]
+      properties:
+        content:
+          type: string
+          minLength: 1
+        targetSnippet:
+          type: string
+          minLength: 1
+        pageNumber:
+          type: integer
+          minimum: 0
+        sectionLabel:
+          type: string
+          maxLength: 255
+        offsetStart:
+          type: integer
+          minimum: 0
+        offsetEnd:
+          type: integer
+          minimum: 0
+
+    AnnotationResponse:
+      type: object
+      required:
+        [id, resourceVersionId, createdByUserId, status, latestRevisionNo, content,
+         targetSnippet, pageNumber, sectionLabel, offsetStart, offsetEnd, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        resourceVersionId:
+          type: string
+          format: uuid
+        createdByUserId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [ACTIVE, DEPRECATED, REMOVED]
+        latestRevisionNo:
+          type: integer
+        content:
+          type: string
+        targetSnippet:
+          type: string
+        pageNumber:
+          type: [integer, "null"]
+        sectionLabel:
+          type: [string, "null"]
+        offsetStart:
+          type: [integer, "null"]
+        offsetEnd:
+          type: [integer, "null"]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateResourceAccessRequest:
+      type: object
+      required: [permission]
+      description: |
+        Exactly one of `recipientUserId` or `recipientOrganizationId` is
+        required (ĐỀ XUẤT — CẦN REVIEW, xem Phase 2 plan B.0.1).
+      properties:
+        recipientUserId:
+          type: string
+          format: uuid
+        recipientOrganizationId:
+          type: string
+          format: uuid
+        permission:
+          type: string
+          enum: [VIEW, DOWNLOAD, MANAGE]
+        expiresAt:
+          type: string
+          format: date-time
+
+    ResourceAccessGrantResponse:
+      type: object
+      required:
+        [id, resourceId, recipientOrganizationId, recipientUserId, permission, status,
+         grantedByUserId, expiresAt, revokedAt, revokedByUserId, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        resourceId:
+          type: string
+          format: uuid
+        recipientOrganizationId:
+          type: [string, "null"]
+          format: uuid
+        recipientUserId:
+          type: [string, "null"]
+          format: uuid
+        permission:
+          type: string
+          enum: [VIEW, DOWNLOAD, MANAGE]
+        status:
+          type: string
+          enum: [ACTIVE, EXPIRED, REVOKED]
+        grantedByUserId:
+          type: string
+          format: uuid
+        expiresAt:
+          type: [string, "null"]
+          format: date-time
+        revokedAt:
+          type: [string, "null"]
+          format: date-time
+        revokedByUserId:
+          type: [string, "null"]
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time

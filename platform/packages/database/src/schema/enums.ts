@@ -85,3 +85,83 @@ export const outboxStatusEnum = pgEnum("outbox_status", [
   "FAILED",
   "DEAD_LETTER",
 ]);
+
+// Phase 2 (Author & Resource) — ported 1:1 from schema_v5_production.dbml.
+
+export const authorVerificationStatusEnum = pgEnum("author_verification_status", [
+  "UNVERIFIED",
+  "PENDING",
+  "VERIFIED",
+  "DECLINED",
+  "SUSPENDED",
+]);
+
+export const resourceTypeEnum = pgEnum("resource_type", [
+  "PAPER",
+  "REPORT",
+  "DATASET",
+  "MODEL",
+  "CHECKPOINT",
+  "SOURCE_CODE",
+  "PATENT",
+  "LICENSE",
+  "ARCHITECTURE_DOCUMENT",
+  "EXPERIMENT_RESULT",
+  "PILOT_EVIDENCE",
+  "VIDEO",
+  "OTHER",
+]);
+
+export const resourceStatusEnum = pgEnum("resource_status", [
+  "DRAFT",
+  "ACTIVE",
+  "ARCHIVED",
+  "WITHDRAWN",
+]);
+
+export const resourceVersionStatusEnum = pgEnum("resource_version_status", [
+  "DRAFT",
+  "PUBLISHED",
+  "SUPERSEDED",
+  "WITHDRAWN",
+]);
+
+export const resourceAccessLevelEnum = pgEnum("resource_access_level", [
+  "PUBLIC",
+  "ORGANIZATION",
+  "CASE_ONLY",
+  "APPROVAL_REQUIRED",
+  "PRIVATE",
+]);
+
+export const accessPermissionEnum = pgEnum("access_permission", [
+  "VIEW",
+  "DOWNLOAD",
+  "MANAGE",
+]);
+
+export const accessGrantStatusEnum = pgEnum("access_grant_status", [
+  "ACTIVE",
+  "EXPIRED",
+  "REVOKED",
+]);
+
+export const contentModerationStatusEnum = pgEnum("content_moderation_status", [
+  "ACTIVE",
+  "HIDDEN",
+  "REMOVED",
+]);
+
+export const ingestionStatusEnum = pgEnum("ingestion_status", [
+  "QUEUED",
+  "PROCESSING",
+  "COMPLETED",
+  "FAILED",
+  "CANCELLED",
+]);
+
+export const annotationStatusEnum = pgEnum("annotation_status", [
+  "ACTIVE",
+  "DEPRECATED",
+  "REMOVED",
+]);

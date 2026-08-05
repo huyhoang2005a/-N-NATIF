@@ -56,6 +56,10 @@ export class JwtAuthGuard implements CanActivate {
       where: eq(schema.organizationMember.userId, user.id),
     });
 
+    const authorProfile = await this.db.query.authorProfile.findFirst({
+      where: eq(schema.authorProfile.userId, user.id),
+    });
+
     request.actor = {
       userId: user.id,
       platformRole: user.platformRole,
@@ -64,6 +68,7 @@ export class JwtAuthGuard implements CanActivate {
         role: membership.role,
         status: membership.status,
       })),
+      authorVerificationStatus: authorProfile?.verificationStatus ?? "UNVERIFIED",
     };
 
     return true;

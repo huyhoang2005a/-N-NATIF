@@ -1,4 +1,9 @@
-import type { MembershipStatus, OrganizationMemberRole, PlatformRole } from "@r2m/domain";
+import type {
+  AuthorVerificationStatus,
+  MembershipStatus,
+  OrganizationMemberRole,
+  PlatformRole,
+} from "@r2m/domain";
 
 export interface OrganizationMembershipContext {
   organizationId: string;
@@ -15,6 +20,9 @@ export interface ActorContext {
   userId: string;
   platformRole: PlatformRole;
   memberships: OrganizationMembershipContext[];
+  /** `UNVERIFIED` when the actor has no `author_profile` row yet (not every user goes
+   * through author verification — see JwtAuthGuard). */
+  authorVerificationStatus: AuthorVerificationStatus;
 }
 
 export function findActiveMembership(

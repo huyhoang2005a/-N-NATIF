@@ -3,7 +3,7 @@ import type { ActorContext } from "./actor-context";
 import { assertOrgOwnerOrAdmin, isOrgOwnerOrAdmin } from "./organization-membership.policy";
 
 function actorWith(memberships: ActorContext["memberships"]): ActorContext {
-  return { userId: "user-1", platformRole: "USER", memberships };
+  return { userId: "user-1", platformRole: "USER", memberships, authorVerificationStatus: "UNVERIFIED" };
 }
 
 describe("organization membership policy", () => {

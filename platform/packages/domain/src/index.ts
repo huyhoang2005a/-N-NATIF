@@ -2,6 +2,7 @@ export * from "./enums/identity.enum";
 export * from "./enums/organization.enum";
 export * from "./enums/verification.enum";
 export * from "./enums/platform-ops.enum";
+export * from "./enums/resource.enum";
 
 export * from "./errors/error-codes";
 export * from "./errors/domain-error";

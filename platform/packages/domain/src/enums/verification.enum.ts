@@ -19,3 +19,14 @@ export const AuthorVerificationStatus = {
 } as const;
 export type AuthorVerificationStatus =
   (typeof AuthorVerificationStatus)[keyof typeof AuthorVerificationStatus];
+
+/** Shared by both organization and author verification documents (Phase 2). */
+export const VerificationDocumentType = {
+  IDENTITY_DOCUMENT: "IDENTITY_DOCUMENT",
+  AFFILIATION_PROOF: "AFFILIATION_PROOF",
+  ORGANIZATION_LETTER: "ORGANIZATION_LETTER",
+  TAX_DOCUMENT: "TAX_DOCUMENT",
+  OTHER: "OTHER",
+} as const;
+export type VerificationDocumentType =
+  (typeof VerificationDocumentType)[keyof typeof VerificationDocumentType];

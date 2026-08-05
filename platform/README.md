@@ -1,21 +1,25 @@
 # R2M — Research-to-Market Platform
 
-Tài liệu tổng hợp cho **Phase 1** (Identity & Organization, Verification). Đọc file này
-trước khi chạy hoặc mở rộng dự án. Với business rule/spec gốc, xem `CLAUDE.md` và
-`docs/spec/`.
+Tài liệu tổng hợp cho **Phase 1 + Phase 2** (Identity & Organization, Verification,
+Resource Catalog & Evidence). Đọc file này trước khi chạy hoặc mở rộng dự án. Với
+business rule/spec gốc, xem `CLAUDE.md` và `docs/spec/`.
 
 ---
 
 ## 1. Tổng quan
 
-R2M là nền tảng đăng ký và xác minh tổ chức phục vụ hoạt động chuyển giao công nghệ, kết
-nối 4 nhóm tổ chức: **đơn vị nghiên cứu**, **doanh nghiệp**, **cơ quan nhà nước**, **tổ
-chức hỗ trợ**. Phase 1 xây phần nền: đăng ký tổ chức, xác thực người dùng, xác minh tổ
-chức thủ công bởi platform reviewer.
+R2M là nền tảng đăng ký, xác minh tổ chức/tác giả và quản lý tài nguyên nghiên cứu phục
+vụ hoạt động chuyển giao công nghệ, kết nối 4 nhóm tổ chức: **đơn vị nghiên cứu**,
+**doanh nghiệp**, **cơ quan nhà nước**, **tổ chức hỗ trợ**. Phase 1 xây phần nền: đăng ký
+tổ chức, xác thực người dùng, xác minh tổ chức thủ công bởi platform reviewer. Phase 2
+thêm: xác minh tác giả, đăng ký/versioning resource (paper/dataset/model/...), annotation,
+cấp quyền truy cập resource, tìm kiếm full-text.
 
 Toàn bộ hệ thống cuối cùng có 8 bounded context (xem `docs/spec/
-R2M_V5_ARCHITECTURE_AND_IMPLEMENTATION_PLAN.md`). Phase 1 chỉ triển khai 3 context đầu:
-**Identity & Organization**, **Verification** (chỉ phần tổ chức), **Platform Operations**.
+R2M_V5_ARCHITECTURE_AND_IMPLEMENTATION_PLAN.md`). Đã triển khai 4 context: **Identity &
+Organization**, **Verification** (tổ chức + tác giả), **Platform Operations**, **Resource
+Catalog & Evidence** (phần buildable của Phase 2 — không gồm Evidence/Citation-linking
+tới Technology Case, thuộc Phase 3).
 
 ---
 
@@ -119,6 +123,10 @@ apps/api Repository   →  Drizzle (packages/database) → Postgres
 
 ### 2.5 `apps/web` — cấu trúc App Router
 
+> Phase 2 (Author & Resource Catalog) chỉ làm backend (`apps/api` + `packages/database`
+> + `packages/contracts`) — **không có trang web mới**, đã verify hoàn toàn qua HTTP
+> thật (xem §4). Cấu trúc `app/` dưới đây vẫn dừng ở các trang Phase 1.
+
 ```
 app/
 ├── layout.tsx              Font (next/font/google), metadata
@@ -164,7 +172,13 @@ pnpm db:seed                      # tạo 3 tài khoản mẫu, xem bảng bên 
 |---|---|---|---|
 | `admin@r2m.local` | `ChangeMe123!` | `PLATFORM_ADMIN` | Xét duyệt tổ chức, có toàn quyền |
 | `reviewer@r2m.local` | `ChangeMe123!` | `PLATFORM_REVIEWER` | Xét duyệt tổ chức (vai trò chuyên viên riêng, không phải admin) |
-| `owner@sample-research-unit.local` | `ChangeMe123!` | `USER` (chủ 1 tổ chức mẫu đã `ACTIVE`) | Xem `/dashboard` với tư cách người dùng thường |
+| `owner@sample-research-unit.local` | `ChangeMe123!` | `USER` (chủ 1 tổ chức mẫu đã `ACTIVE`) | Xem `/dashboard` với tư cách người dùng thường; cũng dùng để test xác minh tác giả + đăng ký resource ở Phase 2 |
+
+> Phase 2 không thêm tài khoản seed mới — dùng lại `owner@sample-research-unit.local`
+> cho toàn bộ luồng tác giả/resource. Bucket MinIO (`S3_VERIFICATION_BUCKET`,
+> `S3_RESOURCE_BUCKET`) được `S3Service` tự tạo (`HeadBucketCommand`/
+> `CreateBucketCommand`) ở lần gọi đầu tiên — không cần provisioning tay trong
+> `docker-compose.yml`.
 
 > **`packages/env/src/env.ts` không tự load `.env`** (không dùng `dotenv`). Mỗi
 > terminal PowerShell mới phải nạp biến môi trường thủ công trước khi chạy `api`/`db:*`:
@@ -226,7 +240,9 @@ pnpm --filter @r2m/worker dev
 
 ---
 
-## 4. Đã làm được (Phase 1)
+## 4. Đã làm được (Phase 1 + Phase 2)
+
+### Phase 1
 
 - **Domain & DB**: schema Drizzle cho Identity & Organization, Verification (chỉ tổ
   chức), Platform Operations — khớp `docs/spec/schema_v5_production.dbml`. State machine
@@ -251,6 +267,44 @@ pnpm --filter @r2m/worker dev
 - **Hạ tầng dev**: `docker-compose.yml` (Postgres pgvector + Redis + MinIO), migration
   2 lớp (drizzle-kit + tay viết), seed data mẫu.
 - `pnpm typecheck` / `pnpm lint` / `pnpm test` toàn repo đều pass.
+
+### Phase 2
+
+- **Restructure thư mục** (tiền đề cho Phase 2, không đổi business logic Phase 1):
+  `packages/config`→`packages/env`, `packages/db`→`packages/database`, gom
+  `auth`/`users`/`organizations` vào `modules/identity-organization/` và `audit`/`jobs`
+  vào `modules/platform-operations/`, mỗi context có 1 module tổng hợp
+  (`<context>.module.ts`) — xem §2.2. `verification/` giữ nguyên vị trí (đã là 1 context
+  phẳng sẵn). Không xoá/mất chức năng nào của Phase 1 — verify lại bằng
+  build/typecheck/lint/test toàn repo (xanh) + chạy lại đúng kịch bản HTTP thật của Phase
+  1 (đăng ký → reviewer duyệt → dashboard).
+- **Domain & DB**: 11 bảng mới (`author_profile`, `author_verification_request`,
+  `resource`, `resource_version`, `paper_metadata`, `resource_ingestion_job`,
+  `resource_chunk` — có cột `vector(1536)` cho pgvector, `citation`, `annotation`,
+  `annotation_revision`, `resource_access_grant`) khớp
+  `docs/spec/schema_v5_production.dbml`. `verification_document` mở rộng additive (FK
+  tới cả org lẫn author verification request, exactly-one qua CHECK constraint) —
+  không đụng dữ liệu Phase 1 đã có. State machine tác giả tái dùng
+  `verification-request.state-machine.ts` sẵn có; state machine `Resource`/
+  `ResourceVersion` là tự đề xuất (không có trong danh sách 10 state machine chính thức
+  của spec), đặt trong `modules/resource-catalog/domain/` theo đúng ranh giới shared-
+  kernel-vs-per-context đã lập ở §2.2.
+- **API**: xác minh tác giả (upload tài liệu lên MinIO qua presigned URL → nộp → reviewer
+  claim/xem tài liệu/duyệt), đăng ký resource + version (publish version đầu tiên tự
+  chuyển resource `DRAFT`→`ACTIVE`), annotation (tạo/sửa qua revision mới — không sửa
+  đè, xoá mềm), resource access grant (tạo/list/thu hồi), tìm kiếm full-text
+  (`GET /resources?q=`, lọc theo quyền truy cập trước khi trả kết quả). Đây là lần đầu
+  tiên repo thật sự gọi S3/MinIO (`@aws-sdk/client-s3`, `forcePathStyle: true` bắt buộc
+  cho MinIO) — checksum tài liệu tính lại phía server bằng cách stream object, không tin
+  giá trị client gửi lên. Toàn bộ luồng verify **qua HTTP thật với Postgres + MinIO
+  thật** (kịch bản đủ 8 bước: xác minh tác giả → đăng ký resource → search → publish
+  version 2 → annotation → access grant, xem `phase2-smoke.mjs`), không chỉ dựa vào 27
+  unit test mock DI mới thêm.
+- **OpenAPI**: `docs/openapi/v1/phase1.yaml` đổi tên thành `v1.yaml` (API versioned theo
+  `/v1`, không theo phase nội bộ), thêm 18 path + ~20 schema mới, validate bằng script
+  `js-yaml` xác nhận toàn bộ `$ref` resolve đúng (155/155).
+- Có 4 điểm **tự đề xuất business rule** (spec chỉ có 1 dòng mô tả hoặc hoàn toàn không
+  đề cập) — đánh dấu `// ĐỀ XUẤT — CẦN REVIEW` trong code, liệt kê chi tiết ở §5.
 
 ### Bug thật đã tìm và sửa trong phiên này (đáng nhớ cho phiên sau)
 
@@ -293,6 +347,25 @@ pnpm --filter @r2m/worker dev
    OrganizationsModule]` vào `IdentityOrganizationModule` (và tương tự cho
    `PlatformOperationsModule`). Bài học lặp lại đúng mẫu bug #2-#4 ở trên: mọi thay đổi
    cấu trúc module NestJS phải verify bằng chạy app thật, không chỉ tin build xanh.
+6. **`tsconfig.base.json` tự sinh giá trị `"ignoreDeprecations": "6.0"` không hợp lệ** —
+   khoá này xuất hiện lặp lại 2 lần trong phiên (không phải do tôi chủ động thêm), luôn
+   ngay sau khi sửa block `paths`, gây `TS5103: Invalid value for '--ignoreDeprecations'`
+   và phá build của **mọi** package cùng lúc (khoá nằm ở file base, ảnh hưởng toàn
+   Project References graph). TypeScript 5.9.3 chỉ chấp nhận giá trị `"5.0"` cho khoá
+   này, không phải `"6.0"`. Nghi do một tool/editor tự "fix" chèn nhầm — chưa xác định
+   được chính xác nguồn. Sửa: xoá hẳn khoá này cả 2 lần; không tái diễn lần thứ 3. Nếu
+   gặp lại `TS5103` sau khi sửa `tsconfig.base.json`, kiểm tra khoá này đầu tiên.
+7. **Service gọi thẳng `loadEnv()` để lấy tên bucket S3 làm hỏng khả năng test** —
+   `AuthorVerificationService`/`ResourcesService` gọi `loadEnv()` trực tiếp để đọc
+   `env.S3_VERIFICATION_BUCKET`/`env.S3_RESOURCE_BUCKET` trước khi gọi `S3Service` (đã
+   mock trong test) — khiến test luôn crash với `Invalid environment configuration:
+   DATABASE_URL: Required...` dù `S3Service` được mock đầy đủ, vì `loadEnv()` chạy
+   validate `process.env` thật ngay trong service, không đi qua mock nào. Vi phạm đúng
+   precedent đã có với `TokenService` (luôn mock nguyên khối, không bao giờ gọi
+   `loadEnv()` lẻ trong service khác). Sửa: chuyển việc đọc tên bucket vào constructor
+   của `S3Service`, expose sẵn method theo bucket (`createVerificationUploadUrl`,
+   `computeResourceContentSha256`...) để service gọi không cần biết tên bucket/không
+   cần tự gọi `loadEnv()`.
 
 ---
 
@@ -339,18 +412,50 @@ pnpm --filter @r2m/worker dev
 - **`apps/web` chưa có test nào** (không unit test component, không E2E). Có thể thêm
   Playwright cho luồng đăng ký/đăng nhập chính.
 - **Không dùng Redis/BullMQ** dù đã có trong `docker-compose.yml` — `apps/worker` là
-  poll loop đơn giản, đủ cho Phase 1 nhưng cần chuyển sang BullMQ khi có job cần
-  backoff/retry thật (ingestion, embedding — Phase 2+, theo `CLAUDE.md`).
-- **MinIO chưa được dùng ở đâu** trong code (chỉ có trong docker-compose và biến môi
-  trường `S3_*`) — sẽ cần khi làm Resource & Evidence (Phase 2).
+  poll loop đơn giản, đủ cho Phase 1+2 nhưng cần chuyển sang BullMQ khi có job cần
+  backoff/retry thật (ingestion, embedding thật — Phase 2 chỉ tạo
+  `resource_ingestion_job` ở trạng thái `QUEUED`, không có worker xử lý).
 - **Chưa có CI** (không có `.github/workflows` hay pipeline nào chạy `typecheck`/`lint`/
   `test` tự động khi push).
 
-### Khi bắt đầu Phase 2
+### Phase 2 — business rule tự đề xuất, cần user review trước khi khoá
 
-Theo đúng thứ tự trong `CLAUDE.md` — **không nhảy cóc module**: Phase 2 là Author &
-Resource (Resource Catalog & Evidence). Thêm `schema/<bounded-context>.ts` mới +
-migration mới, **không** ALTER bảng Phase 1 đã có dữ liệu (đặc biệt
-`verification_document` sẽ cần thêm `author_verification_request_id` + check constraint
-"exactly one non-null" — additive migration, xem ghi chú trong
-`packages/database/src/schema/verification.ts`).
+Spec cho các use case này chỉ có 1 dòng mô tả yêu cầu (không đủ 15 mục như UC chính) hoặc
+hoàn toàn không đề cập — đã chọn cách làm hợp lý nhất theo enum/constraint đã khoá trong
+`schema_v5_production.dbml`, đánh dấu `// ĐỀ XUẤT — CẦN REVIEW` tại chỗ trong code:
+
+- **SUC-04 (Resource Access Grant)**: mô tả spec nói "request/approve" (ngụ ý có bước chờ
+  duyệt) nhưng `AccessGrantStatus` trong schema chỉ có `ACTIVE/EXPIRED/REVOKED` — không
+  có `PENDING`, không có bảng request riêng. Đã chọn: actor quản lý resource
+  (owner/admin tổ chức sở hữu) gọi thẳng endpoint để tạo grant `ACTIVE` ngay, không có
+  state chờ duyệt. Endpoint tạo (`POST /resources/{id}/access-requests`) đúng tên trong
+  catalogue chính thức (§13.2); 2 endpoint list/revoke (`GET /resources/{id}/
+  access-grants`, `POST /access-grants/{id}/revoke`) là **path tự đặt**, không có trong
+  catalogue.
+- **SUC-05 (Resource Search)**: có trong phạm vi bắt buộc chính thức (§12.3), nhưng cách
+  làm kỹ thuật phải tự chọn — hiện chỉ làm full-text search (GIN index trên
+  title/description) qua `GET /resources?q=`, **chưa làm vector/semantic search** vì
+  Phase 2 không build pipeline embedding thật (xem mục dưới) nên chưa có dữ liệu vector
+  để tìm. HNSW index cho `resource_chunk.embedding` cố tình để comment, không bật (đúng
+  ghi chú của spec "tạo sau khi đủ dữ liệu và benchmark").
+- **State machine `Resource`/`ResourceVersion`**: không nằm trong danh sách 10 state
+  machine chính thức của spec — tự đề xuất transition (`Resource`: DRAFT→ACTIVE khi
+  publish version đầu tiên, →ARCHIVED/WITHDRAWN; `ResourceVersion`: DRAFT→PUBLISHED/
+  WITHDRAWN, PUBLISHED→SUPERSEDED/WITHDRAWN) bám theo đúng giá trị enum thật trong dbml.
+- **Không có ingestion pipeline thật** (extract/chunk/embedding) — `POST /resources`/
+  `POST .../versions` chỉ tạo `resource_ingestion_job` trạng thái `QUEUED`, không có
+  worker nào xử lý tiếp. Để dành khi có quyết định chính thức về AI/embedding stack
+  (liên quan Phase 5 — AI Recommendation).
+- **Không scan malware thật** — chỉ validate MIME allowlist
+  (`application/pdf`/`image/jpeg`/`image/png`) + giới hạn 20MB phía client trước khi
+  cấp presigned upload URL. Không có thư viện scanning nào trong repo.
+
+### Khi bắt đầu Phase 3
+
+Theo đúng thứ tự trong `CLAUDE.md` — **không nhảy cóc module**: Phase 3 là Technology
+Case & Evidence. Bảng `evidence`/`evidence_citation` (FK cứng tới `technology_case`) cố
+tình chưa tạo ở Phase 2 vì phụ thuộc bảng Phase 3 chưa tồn tại — tạo mới ở migration
+riêng của Phase 3, cùng cách xử lý additive đã dùng cho `verification_document`
+(Phase 1→2). Trước khi code, đọc lại đúng thứ tự đã quy định ở rule 10 trong
+`CLAUDE.md`: `01_workflow_theo_phase.md` (mục Phase 3) → `03_activity_diagrams.md` (mục
+Phase 3) → `02_usecase_diagram.md` → đối chiếu `R2M_SPEC_DESIGN_V5_COMPLETE.md`.

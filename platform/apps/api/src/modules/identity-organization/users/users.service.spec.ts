@@ -5,7 +5,12 @@ import type { UsersRepository } from "./users.repository";
 import type { AuditService } from "../../platform-operations/audit/audit.service";
 import type { OutboxService } from "../../platform-operations/jobs/outbox.service";
 
-const actor: ActorContext = { userId: "user-1", platformRole: "USER", memberships: [] };
+const actor: ActorContext = {
+  userId: "user-1",
+  platformRole: "USER",
+  memberships: [],
+  authorVerificationStatus: "UNVERIFIED",
+};
 
 describe("UsersService.updateMyProfile", () => {
   it("writes the profile update, an audit row and an outbox event in one transaction", async () => {

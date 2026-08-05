@@ -58,6 +58,81 @@ export interface UserProfileUpdatedEvent {
   changedFields: string[];
 }
 
+export interface AuthorVerificationSubmittedEvent {
+  type: "AuthorVerificationSubmitted";
+  authorUserId: string;
+  verificationRequestId: string;
+}
+
+export interface AuthorVerifiedEvent {
+  type: "AuthorVerified";
+  authorUserId: string;
+  verificationRequestId: string;
+  reviewerUserId: string;
+}
+
+export interface AuthorVerificationRejectedEvent {
+  type: "AuthorVerificationRejected";
+  authorUserId: string;
+  verificationRequestId: string;
+  reviewerUserId: string;
+  reason: string;
+}
+
+export interface ResourceRegisteredEvent {
+  type: "ResourceRegistered";
+  resourceId: string;
+  ownerOrganizationId: string;
+  createdByUserId: string;
+}
+
+export interface ResourceVersionPublishedEvent {
+  type: "ResourceVersionPublished";
+  resourceId: string;
+  resourceVersionId: string;
+  versionNo: number;
+}
+
+export interface ResourceIngestionQueuedEvent {
+  type: "ResourceIngestionQueued";
+  resourceVersionId: string;
+  ingestionJobId: string;
+}
+
+export interface AnnotationCreatedEvent {
+  type: "AnnotationCreated";
+  annotationId: string;
+  resourceVersionId: string;
+  createdByUserId: string;
+}
+
+export interface AnnotationRevisedEvent {
+  type: "AnnotationRevised";
+  annotationId: string;
+  previousRevisionNo: number;
+  newRevisionNo: number;
+}
+
+export interface AnnotationRemovedEvent {
+  type: "AnnotationRemoved";
+  annotationId: string;
+  removedByUserId: string;
+}
+
+export interface ResourceAccessGrantedEvent {
+  type: "ResourceAccessGranted";
+  accessGrantId: string;
+  resourceId: string;
+  grantedByUserId: string;
+}
+
+export interface ResourceAccessRevokedEvent {
+  type: "ResourceAccessRevoked";
+  accessGrantId: string;
+  resourceId: string;
+  revokedByUserId: string;
+}
+
 export type DomainEvent =
   | OrganizationRegisteredEvent
   | OrganizationVerificationRequestedEvent
@@ -65,4 +140,15 @@ export type DomainEvent =
   | OrganizationVerificationRejectedEvent
   | OrganizationMemberInvitedEvent
   | OrganizationMemberRoleChangedEvent
-  | UserProfileUpdatedEvent;
+  | UserProfileUpdatedEvent
+  | AuthorVerificationSubmittedEvent
+  | AuthorVerifiedEvent
+  | AuthorVerificationRejectedEvent
+  | ResourceRegisteredEvent
+  | ResourceVersionPublishedEvent
+  | ResourceIngestionQueuedEvent
+  | AnnotationCreatedEvent
+  | AnnotationRevisedEvent
+  | AnnotationRemovedEvent
+  | ResourceAccessGrantedEvent
+  | ResourceAccessRevokedEvent;

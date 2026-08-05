@@ -109,11 +109,13 @@ describe("OrganizationsService member management (SUC-02)", () => {
     userId: "owner-1",
     platformRole: "USER",
     memberships: [{ organizationId: "org-1", role: "ORG_OWNER", status: "ACTIVE" }],
+    authorVerificationStatus: "UNVERIFIED",
   };
   const plainMemberActor: ActorContext = {
     userId: "member-1",
     platformRole: "USER",
     memberships: [{ organizationId: "org-1", role: "MEMBER", status: "ACTIVE" }],
+    authorVerificationStatus: "UNVERIFIED",
   };
 
   let deps: ReturnType<typeof buildService>;
