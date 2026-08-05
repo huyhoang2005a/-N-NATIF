@@ -240,6 +240,16 @@ pnpm --filter @r2m/worker dev
    thật + chạy `node dist/main.js` thì đúng. **Quyết định**: đổi hẳn script `dev` của
    `apps/api` thành `tsc -p tsconfig.json && node dist/main.js`, bỏ `tsx` khỏi
    dependencies — không còn hot-reload, nhưng đảm bảo đúng.
+4. **`ZodValidationPipe` validate nhầm cả tham số route, không chỉ `@Body()`** — pipe
+   dùng qua `@UsePipes()` cấp method áp dụng cho **mọi** tham số của handler. Bất kỳ
+   route nào vừa có `@Param()` vừa dùng pattern này (`decide`, `inviteMember`,
+   `updateMember`) đều luôn trả 400 `"Expected object, received string"` khi gọi thật,
+   vì chuỗi id trong URL bị đem validate theo schema của body. Không unit test nào bắt
+   được vì test gọi thẳng service, bỏ qua tầng pipe/HTTP hoàn toàn — chỉ lộ ra khi trang
+   xét duyệt tổ chức mới (Phần "Hoàn thiện Phase 1") gọi `POST .../decision` qua trình
+   duyệt thật. Sửa: `transform()` chỉ áp dụng schema khi `metadata.type === "body"`, các
+   loại tham số khác trả nguyên giá trị. Thêm `zod-validation.pipe.spec.ts` để tránh tái
+   diễn.
 
 ---
 

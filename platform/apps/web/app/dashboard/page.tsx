@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { MeResponse, OrganizationResponse } from "@r2m/contracts";
 import { authFetch, SessionExpiredError } from "../../lib/api-client";
-import { ORG_STATUS_LABELS, ORG_TYPE_LABELS, PLATFORM_ROLE_LABELS } from "../../lib/labels";
+import { ORG_STATUS_LABELS, ORG_TYPE_LABELS, orgStatusBadgeClass, PLATFORM_ROLE_LABELS } from "../../lib/labels";
 import { getAccessToken } from "../../lib/session";
 import { SiteHeader } from "../_components/SiteHeader";
 
@@ -105,7 +105,7 @@ export default function DashboardPage() {
                       {ORG_TYPE_LABELS[org.type]}
                     </p>
                   </div>
-                  <span className="badge badge-pending">{ORG_STATUS_LABELS[org.status] ?? org.status}</span>
+                  <span className={orgStatusBadgeClass(org.status)}>{ORG_STATUS_LABELS[org.status] ?? org.status}</span>
                 </div>
               ))}
             </div>

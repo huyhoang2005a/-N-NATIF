@@ -21,6 +21,12 @@ export const PLATFORM_ROLE_LABELS: Record<string, string> = {
   PLATFORM_ADMIN: "Quản trị nền tảng",
 };
 
+export function orgStatusBadgeClass(status: string): string {
+  if (status === "ACTIVE") return "badge badge-active";
+  if (status === "REJECTED" || status === "SUSPENDED") return "badge badge-negative";
+  return "badge badge-pending";
+}
+
 export const VERIFICATION_REQUEST_STATUS_LABELS: Record<string, string> = {
   PENDING: "Chưa ai nhận",
   IN_REVIEW: "Đang được xử lý",

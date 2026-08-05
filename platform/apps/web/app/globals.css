@@ -404,6 +404,18 @@ select {
   background: #faf4ea;
 }
 
+.badge-active {
+  border-color: var(--signal-green);
+  color: var(--signal-green);
+  background: var(--signal-green-soft);
+}
+
+.badge-negative {
+  border-color: var(--signal-red);
+  color: var(--signal-red);
+  background: var(--signal-red-soft);
+}
+
 .badge-on-dark {
   display: inline-block;
   min-width: 0;
