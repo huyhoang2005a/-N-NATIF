@@ -42,25 +42,55 @@ platform/                       pnpm + Turborepo workspace
 
 ### 2.2 Phân tầng trong `apps/api` (NestJS)
 
-Mỗi bounded context = 1 module độc lập dưới `src/modules/<context>/`, theo đúng 1 khuôn
-mẫu 4 lớp:
+Mỗi bounded context = 1 thư mục dưới `src/modules/<context>/`. Context nhỏ (1 domain
+concern) là 1 NestJS module phẳng ngay trong thư mục đó (vd `verification/`); context
+gồm nhiều module con thì gom các module con vào chung thư mục + có thêm 1 **module
+tổng hợp** `<context>.module.ts` re-export chúng, để `app.module.ts` chỉ cần import
+đúng số bounded context đang tồn tại — không import lẻ module con:
 
 ```
-modules/<context>/
-├── <context>.controller.ts   Tầng HTTP — nhận request, gọi service, không chứa business rule
-├── <context>.service.ts      Tầng nghiệp vụ — enforce invariant, state transition, ghi audit/outbox
-├── <context>.repository.ts   Tầng dữ liệu — duy nhất nơi gọi Drizzle/SQL trực tiếp
-└── <context>.module.ts       Khai báo provider cho NestJS DI container
+modules/
+├── identity-organization/
+│   ├── auth/                              AuthModule (login, refresh, token)
+│   ├── users/                             UsersModule (hồ sơ cá nhân)
+│   ├── organizations/                     OrganizationsModule (đăng ký, thành viên)
+│   └── identity-organization.module.ts    imports + exports 3 module trên
+├── verification/                          1 module duy nhất (org + author verification)
+└── platform-operations/
+    ├── audit/                             AuditModule (audit_log)
+    ├── jobs/                              JobsModule (outbox_event, idempotency_key)
+    └── platform-operations.module.ts      imports + exports 2 module trên
 ```
 
+Mỗi module con (vd `auth/`) theo đúng 1 khuôn mẫu 4 lớp:
+
+```
+auth/
+├── auth.controller.ts   Tầng HTTP — nhận request, gọi service, không chứa business rule
+├── auth.service.ts      Tầng nghiệp vụ — enforce invariant, state transition, ghi audit/outbox
+├── auth.repository.ts   Tầng dữ liệu — duy nhất nơi gọi Drizzle/SQL trực tiếp
+└── auth.module.ts       Khai báo provider cho NestJS DI container
+```
+
+- **Module tổng hợp phải `exports` lại các module con nó import** — nếu không, provider
+  của module con (vd `TokenService` trong `AuthModule`) sẽ không "lộ" ra ngoài
+  `IdentityOrganizationModule`, và bất kỳ chỗ nào cần inject nó từ ngoài bounded context
+  (vd `JwtAuthGuard` đăng ký làm `APP_GUARD` toàn cục trong `AppModule`) sẽ crash lúc
+  khởi động với lỗi `Nest can't resolve dependencies` — đây là bug thật đã gặp khi gom
+  module (xem mục "Bug thật đã tìm và sửa" bên dưới).
 - **`common/`** — cross-cutting: `JwtAuthGuard` (đọc lại user/membership từ DB mỗi
   request, không tin token), `ZodValidationPipe`, `domain-error.filter.ts` (map
   `DomainError` → HTTP response chuẩn `{ error: { code, message, ... } }`),
   `request-id.middleware.ts`.
 - **`database/database.module.ts`** — cung cấp kết nối Drizzle qua token `DATABASE`,
-  inject bằng `@Inject(DATABASE)`.
+  inject bằng `@Inject(DATABASE)`. Đánh dấu `@Global()` nên không cần export/import lại
+  qua module tổng hợp như các module khác.
 - State transition (`organization.status`, `verification_request.status`) **luôn đi qua
   state machine trong `packages/domain`**, controller/repository không tự set status.
+  `packages/domain` là **shared kernel** dùng chung mọi bounded context (xem
+  `packages/domain/README.md`) — business rule/state machine riêng của 1 bounded context
+  (từ Phase 2 trở đi) đặt trong `modules/<context>/domain/`, không đặt ở
+  `packages/domain`.
 
 ### 2.3 Luồng dữ liệu 1 request điển hình
 
@@ -250,6 +280,19 @@ pnpm --filter @r2m/worker dev
    duyệt thật. Sửa: `transform()` chỉ áp dụng schema khi `metadata.type === "body"`, các
    loại tham số khác trả nguyên giá trị. Thêm `zod-validation.pipe.spec.ts` để tránh tái
    diễn.
+5. **Gom module theo bounded context làm mất provider export, app crash lúc khởi động**
+   — khi gom `auth/`, `users/`, `organizations/` vào chung `modules/identity-
+   organization/` và tạo module tổng hợp `IdentityOrganizationModule` chỉ có
+   `imports: [AuthModule, ...]` (không có `exports`), `JwtAuthGuard` (đăng ký làm
+   `APP_GUARD` toàn cục trong `AppModule`) không còn resolve được `TokenService` —
+   NestJS không tự "lộ" provider của module con ra ngoài module cha chỉ vì cha import
+   nó, phải khai báo `exports` tường minh. Lỗi này **build/typecheck/lint/test đều pass
+   sạch** (đây là lỗi runtime DI graph, không phải lỗi kiểu TypeScript, và unit test
+   dùng `new Service(...)` thủ công nên không đi qua NestJS DI) — chỉ lộ ra khi thật sự
+   chạy `node dist/main.js`. Sửa: thêm `exports: [AuthModule, UsersModule,
+   OrganizationsModule]` vào `IdentityOrganizationModule` (và tương tự cho
+   `PlatformOperationsModule`). Bài học lặp lại đúng mẫu bug #2-#4 ở trên: mọi thay đổi
+   cấu trúc module NestJS phải verify bằng chạy app thật, không chỉ tin build xanh.
 
 ---
 
