@@ -13,6 +13,7 @@
     "lint": "eslint .",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
+    "test:integration": "turbo run test:integration",
     "db:generate": "pnpm --filter @r2m/database generate",
     "db:migrate": "pnpm --filter @r2m/database migrate",
     "db:seed": "pnpm --filter @r2m/database seed"

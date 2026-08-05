@@ -229,6 +229,7 @@ pnpm --filter @r2m/worker dev
 | `pnpm typecheck` | `tsc --noEmit` toàn bộ package/app (qua Turborepo) |
 | `pnpm lint` | ESLint toàn repo |
 | `pnpm test` | Unit test toàn repo (Vitest) — **toàn bộ mock DI, không đụng Postgres thật** |
+| `pnpm test:integration` | Integration test cho `apps/api` — NestJS DI container **thật** (`Test.createTestingModule`) + Postgres thật. Cần `docker compose up -d` + nạp `.env` trước. Xem §3.6. |
 | `pnpm build` | Build tất cả theo đúng thứ tự phụ thuộc (TS Project References) |
 | `pnpm db:generate` | Sinh migration mới từ thay đổi schema Drizzle |
 | `pnpm db:migrate` / `pnpm db:seed` | Chạy migration / seed dữ liệu mẫu |
@@ -243,9 +244,40 @@ pnpm --filter @r2m/worker dev
 | `Couldn't find any pages or app directory` | Đang chạy `next dev` sai thư mục | Phải đứng trong `apps/web`, không phải `platform` root |
 | `type "citext" does not exist` khi migrate | Không thể xảy ra nữa — đã sửa trong `migrate.ts` (xem §5) | — |
 
+### 3.6 Integration test (`apps/api`)
+
+Tách biệt hoàn toàn khỏi unit test (`pnpm test`, mock DI, chạy mọi máy không cần gì
+thêm). Integration test boot **NestJS DI container thật** (`Test.createTestingModule({
+imports: [AppModule] }).compile()`), gọi HTTP thật qua `supertest`, dùng Postgres thật —
+đúng lớp test mà unit test `new Service(...)` thủ công không bao giờ chạm tới (xem README
+§4 bug #5, #8).
+
+```powershell
+cd platform
+docker compose -f infra/docker/docker-compose.yml up -d
+Get-Content .env | ForEach-Object {
+    if ($_ -match '^\s*([^#][^=]+)=(.*)$') {
+        Set-Item -Path "Env:$($matches[1].Trim())" -Value $matches[2].Trim()
+    }
+}
+pnpm test:integration
+```
+
+- `apps/api/test/app-bootstrap.integration-spec.ts` — chỉ boot toàn bộ `AppModule` qua DI
+  thật, assert `app.init()` không throw. Test giá trị cao nhất: tự động canh mọi module
+  hiện có lẫn module mới thêm ở phase sau, không cần biết trước tên class nào.
+- `apps/api/test/identity-organization.integration-spec.ts` — HTTP thật qua module từng
+  bị bug #5: `GET /v1/me/profile` không token → 401, có token hợp lệ → 200;
+  `POST /v1/organizations/register` → 201.
+- Config riêng (`apps/api/vitest.integration.config.ts`, không đụng `vitest.config.ts`
+  gốc) — dùng `unplugin-swc` thay vì esbuild mặc định của Vitest, **bắt buộc** vì NestJS
+  DI thật cần decorator metadata mà esbuild không emit đúng (xem bug #8, cùng lớp với bug
+  #3). File `*.integration-spec.ts` reset dữ liệu giữa các test bằng
+  `resetDatabase()`/`createTestUser()` (`packages/testkit`).
+
 ---
 
-## 4. Đã làm được (Phase 1 + Phase 2)
+## 4. Đã làm được (Phase 1-3)
 
 ### Phase 1
 
@@ -350,6 +382,27 @@ pnpm --filter @r2m/worker dev
 - 2 điểm **tự đề xuất business rule** đã được user review và chốt ngày 2026-08-05 — chi
   tiết quyết định + lý do ở §5 "Phase 3 — business rule đã chốt sau review".
 
+### Chuẩn bị Phase 4 — Integration test + CI
+
+Hạ tầng test thuần tuý, không đụng business logic Phase 1-3. Xem §3.6 để chạy.
+
+- **Integration test tách riêng unit test**: `apps/api/test/*.integration-spec.ts` (khác
+  `*.spec.ts`), config Vitest riêng (`vitest.integration.config.ts`), script
+  `pnpm test:integration` — không lẫn vào `pnpm test` (khác suffix file, khác config).
+- **`app-bootstrap.integration-spec.ts`**: boot toàn bộ `AppModule` qua DI container thật.
+- **`identity-organization.integration-spec.ts`**: HTTP thật qua `supertest` cho đúng
+  module từng vỡ ở bug #5 — guard chặn/cho qua đúng, đăng ký tổ chức end-to-end.
+- **CI** (`.github/workflows/ci.yml`, ở gốc git repo vì workspace pnpm nằm trong
+  `platform/`): typecheck → lint → unit test → migrate → integration test → build, dùng
+  đúng `infra/docker/docker-compose.yml` có sẵn (không định nghĩa lại service), dọn dẹp
+  bằng `docker compose down -v` kể cả khi có bước fail.
+- **Phát hiện 1 bug thật khi xây tầng này** — xem bug #8: Vitest (esbuild) không emit
+  đúng decorator metadata cho NestJS DI thật, cùng lớp với bug #3. Sửa bằng
+  `unplugin-swc`, chỉ áp dụng cho `vitest.integration.config.ts`.
+- `turbo.json` cần khai báo `passThroughEnv` cho task `test:integration` — Turbo v2 mặc
+  định sandbox biến môi trường của process con, không tự động truyền `DATABASE_URL`/
+  `JWT_*`/`S3_*` dù đã có sẵn trong shell chạy lệnh.
+
 ### Bug thật đã tìm và sửa trong phiên này (đáng nhớ cho phiên sau)
 
 1. **Thứ tự tạo Postgres extension sai** — `migrate.ts` chạy baseline migration (dùng
@@ -418,6 +471,29 @@ học đã ghi nhận trước đó: module tổng hợp phải `exports` (bug #
 `loadEnv()` (bug #7) — không có nghĩa là code Phase 3 không cần kiểm tra kỹ, chỉ là lần
 này không có phát hiện mới đáng ghi lại.
 
+8. **Vitest (esbuild) không emit đúng decorator metadata cho NestJS DI thật — cùng lớp
+   bug với bug #3** — khi thêm tầng integration test đầu tiên chạy qua DI container thật
+   (`Test.createTestingModule({ imports: [AppModule] }).compile()`, chuẩn bị hạ tầng
+   test trước Phase 4), `app.init()` pass bình thường (module graph resolve được), nhưng
+   gọi HTTP thật qua `supertest` vào 1 route có `JwtAuthGuard` luôn trả **500**:
+   `TypeError: Cannot read properties of undefined (reading 'getAllAndOverride')` tại
+   `this.reflector.getAllAndOverride(...)` — `Reflector` (provider lõi của NestJS, không
+   phải code tự viết) bị inject thành `undefined`. Nguyên nhân giống hệt bug #3: esbuild
+   (transform mặc định của Vitest cho file `.ts`) không emit đúng `design:paramtypes` mà
+   NestJS DI cần đọc lúc runtime — khác bug #3 ở chỗ lần này lộ ra qua 1 provider lõi
+   (`Reflector`) thay vì service tự viết, và **chỉ lộ khi thực sự gọi HTTP qua guard**,
+   không lộ lúc `app.init()` (module resolve không cần metadata runtime, guard hoạt động
+   mới cần) — đúng lý do vì sao yêu cầu 3 (HTTP thật qua module từng vỡ) tồn tại độc lập
+   với yêu cầu 2 (chỉ boot app), không cái nào thay thế được cái kia. Sửa: thêm
+   `unplugin-swc` + `@swc/core`, chỉ áp dụng cho `apps/api/vitest.integration.config.ts`
+   (bật `jsc.transform.legacyDecorator` + `jsc.transform.decoratorMetadata`) —
+   **KHÔNG đổi** `vitest.config.ts` gốc (unit test dùng `new Service(...)` thủ công,
+   không qua NestJS DI/reflection nên không cần), và **KHÔNG đổi** script
+   `dev`/`build`/`start` của `apps/api` (vẫn `tsc` thật + `node dist/main.js` từ khi sửa
+   bug #3, không liên quan tới transform của Vitest). Nếu sau này có ý định gộp lại dùng
+   esbuild cho integration test để "cho gọn", đọc lại mục này trước — sẽ tái diễn đúng
+   lỗi này, âm thầm và chỉ lộ qua HTTP thật, không lộ qua `app.init()`.
+
 ---
 
 ## 5. Cần cải thiện cho Phase tiếp theo
@@ -455,19 +531,12 @@ này không có phát hiện mới đáng ghi lại.
   false).
 
 ### Kỹ thuật / nợ kỹ thuật
-
-- **Không có test nào chạy qua NestJS DI container thật** — toàn bộ `*.spec.ts` hiện tại
-  `new Service(mockRepo, ...)` thủ công. Nên thêm ít nhất 1 bộ integration test dùng
-  `@nestjs/testing` (`Test.createTestingModule`) + Postgres thật (`packages/testkit`) để
-  bắt được lớp bug như mục "eslint phá DI" ở trên sớm hơn.
 - **`apps/web` chưa có test nào** (không unit test component, không E2E). Có thể thêm
   Playwright cho luồng đăng ký/đăng nhập chính.
 - **Không dùng Redis/BullMQ** dù đã có trong `docker-compose.yml` — `apps/worker` là
   poll loop đơn giản, đủ cho Phase 1-3 nhưng cần chuyển sang BullMQ khi có job cần
   backoff/retry thật (ingestion, embedding thật — Phase 2 chỉ tạo
   `resource_ingestion_job` ở trạng thái `QUEUED`, không có worker xử lý).
-- **Chưa có CI** (không có `.github/workflows` hay pipeline nào chạy `typecheck`/`lint`/
-  `test` tự động khi push).
 - **Chưa có ingestion pipeline thật** (extract/chunk/embedding) — `POST /resources`/
   `POST .../versions` chỉ tạo `resource_ingestion_job` trạng thái `QUEUED`, không có
   worker nào xử lý tiếp. Để dành khi có quyết định chính thức về AI/embedding stack
