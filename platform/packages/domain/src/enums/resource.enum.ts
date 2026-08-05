@@ -15,8 +15,14 @@ export const ResourceType = {
 } as const;
 export type ResourceType = (typeof ResourceType)[keyof typeof ResourceType];
 
-/** ĐỀ XUẤT — CẦN REVIEW (không có trong danh sách 10 state machine chính thức ở §8
- * R2M_SPEC_DESIGN_V5_COMPLETE.md — xem plan PHẦN B.0.1). */
+/** Đã chốt sau review (2026-08-05) — không có trong danh sách 10 state machine chính
+ * thức ở §8 R2M_SPEC_DESIGN_V5_COMPLETE.md, tự đề xuất transition dựa theo UC-RES-01 +
+ * giá trị enum thật trong dbml, user đã duyệt. ARCHIVED/WITHDRAWN KHÔNG cascade xuống
+ * `ResourceVersion` — 2 khái niệm độc lập ("container còn hoạt động không" vs "bản nào
+ * là bản chính thức"); version đã có citation/evidence trỏ vào không được tự đổi trạng
+ * thái chỉ vì Resource cha bị archive, nếu không sẽ phá vỡ invariant "evidence active
+ * phải có citation hợp lệ" (Phase 3). Endpoint archive/withdraw Resource CHƯA tồn tại ở
+ * Phase 2 (ngoài phạm vi §13.2) — quyết định này chỉ ghi nhận để áp dụng khi thật sự xây. */
 export const ResourceStatus = {
   DRAFT: "DRAFT",
   ACTIVE: "ACTIVE",
@@ -25,7 +31,12 @@ export const ResourceStatus = {
 } as const;
 export type ResourceStatus = (typeof ResourceStatus)[keyof typeof ResourceStatus];
 
-/** ĐỀ XUẤT — CẦN REVIEW — xem ghi chú ở `ResourceStatus` phía trên. */
+/** Đã chốt sau review (2026-08-05) — xem ghi chú ở `ResourceStatus` phía trên.
+ * `PUBLISHED → SUPERSEDED` PHẢI cascade (khi publish version mới, version PUBLISHED cũ
+ * tự chuyển SUPERSEDED trong cùng transaction) — nếu không, không nơi nào biết đâu là
+ * "bản hiện hành" khi resolve citation/evidence. Cascade này đặt trong domain service
+ * (`resources.service.ts#publishVersion`), KHÔNG đặt trong state machine — đã đúng vị
+ * trí từ đầu. */
 export const ResourceVersionStatus = {
   DRAFT: "DRAFT",
   PUBLISHED: "PUBLISHED",

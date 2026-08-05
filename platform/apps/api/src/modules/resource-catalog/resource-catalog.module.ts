@@ -34,5 +34,10 @@ import { ResourceAccessGrantsService } from "./resource-access-grants.service";
     ResourceAccessGrantsRepository,
     ResourceAccessGrantsService,
   ],
+  // Exported for `technology-case/evidence.service.ts` (UC-EVD-01 must confirm the
+  // actor can read a resource version before linking it as evidence) — same DI-export
+  // requirement as the aggregator modules in identity-organization/platform-operations,
+  // see README "Bug thật đã tìm và sửa" #5.
+  exports: [ResourcesRepository, ResourcesService],
 })
 export class ResourceCatalogModule {}

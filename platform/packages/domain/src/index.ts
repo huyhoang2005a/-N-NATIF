@@ -3,6 +3,7 @@ export * from "./enums/organization.enum";
 export * from "./enums/verification.enum";
 export * from "./enums/platform-ops.enum";
 export * from "./enums/resource.enum";
+export * from "./enums/technology-case.enum";
 
 export * from "./errors/error-codes";
 export * from "./errors/domain-error";

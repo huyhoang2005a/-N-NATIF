@@ -4,5 +4,6 @@ export * from "./organization";
 export * from "./author";
 export * from "./verification";
 export * from "./resource";
+export * from "./technology-case";
 export * from "./platform-ops";
 export * from "./relations";

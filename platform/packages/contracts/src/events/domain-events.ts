@@ -133,6 +133,29 @@ export interface ResourceAccessRevokedEvent {
   revokedByUserId: string;
 }
 
+export interface TechnologyCaseCreatedEvent {
+  type: "TechnologyCaseCreated";
+  technologyCaseId: string;
+  owningOrganizationId: string;
+  createdByUserId: string;
+}
+
+export interface CaseStatusChangedEvent {
+  type: "CaseStatusChanged";
+  technologyCaseId: string;
+  fromStatus: string | null;
+  toStatus: string;
+  changedByUserId: string;
+}
+
+export interface EvidenceLinkedEvent {
+  type: "EvidenceLinked";
+  evidenceId: string;
+  technologyCaseId: string;
+  resourceVersionId: string;
+  createdByUserId: string;
+}
+
 export type DomainEvent =
   | OrganizationRegisteredEvent
   | OrganizationVerificationRequestedEvent
@@ -151,4 +174,7 @@ export type DomainEvent =
   | AnnotationRevisedEvent
   | AnnotationRemovedEvent
   | ResourceAccessGrantedEvent
-  | ResourceAccessRevokedEvent;
+  | ResourceAccessRevokedEvent
+  | TechnologyCaseCreatedEvent
+  | CaseStatusChangedEvent
+  | EvidenceLinkedEvent;

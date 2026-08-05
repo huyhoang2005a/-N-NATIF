@@ -24,7 +24,7 @@ export class ResourceAccessGrantsRepository {
     });
   }
 
-  /** SUC-04 invariant (ĐỀ XUẤT — CẦN REVIEW, xem plan B.0.1): không tạo 2 grant ACTIVE
+  /** SUC-04 invariant (đã chốt sau review, 2026-08-05): không tạo 2 grant ACTIVE
    * trùng (resource, recipient, permission). */
   async findActiveDuplicate(input: {
     resourceId: string;

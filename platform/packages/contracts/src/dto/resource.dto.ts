@@ -104,7 +104,9 @@ export const ReviseAnnotationRequestSchema = z.object({
 });
 export type ReviseAnnotationRequest = z.infer<typeof ReviseAnnotationRequestSchema>;
 
-/** SUC-04 (ĐỀ XUẤT — CẦN REVIEW, xem plan B.0.1): recipient là user XOR organization. */
+/** SUC-04 (đã chốt sau review, 2026-08-05): grant tạo ACTIVE trực tiếp, không có state
+ * PENDING/entity request riêng — "request" trong tên use case chỉ là hành động
+ * resource-manager cấp quyền. Recipient là user XOR organization. */
 export const CreateResourceAccessRequestSchema = z
   .object({
     recipientUserId: z.string().uuid().optional(),

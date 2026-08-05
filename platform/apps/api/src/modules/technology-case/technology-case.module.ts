@@ -1,0 +1,21 @@
+import { Module } from "@nestjs/common";
+import { ResourceCatalogModule } from "../resource-catalog/resource-catalog.module";
+import { AuditModule } from "../platform-operations/audit/audit.module";
+import { JobsModule } from "../platform-operations/jobs/jobs.module";
+import { TechnologyCasesController } from "./technology-case.controller";
+import { TechnologyCaseRepository } from "./technology-case.repository";
+import { TechnologyCaseService } from "./technology-case.service";
+import { EvidenceRepository } from "./evidence.repository";
+import { EvidenceService } from "./evidence.service";
+
+/** Technology Case bounded context — 1 NestJS module, 1 controller (mirrors the
+ * `verification/` pattern: no aggregator needed, only one real module here — see
+ * CLAUDE.md "Nguyên tắc bắt buộc"). Imports `ResourceCatalogModule` (which now
+ * `exports` `ResourcesService`/`ResourcesRepository`) so `EvidenceService` can reuse
+ * `assertVisible` for UC-EVD-01's "actor có quyền đọc resource" check. */
+@Module({
+  imports: [AuditModule, JobsModule, ResourceCatalogModule],
+  controllers: [TechnologyCasesController],
+  providers: [TechnologyCaseRepository, TechnologyCaseService, EvidenceRepository, EvidenceService],
+})
+export class TechnologyCaseModule {}

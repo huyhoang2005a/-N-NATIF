@@ -56,8 +56,10 @@ export class ResourcesController {
     return this.resourcesService.register(actor, body, requestId(req));
   }
 
-  /** SUC-05 (ĐỀ XUẤT — CẦN REVIEW, xem plan B.0.1): `?q=` full-text search, không tạo
-   * path `/resources/search` riêng vì §13.2 chỉ liệt kê `GET /resources`. */
+  /** SUC-05 (đã chốt sau review, 2026-08-05): `?q=` full-text search, không tạo path
+   * `/resources/search` riêng vì §13.2 chỉ liệt kê `GET /resources`. Vector/semantic
+   * search trì hoãn tới khi có embedding stack thật (Phase 5) — xác nhận không làm ở
+   * Phase 2. */
   @Get()
   list(@CurrentActor() actor: ActorContext, @Query("q") q?: string): Promise<ResourceResponse[]> {
     return this.resourcesService.list(actor, q);
@@ -79,9 +81,10 @@ export class ResourcesController {
     return this.resourcesService.createVersion(actor, id, body, requestId(req));
   }
 
-  /** SUC-04 (ĐỀ XUẤT — CẦN REVIEW, xem plan B.0.1): tên endpoint theo đúng §13.2
+  /** SUC-04 (đã chốt sau review, 2026-08-05): tên endpoint theo đúng §13.2
    * (`access-requests`), nhưng tạo `resource_access_grant` ACTIVE ngay — không có
-   * bảng/state PENDING trong schema đã khoá. */
+   * bảng/state PENDING trong schema đã khoá. "Request" trong tên use case là hành động
+   * resource-manager cấp quyền trực tiếp, không phải entity có vòng đời riêng. */
   @Post(":id/access-requests")
   @UsePipes(new ZodValidationPipe(CreateResourceAccessRequestSchema))
   createAccessGrant(
@@ -93,7 +96,7 @@ export class ResourcesController {
     return this.accessGrantsService.create(actor, id, body, requestId(req));
   }
 
-  /** Path tự đặt, không có trong catalogue §13.2 (xem plan B.0.1). */
+  /** Path tự đặt, không có trong catalogue §13.2 — đã chốt sau review (2026-08-05). */
   @Get(":id/access-grants")
   listAccessGrants(
     @CurrentActor() actor: ActorContext,
@@ -107,7 +110,9 @@ export class ResourcesController {
 export class ResourceAccessGrantsController {
   constructor(private readonly accessGrantsService: ResourceAccessGrantsService) {}
 
-  /** Path tự đặt, không có trong catalogue §13.2 (xem plan B.0.1). */
+  /** Path tự đặt, không có trong catalogue §13.2. Đã chốt sau review (2026-08-05): giữ
+   * `POST .../revoke` — khớp cách đặt tên action (submit/approve/publish) đã dùng ở các
+   * use case khác, dùng nhất quán cho mọi endpoint tự đặt về sau. */
   @Post(":id/revoke")
   revoke(
     @CurrentActor() actor: ActorContext,

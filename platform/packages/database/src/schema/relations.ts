@@ -14,6 +14,16 @@ import {
   resourceIngestionJob,
   resourceVersion,
 } from "./resource";
+import {
+  caseMember,
+  caseOrganization,
+  caseOrigin,
+  caseStatusHistory,
+  evidence,
+  evidenceCitation,
+  technologyCase,
+  technologyProfile,
+} from "./technology-case";
 import type { outboxEvent } from "./platform-ops";
 import { auditLog, idempotencyKey, notification } from "./platform-ops";
 
@@ -237,6 +247,119 @@ export const resourceAccessGrantRelations = relations(resourceAccessGrant, ({ on
   revokedBy: one(userAccount, {
     fields: [resourceAccessGrant.revokedByUserId],
     references: [userAccount.id],
+  }),
+}));
+
+export const technologyCaseRelations = relations(technologyCase, ({ one, many }) => ({
+  owningOrganization: one(organization, {
+    fields: [technologyCase.owningOrganizationId],
+    references: [organization.id],
+  }),
+  createdBy: one(userAccount, {
+    fields: [technologyCase.createdByUserId],
+    references: [userAccount.id],
+  }),
+  origin: one(caseOrigin, {
+    fields: [technologyCase.id],
+    references: [caseOrigin.technologyCaseId],
+  }),
+  profile: one(technologyProfile, {
+    fields: [technologyCase.id],
+    references: [technologyProfile.technologyCaseId],
+  }),
+  organizations: many(caseOrganization),
+  members: many(caseMember),
+  statusHistory: many(caseStatusHistory),
+  evidence: many(evidence),
+}));
+
+export const caseOriginRelations = relations(caseOrigin, ({ one }) => ({
+  technologyCase: one(technologyCase, {
+    fields: [caseOrigin.technologyCaseId],
+    references: [technologyCase.id],
+  }),
+}));
+
+export const technologyProfileRelations = relations(technologyProfile, ({ one }) => ({
+  technologyCase: one(technologyCase, {
+    fields: [technologyProfile.technologyCaseId],
+    references: [technologyCase.id],
+  }),
+  updatedBy: one(userAccount, {
+    fields: [technologyProfile.updatedByUserId],
+    references: [userAccount.id],
+  }),
+}));
+
+export const caseOrganizationRelations = relations(caseOrganization, ({ one }) => ({
+  technologyCase: one(technologyCase, {
+    fields: [caseOrganization.technologyCaseId],
+    references: [technologyCase.id],
+  }),
+  organization: one(organization, {
+    fields: [caseOrganization.organizationId],
+    references: [organization.id],
+  }),
+}));
+
+export const caseMemberRelations = relations(caseMember, ({ one }) => ({
+  technologyCase: one(technologyCase, {
+    fields: [caseMember.technologyCaseId],
+    references: [technologyCase.id],
+  }),
+  user: one(userAccount, {
+    fields: [caseMember.userId],
+    references: [userAccount.id],
+  }),
+  organization: one(organization, {
+    fields: [caseMember.organizationId],
+    references: [organization.id],
+  }),
+  invitedBy: one(userAccount, {
+    fields: [caseMember.invitedByUserId],
+    references: [userAccount.id],
+  }),
+}));
+
+export const caseStatusHistoryRelations = relations(caseStatusHistory, ({ one }) => ({
+  technologyCase: one(technologyCase, {
+    fields: [caseStatusHistory.technologyCaseId],
+    references: [technologyCase.id],
+  }),
+  changedBy: one(userAccount, {
+    fields: [caseStatusHistory.changedByUserId],
+    references: [userAccount.id],
+  }),
+}));
+
+export const evidenceRelations = relations(evidence, ({ one, many }) => ({
+  technologyCase: one(technologyCase, {
+    fields: [evidence.technologyCaseId],
+    references: [technologyCase.id],
+  }),
+  resourceVersion: one(resourceVersion, {
+    fields: [evidence.resourceVersionId],
+    references: [resourceVersion.id],
+  }),
+  annotation: one(annotation, {
+    fields: [evidence.annotationId],
+    references: [annotation.id],
+  }),
+  createdBy: one(userAccount, {
+    fields: [evidence.createdByUserId],
+    references: [userAccount.id],
+  }),
+  citations: many(evidenceCitation),
+}));
+
+export const evidenceCitationRelations = relations(evidenceCitation, ({ one }) => ({
+  evidence: one(evidence, {
+    fields: [evidenceCitation.evidenceId],
+    references: [evidence.id],
+  }),
+  citation: one(citation, {
+    fields: [evidenceCitation.citationId],
+    references: [citation.id],
   }),
 }));
 

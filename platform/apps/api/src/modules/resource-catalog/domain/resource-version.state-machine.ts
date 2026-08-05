@@ -1,11 +1,13 @@
 import { ConflictError, ErrorCode, ResourceVersionStatus, TransitionTable } from "@r2m/domain";
 
 /**
- * ĐỀ XUẤT — CẦN REVIEW (không có trong spec gốc) — xem ghi chú ở `resource.state-machine.ts`.
+ * Đã chốt sau review (2026-08-05) — xem ghi chú ở `resource.state-machine.ts`.
  * `PUBLISHED -> SUPERSEDED` không tự động thực hiện ở đây — service gọi
  * `assertResourceVersionTransition` khi version mới hơn được publish để chuyển version
  * PUBLISHED trước đó sang SUPERSEDED trong cùng transaction (UC-RES-01 business
- * invariant: "Published resource version bất biến").
+ * invariant: "Published resource version bất biến"). User đã xác nhận cascade này là bắt
+ * buộc (tránh 2 version PUBLISHED song song, không nơi nào biết đâu là bản hiện hành) và
+ * đúng vị trí đặt ở domain service, không đặt trong state machine.
  */
 const resourceVersionTransitions = new TransitionTable<ResourceVersionStatus>({
   [ResourceVersionStatus.DRAFT]: [ResourceVersionStatus.PUBLISHED, ResourceVersionStatus.WITHDRAWN],

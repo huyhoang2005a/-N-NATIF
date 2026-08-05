@@ -1,7 +1,7 @@
 # R2M — Research-to-Market Platform
 
-Tài liệu tổng hợp cho **Phase 1 + Phase 2** (Identity & Organization, Verification,
-Resource Catalog & Evidence). Đọc file này trước khi chạy hoặc mở rộng dự án. Với
+Tài liệu tổng hợp cho **Phase 1-3** (Identity & Organization, Verification, Resource
+Catalog & Evidence, Technology Case). Đọc file này trước khi chạy hoặc mở rộng dự án. Với
 business rule/spec gốc, xem `CLAUDE.md` và `docs/spec/`.
 
 ---
@@ -13,13 +13,16 @@ vụ hoạt động chuyển giao công nghệ, kết nối 4 nhóm tổ chức:
 **doanh nghiệp**, **cơ quan nhà nước**, **tổ chức hỗ trợ**. Phase 1 xây phần nền: đăng ký
 tổ chức, xác thực người dùng, xác minh tổ chức thủ công bởi platform reviewer. Phase 2
 thêm: xác minh tác giả, đăng ký/versioning resource (paper/dataset/model/...), annotation,
-cấp quyền truy cập resource, tìm kiếm full-text.
+cấp quyền truy cập resource, tìm kiếm full-text. Phase 3 thêm: Technology Case (aggregate
+trung tâm — case + member + organization + lifecycle) và Evidence/Citation (liên kết
+resource version làm bằng chứng cho case, bắt buộc có citation).
 
 Toàn bộ hệ thống cuối cùng có 8 bounded context (xem `docs/spec/
-R2M_V5_ARCHITECTURE_AND_IMPLEMENTATION_PLAN.md`). Đã triển khai 4 context: **Identity &
+R2M_V5_ARCHITECTURE_AND_IMPLEMENTATION_PLAN.md`). Đã triển khai 5 context: **Identity &
 Organization**, **Verification** (tổ chức + tác giả), **Platform Operations**, **Resource
-Catalog & Evidence** (phần buildable của Phase 2 — không gồm Evidence/Citation-linking
-tới Technology Case, thuộc Phase 3).
+Catalog & Evidence** (bao gồm cả `citation`, dùng thật lần đầu ở Phase 3),
+**Technology Case** (case core/member/organization/lifecycle + evidence — không gồm
+Assessment/Gap/Roadmap, thuộc Phase 4).
 
 ---
 
@@ -60,6 +63,8 @@ modules/
 │   ├── organizations/                     OrganizationsModule (đăng ký, thành viên)
 │   └── identity-organization.module.ts    imports + exports 3 module trên
 ├── verification/                          1 module duy nhất (org + author verification)
+├── resource-catalog/                      1 module duy nhất (resource/version/annotation/access-grant)
+├── technology-case/                       1 module duy nhất (case/member/organization/evidence)
 └── platform-operations/
     ├── audit/                             AuditModule (audit_log)
     ├── jobs/                              JobsModule (outbox_event, idempotency_key)
@@ -287,7 +292,8 @@ pnpm --filter @r2m/worker dev
   không đụng dữ liệu Phase 1 đã có. State machine tác giả tái dùng
   `verification-request.state-machine.ts` sẵn có; state machine `Resource`/
   `ResourceVersion` là tự đề xuất (không có trong danh sách 10 state machine chính thức
-  của spec), đặt trong `modules/resource-catalog/domain/` theo đúng ranh giới shared-
+  của spec, đã được review và duyệt ngày 2026-08-05 — xem §5), đặt trong
+  `modules/resource-catalog/domain/` theo đúng ranh giới shared-
   kernel-vs-per-context đã lập ở §2.2.
 - **API**: xác minh tác giả (upload tài liệu lên MinIO qua presigned URL → nộp → reviewer
   claim/xem tài liệu/duyệt), đăng ký resource + version (publish version đầu tiên tự
@@ -303,8 +309,45 @@ pnpm --filter @r2m/worker dev
 - **OpenAPI**: `docs/openapi/v1/phase1.yaml` đổi tên thành `v1.yaml` (API versioned theo
   `/v1`, không theo phase nội bộ), thêm 18 path + ~20 schema mới, validate bằng script
   `js-yaml` xác nhận toàn bộ `$ref` resolve đúng (155/155).
-- Có 4 điểm **tự đề xuất business rule** (spec chỉ có 1 dòng mô tả hoặc hoàn toàn không
-  đề cập) — đánh dấu `// ĐỀ XUẤT — CẦN REVIEW` trong code, liệt kê chi tiết ở §5.
+- 4 điểm **tự đề xuất business rule** (spec chỉ có 1 dòng mô tả hoặc hoàn toàn không đề
+  cập) đã được user review và chốt ngày 2026-08-05 — chi tiết quyết định + lý do ở §5
+  "Phase 2 — business rule đã chốt sau review".
+
+### Phase 3
+
+- **Domain & DB**: 8 bảng mới (`technology_case`, `case_origin`, `technology_profile`,
+  `case_organization`, `case_member`, `case_status_history`, `evidence`,
+  `evidence_citation`) khớp `docs/spec/schema_v5_production.dbml`. `case_origin` bỏ 3 cột
+  FK tới bảng Phase 5 (`recommendation_item_id`/`research_proposal_id`/
+  `case_initiation_request_id` — bảng chưa tồn tại), y hệt cách xử lý
+  `resource_access_grant.source_transfer_manifest_id` ở Phase 2 — additive migration khi
+  làm Phase 5. State machine `TechnologyCase` (10 trạng thái, **chính thức** trong §8, không
+  tự đề xuất — khác Resource/ResourceVersion ở Phase 2) đặt ở
+  `modules/technology-case/domain/`, khai báo đủ nhưng Phase 3 chỉ thực thi transition
+  `DRAFT→EVIDENCE_COLLECTION`.
+- **API**: tạo case thủ công (MANUAL origin, transaction đủ case + origin + profile +
+  owning organization + OWNER member + status history), quản lý case member/organization
+  (đúng 1 OWNER active, PARTNER_MEMBER phải thuộc org đã link PARTNER_COMPANY, member
+  phải là active org member), transition lifecycle (giới hạn `EVIDENCE_COLLECTION` ở
+  Phase 3), link evidence (citation bắt buộc, tự động transition case khi đây là evidence
+  đầu tiên). Tái dùng `ResourcesService.assertVisible` (đổi `private`→public) để kiểm tra
+  quyền đọc resource version trước khi cho evidence — cross-module reuse đúng tiền lệ
+  `verification/` import `identity-organization/organizations`.
+- **DB constraint mới**: lần đầu tiên dùng `CONSTRAINT TRIGGER ... DEFERRABLE INITIALLY
+  DEFERRED` trong repo (`trg_evidence_requires_citation`) — kiểm tra evidence ACTIVE có
+  ≥1 citation tại thời điểm COMMIT (không phải AFTER INSERT ngay, vì evidence và
+  evidence_citation insert trong cùng transaction). Verify trực tiếp bằng `psql`: insert
+  1 evidence ACTIVE không kèm citation trong transaction riêng → `COMMIT` bị chặn đúng
+  bằng `CASE_EVIDENCE_REQUIRES_CITATION`, không để lại row mồ côi nào.
+- Toàn bộ luồng verify **qua HTTP thật với Postgres thật** (kịch bản 10 bước: tạo case →
+  chặn partner member chưa link org → link partner org → thêm partner member → chặn
+  2 owner → link evidence (tự transition case) → chặn transition ngoài phạm vi Phase 3 →
+  chặn VIEWER tạo evidence, xem `phase3-smoke.mjs`), cộng 16 unit test mock DI mới.
+- **OpenAPI**: thêm 7 path (`technology-cases`, `technology-cases/{id}/{members,
+  organizations,transitions,evidence}`) + 9 schema mới, mở rộng `Error.code`. Validate
+  bằng script `js-yaml`: 191/191 `$ref` resolve đúng. Tiện sửa luôn 1 lỗi có sẵn từ
+  Phase 2: endpoint search resource bị ghi nhầm tag "SUC-04" (đúng ra SUC-05).
+- 2 điểm **tự đề xuất business rule** cần user review — xem §5.
 
 ### Bug thật đã tìm và sửa trong phiên này (đáng nhớ cho phiên sau)
 
@@ -367,6 +410,13 @@ pnpm --filter @r2m/worker dev
    `computeResourceContentSha256`...) để service gọi không cần biết tên bucket/không
    cần tự gọi `loadEnv()`.
 
+**Phase 3 không phát sinh bug thật mới** — build/typecheck/lint/test đều sạch ngay từ
+lần chạy đầu, và HTTP smoke test + verify constraint trigger trực tiếp qua `psql` cũng
+pass ngay lần đầu. Khác biệt so với Phase 1-2 chủ yếu vì đã áp dụng đúng ngay từ đầu 2 bài
+học đã ghi nhận trước đó: module tổng hợp phải `exports` (bug #5) và service không tự gọi
+`loadEnv()` (bug #7) — không có nghĩa là code Phase 3 không cần kiểm tra kỹ, chỉ là lần
+này không có phát hiện mới đáng ghi lại.
+
 ---
 
 ## 5. Cần cải thiện cho Phase tiếp theo
@@ -412,37 +462,12 @@ pnpm --filter @r2m/worker dev
 - **`apps/web` chưa có test nào** (không unit test component, không E2E). Có thể thêm
   Playwright cho luồng đăng ký/đăng nhập chính.
 - **Không dùng Redis/BullMQ** dù đã có trong `docker-compose.yml` — `apps/worker` là
-  poll loop đơn giản, đủ cho Phase 1+2 nhưng cần chuyển sang BullMQ khi có job cần
+  poll loop đơn giản, đủ cho Phase 1-3 nhưng cần chuyển sang BullMQ khi có job cần
   backoff/retry thật (ingestion, embedding thật — Phase 2 chỉ tạo
   `resource_ingestion_job` ở trạng thái `QUEUED`, không có worker xử lý).
 - **Chưa có CI** (không có `.github/workflows` hay pipeline nào chạy `typecheck`/`lint`/
   `test` tự động khi push).
-
-### Phase 2 — business rule tự đề xuất, cần user review trước khi khoá
-
-Spec cho các use case này chỉ có 1 dòng mô tả yêu cầu (không đủ 15 mục như UC chính) hoặc
-hoàn toàn không đề cập — đã chọn cách làm hợp lý nhất theo enum/constraint đã khoá trong
-`schema_v5_production.dbml`, đánh dấu `// ĐỀ XUẤT — CẦN REVIEW` tại chỗ trong code:
-
-- **SUC-04 (Resource Access Grant)**: mô tả spec nói "request/approve" (ngụ ý có bước chờ
-  duyệt) nhưng `AccessGrantStatus` trong schema chỉ có `ACTIVE/EXPIRED/REVOKED` — không
-  có `PENDING`, không có bảng request riêng. Đã chọn: actor quản lý resource
-  (owner/admin tổ chức sở hữu) gọi thẳng endpoint để tạo grant `ACTIVE` ngay, không có
-  state chờ duyệt. Endpoint tạo (`POST /resources/{id}/access-requests`) đúng tên trong
-  catalogue chính thức (§13.2); 2 endpoint list/revoke (`GET /resources/{id}/
-  access-grants`, `POST /access-grants/{id}/revoke`) là **path tự đặt**, không có trong
-  catalogue.
-- **SUC-05 (Resource Search)**: có trong phạm vi bắt buộc chính thức (§12.3), nhưng cách
-  làm kỹ thuật phải tự chọn — hiện chỉ làm full-text search (GIN index trên
-  title/description) qua `GET /resources?q=`, **chưa làm vector/semantic search** vì
-  Phase 2 không build pipeline embedding thật (xem mục dưới) nên chưa có dữ liệu vector
-  để tìm. HNSW index cho `resource_chunk.embedding` cố tình để comment, không bật (đúng
-  ghi chú của spec "tạo sau khi đủ dữ liệu và benchmark").
-- **State machine `Resource`/`ResourceVersion`**: không nằm trong danh sách 10 state
-  machine chính thức của spec — tự đề xuất transition (`Resource`: DRAFT→ACTIVE khi
-  publish version đầu tiên, →ARCHIVED/WITHDRAWN; `ResourceVersion`: DRAFT→PUBLISHED/
-  WITHDRAWN, PUBLISHED→SUPERSEDED/WITHDRAWN) bám theo đúng giá trị enum thật trong dbml.
-- **Không có ingestion pipeline thật** (extract/chunk/embedding) — `POST /resources`/
+- **Chưa có ingestion pipeline thật** (extract/chunk/embedding) — `POST /resources`/
   `POST .../versions` chỉ tạo `resource_ingestion_job` trạng thái `QUEUED`, không có
   worker nào xử lý tiếp. Để dành khi có quyết định chính thức về AI/embedding stack
   (liên quan Phase 5 — AI Recommendation).
@@ -450,12 +475,84 @@ hoàn toàn không đề cập — đã chọn cách làm hợp lý nhất theo 
   (`application/pdf`/`image/jpeg`/`image/png`) + giới hạn 20MB phía client trước khi
   cấp presigned upload URL. Không có thư viện scanning nào trong repo.
 
-### Khi bắt đầu Phase 3
+### Phase 2 — business rule đã chốt sau review (2026-08-05)
 
-Theo đúng thứ tự trong `CLAUDE.md` — **không nhảy cóc module**: Phase 3 là Technology
-Case & Evidence. Bảng `evidence`/`evidence_citation` (FK cứng tới `technology_case`) cố
-tình chưa tạo ở Phase 2 vì phụ thuộc bảng Phase 3 chưa tồn tại — tạo mới ở migration
-riêng của Phase 3, cùng cách xử lý additive đã dùng cho `verification_document`
-(Phase 1→2). Trước khi code, đọc lại đúng thứ tự đã quy định ở rule 10 trong
-`CLAUDE.md`: `01_workflow_theo_phase.md` (mục Phase 3) → `03_activity_diagrams.md` (mục
-Phase 3) → `02_usecase_diagram.md` → đối chiếu `R2M_SPEC_DESIGN_V5_COMPLETE.md`.
+4 điểm dưới đây từng đánh dấu `// ĐỀ XUẤT — CẦN REVIEW` trong code vì spec chỉ có 1 dòng
+mô tả (không đủ 15 mục như UC chính) hoặc hoàn toàn không đề cập. User đã review và chốt
+— code/comment/OpenAPI đã cập nhật để phản ánh đúng quyết định cuối, không còn đánh dấu
+"cần review" nữa:
+
+1. **SUC-04 (Resource Access Grant)** — xác nhận: "request" trong tên use case chỉ là
+   hành động resource-manager cấp quyền trực tiếp, **không có state PENDING/entity
+   request riêng**. Actor quản lý resource gọi thẳng endpoint để tạo
+   `resource_access_grant` status `ACTIVE` ngay. Giữ nguyên implementation hiện tại,
+   không đổi code.
+2. **Đặt tên endpoint tự thêm** (không có trong catalogue §13.2) — chốt dùng
+   `POST .../revoke` (khớp cách đặt tên action `submit`/`approve`/`publish` đã dùng ở
+   các use case khác), áp dụng nhất quán cho mọi endpoint tự đặt về sau. Endpoint hiện
+   tại (`POST /access-grants/{id}/revoke`) đã đúng convention này từ đầu.
+3. **SUC-05 (Resource Search)** — xác nhận trì hoãn vector/semantic search tới khi có
+   embedding stack thật (Phase 5), Phase 2 chỉ làm full-text search. Giữ nguyên
+   implementation hiện tại.
+4. **Cascade giữa `Resource` và `ResourceVersion`** — 2 quyết định tách biệt, không trộn
+   chung 1 quy tắc:
+   - `PUBLISHED → SUPERSEDED` (khi publish version mới hơn) **bắt buộc cascade**, để
+     tránh 2 version cùng `PUBLISHED` song song khiến không nơi nào biết đâu là bản hiện
+     hành khi resolve citation/evidence. Cascade đặt ở domain service
+     (`resources.service.ts#publishVersion`), không đặt trong state machine — đã đúng vị
+     trí từ khi implement, không đổi code.
+   - `Resource` chuyển `ARCHIVED`/`WITHDRAWN` **không** cascade xuống `ResourceVersion` —
+     đây là 2 khái niệm độc lập ("container còn hoạt động không" vs "bản nào là bản
+     chính thức"). Version đã có citation/evidence trỏ vào (Phase 3) không được tự đổi
+     trạng thái chỉ vì Resource cha bị archive, nếu không sẽ phá vỡ invariant "evidence
+     active phải có citation hợp lệ". **Lưu ý**: endpoint archive/withdraw cho `Resource`
+     **chưa tồn tại** ở Phase 2 (state machine đã khai báo transition
+     `ACTIVE→ARCHIVED/WITHDRAWN` nhưng không nằm trong catalogue §13.2 gốc nên chưa có
+     service/controller nào gọi tới) — quyết định "không cascade" này chỉ được **ghi
+     nhận** để áp dụng đúng khi tính năng archive/withdraw thực sự được xây (thường đi
+     cùng luồng quản lý resource ở phase sau), chưa cần code thêm ở Phase 2.
+
+### Phase 3 — business rule tự đề xuất, cần user review trước khi khoá
+
+2 điểm dưới đây đánh dấu `// ĐỀ XUẤT — CẦN REVIEW` trong code vì spec mô tả không đủ chi
+tiết hoặc có 2 nguồn hơi lệch nhau — đã chọn cách đọc hợp lý nhất, chưa được user duyệt:
+
+1. **Actor tạo Technology Case** (`technology-case.service.ts#register`) — bảng endpoint
+   §3.4 `01_workflow_theo_phase.md` ghi actor "Author VERIFIED / Org member" (lỏng hơn,
+   ngụ ý OR) nhưng UC-CASE-01 (nguồn 15-mục chính thức, §10
+   `R2M_SPEC_DESIGN_V5_COMPLETE.md`) ghi rõ "Actor: Verified Author", tiền điều kiện
+   "Author VERIFIED. Owning organization ACTIVE." — đã chọn theo UC-CASE-01 (nghiêm hơn):
+   actor phải **vừa** là verified author **vừa** là active member của
+   `owningOrganizationId`. Nếu ý định thật là OR (verified author HOẶC bất kỳ active org
+   member nào), cần nới lỏng lại điều kiện.
+2. **Vai trò được phép link evidence** (`evidence.service.ts#create`) — spec chỉ nói
+   "Case member có quyền ghi" (1 dòng, không liệt kê role cụ thể) — đã chọn: mọi
+   `case_member` `ACTIVE` **trừ** `VIEWER` (`OWNER`/`TECHNICAL_MEMBER`/`CASE_REVIEWER`/
+   `PARTNER_MEMBER`) được tạo evidence, dựa trên tên gọi "VIEWER" ngụ ý chỉ xem. Nếu ý
+   định thật hẹp hơn (vd chỉ `OWNER`/`TECHNICAL_MEMBER`), cần siết lại.
+
+### Phạm vi cố tình chưa làm ở Phase 3
+
+- **`POST /technology-cases/:id/transitions`** chỉ thực sự cho phép target
+  `EVIDENCE_COLLECTION` — các bước sau (`UNDER_ASSESSMENT` trở đi) cần dữ liệu
+  Assessment/Gap (Phase 4) chưa tồn tại để guard đúng (vd chặn `ROADMAP_APPROVED` khi còn
+  gap CRITICAL). State machine đã khai báo đủ 10 trạng thái chính thức, chỉ chưa mở khoá
+  guard cho các bước xa hơn.
+- **Citation không dedupe** — mỗi lần link evidence luôn tạo `citation` mới, kể cả khi
+  cùng `resource_version_id`/snippet đã có citation trước đó. Spec nói "tạo hoặc reuse"
+  nhưng không định nghĩa tiêu chí trùng lặp.
+- **`case_member` không có luồng invite/accept** — thêm thẳng status `ACTIVE`, khác
+  `organization_member` (có `INVITED`→accept). Breakdown Phase 3 không yêu cầu bước này.
+- **Endpoint archive/withdraw cho `Resource`** (gap đã ghi từ Phase 2) vẫn chưa xây —
+  quyết định "không cascade xuống `ResourceVersion`" đã chốt, chỉ chưa có endpoint gọi
+  tới.
+
+### Khi bắt đầu Phase 4
+
+Theo đúng thứ tự trong `CLAUDE.md` — **không nhảy cóc module**: Phase 4 là Assessment,
+Gap, Roadmap. Case phải ở `EVIDENCE_COLLECTION` mới bắt đầu assessment được (đã sẵn sàng
+từ Phase 3). Trước khi code, đọc lại đúng thứ tự đã quy định ở rule 10 trong
+`CLAUDE.md`: `01_workflow_theo_phase.md` (mục Phase 4) → `03_activity_diagrams.md` (mục
+Phase 4) → `02_usecase_diagram.md` → đối chiếu `R2M_SPEC_DESIGN_V5_COMPLETE.md`. Đặc
+biệt chú ý invariant "client không quyết định composite score" (UC-ASM-01) và guard
+"không approve roadmap khi còn CRITICAL gap mở".

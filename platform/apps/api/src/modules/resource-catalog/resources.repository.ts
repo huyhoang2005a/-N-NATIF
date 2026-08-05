@@ -23,7 +23,7 @@ export class ResourcesRepository {
     return this.db.query.resource.findFirst({ where: eq(schema.resource.id, id) });
   }
 
-  /** SUC-05 (ĐỀ XUẤT — CẦN REVIEW, xem plan B.0.1): full-text search + permission filter
+  /** SUC-05 (đã chốt sau review, 2026-08-05): full-text search + permission filter
    * applied BEFORE returning results — actor sees a resource if it is PUBLIC, owned by
    * one of their active organizations, or explicitly granted via `resource_access_grant`.
    * Two queries instead of one correlated subquery keeps the permission check readable

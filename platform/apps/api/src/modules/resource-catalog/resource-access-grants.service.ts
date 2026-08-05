@@ -38,7 +38,7 @@ function toResponse(grant: {
   };
 }
 
-/** SUC-04 (ĐỀ XUẤT — CẦN REVIEW, xem plan B.0.1). Bounded context: Resource Catalog. */
+/** SUC-04 (đã chốt sau review, 2026-08-05). Bounded context: Resource Catalog. */
 @Injectable()
 export class ResourceAccessGrantsService {
   constructor(

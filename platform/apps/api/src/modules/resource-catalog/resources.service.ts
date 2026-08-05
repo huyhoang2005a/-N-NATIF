@@ -373,7 +373,11 @@ export class ResourcesService {
     return toVersionResponse(publishedVersion);
   }
 
-  private async assertVisible(
+  /** Public so other bounded contexts (e.g. `technology-case/evidence.service.ts`, which
+   * must confirm the actor can read a resource version before linking it as evidence —
+   * UC-EVD-01) can reuse the exact same 3-way visibility check instead of duplicating
+   * it. */
+  async assertVisible(
     actor: ActorContext,
     resource: { id: string; accessLevel: string; ownerOrganizationId: string },
   ): Promise<void> {

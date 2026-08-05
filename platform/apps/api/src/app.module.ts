@@ -8,6 +8,7 @@ import { IdentityOrganizationModule } from "./modules/identity-organization/iden
 import { PlatformOperationsModule } from "./modules/platform-operations/platform-operations.module";
 import { VerificationModule } from "./modules/verification/verification.module";
 import { ResourceCatalogModule } from "./modules/resource-catalog/resource-catalog.module";
+import { TechnologyCaseModule } from "./modules/technology-case/technology-case.module";
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { ResourceCatalogModule } from "./modules/resource-catalog/resource-catal
     IdentityOrganizationModule,
     VerificationModule,
     ResourceCatalogModule,
+    TechnologyCaseModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

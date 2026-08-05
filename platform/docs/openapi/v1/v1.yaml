@@ -5,11 +5,11 @@ info:
   description: |
     Living document for the `/v1` API surface, versioned by API version — not by
     internal phase name (see B.0 in the Phase 2 implementation plan). Currently
-    covers Identity & Organization, Verification (organization + author), and
-    Resource Catalog & Evidence (Phase 1 + Phase 2). Endpoints for Technology
-    Case, Assessment/Gap/Roadmap, Company & Discovery, and Transfer (architecture
-    plan §9) land here as those phases are implemented — do not fork this file
-    per phase.
+    covers Identity & Organization, Verification (organization + author),
+    Resource Catalog & Evidence, and Technology Case (Phase 1-3). Endpoints for
+    Assessment/Gap/Roadmap, Company & Discovery, and Transfer (architecture plan
+    §9) land here as those phases are implemented — do not fork this file per
+    phase.
 
     Error responses always use the unified envelope from architecture plan §10,
     with a stable `code` from `packages/domain/src/errors/error-codes.ts` — see
@@ -29,6 +29,8 @@ tags:
   - name: resources
   - name: annotations
   - name: resource-access-grants
+  - name: technology-cases
+  - name: evidence
 
 paths:
   /auth/login:
@@ -617,11 +619,11 @@ paths:
           $ref: "#/components/responses/DomainError"
     get:
       operationId: listResources
-      summary: SUC-04 — full-text search, permission-filtered before returning results
+      summary: SUC-05 — full-text search, permission-filtered before returning results
       description: |
-        ĐỀ XUẤT — CẦN REVIEW (xem Phase 2 plan B.0.1): `?q=` searches
+        Đã chốt sau review (2026-08-05): `?q=` searches
         title/description via Postgres full-text (GIN index); vector/semantic
-        search is deferred until a real embedding pipeline exists. A resource
+        search is deferred until a real embedding pipeline exists (Phase 5). A resource
         is only returned if it is PUBLIC, owned by one of the caller's active
         organizations, or explicitly granted via `resource_access_grant`.
       tags: [resources]
@@ -701,9 +703,10 @@ paths:
       description: |
         Publishing the resource's first version activates the resource
         (DRAFT -> ACTIVE). Publishing any later version supersedes the
-        previously PUBLISHED one (ĐỀ XUẤT — CẦN REVIEW, xem Phase 2 plan
-        B.0.1 — Resource/ResourceVersion không nằm trong 10 state machine
-        chính thức ở §8).
+        previously PUBLISHED one — cascade is mandatory (đã chốt sau review,
+        2026-08-05), so no two versions are PUBLISHED at once. Resource/
+        ResourceVersion state machine không nằm trong 10 state machine chính
+        thức ở §8, tự đề xuất và đã được duyệt.
       tags: [resources]
       parameters:
         - $ref: "#/components/parameters/ResourceVersionId"
@@ -808,7 +811,7 @@ paths:
   /resources/{id}/access-requests:
     post:
       operationId: createResourceAccessGrant
-      summary: SUC-04 — grant access to a resource (ĐỀ XUẤT — CẦN REVIEW)
+      summary: SUC-04 — grant access to a resource (đã chốt sau review, 2026-08-05)
       description: |
         Endpoint name matches §13.2 (`access-requests`), but creates a
         `resource_access_grant` with status ACTIVE immediately — the locked
@@ -847,8 +850,8 @@ paths:
   /resources/{id}/access-grants:
     get:
       operationId: listResourceAccessGrants
-      summary: List access grants for a resource (ĐỀ XUẤT — CẦN REVIEW, path tự đặt)
-      description: Path not listed in §13.2 — self-defined (see Phase 2 plan B.0.1). Requires MANAGE.
+      summary: List access grants for a resource (path tự đặt, đã chốt sau review)
+      description: Path not listed in §13.2 — self-defined and confirmed 2026-08-05. Requires MANAGE.
       tags: [resource-access-grants]
       parameters:
         - $ref: "#/components/parameters/ResourceId"
@@ -871,8 +874,11 @@ paths:
   /access-grants/{id}/revoke:
     post:
       operationId: revokeResourceAccessGrant
-      summary: Revoke an ACTIVE resource access grant (ĐỀ XUẤT — CẦN REVIEW, path tự đặt)
-      description: Path not listed in §13.2 — self-defined (see Phase 2 plan B.0.1). Requires MANAGE.
+      summary: Revoke an ACTIVE resource access grant (path tự đặt, đã chốt sau review)
+      description: >-
+        Path not listed in §13.2 — self-defined and confirmed 2026-08-05
+        (naming kept consistent with other action endpoints:
+        submit/approve/publish/revoke). Requires MANAGE.
       tags: [resource-access-grants]
       parameters:
         - name: id
@@ -900,6 +906,214 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+
+  /technology-cases:
+    post:
+      operationId: registerTechnologyCase
+      summary: UC-CASE-01 — create a Technology Case (MANUAL origin)
+      description: |
+        Đã chốt sau review (2026-08-05): actor phải là verified author VÀ active
+        member của `owningOrganizationId` (theo UC-CASE-01, nghiêm hơn mô tả 1
+        dòng ở bảng endpoint §3.4 01_workflow_theo_phase.md). Tạo trong 1
+        transaction: case + case_origin(MANUAL) + technology_profile draft +
+        case_organization(OWNING_ORGANIZATION) + case_member(OWNER) +
+        case_status_history(DRAFT).
+      tags: [technology-cases]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterTechnologyCaseRequest"
+      responses:
+        "201":
+          description: Created case, status DRAFT
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TechnologyCaseResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          $ref: "#/components/responses/DomainError"
+    get:
+      operationId: listTechnologyCases
+      summary: List technology cases visible to the actor
+      description: |
+        Actor thấy case nếu là active case_member, hoặc thuộc (active org
+        member) một organization đã link qua `case_organization` — bao gồm cả
+        owning organization.
+      tags: [technology-cases]
+      responses:
+        "200":
+          description: Visible technology cases
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TechnologyCaseResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+
+  /technology-cases/{id}:
+    get:
+      operationId: getTechnologyCase
+      summary: Get a technology case by id
+      tags: [technology-cases]
+      parameters:
+        - $ref: "#/components/parameters/TechnologyCaseId"
+      responses:
+        "200":
+          description: Technology case
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TechnologyCaseResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/DomainError"
+
+  /technology-cases/{id}/members:
+    post:
+      operationId: addCaseMember
+      summary: SUC-06 — add a member to a technology case
+      description: |
+        §3.5: chỉ OWNER hoặc ORG_OWNER/ORG_ADMIN của owning organization được
+        gọi. Đúng 1 OWNER active tại mọi thời điểm
+        (`CASE_OWNER_ALREADY_EXISTS`); OWNER phải thuộc owning organization
+        (`CASE_OWNER_NOT_IN_OWNING_ORG`); PARTNER_MEMBER phải thuộc organization
+        đã có role PARTNER_COMPANY trong case (`CASE_PARTNER_MEMBER_ORG_NOT_LINKED`);
+        user được mời phải là active member của organizationId khai báo
+        (`CASE_MEMBER_NOT_ACTIVE_IN_ORGANIZATION`).
+      tags: [technology-cases]
+      parameters:
+        - $ref: "#/components/parameters/TechnologyCaseId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddCaseMemberRequest"
+      responses:
+        "201":
+          description: Added case member
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaseMemberResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/DomainError"
+
+  /technology-cases/{id}/organizations:
+    post:
+      operationId: addCaseOrganization
+      summary: SUC-06 — link a partner/review/support organization to a case
+      description: |
+        §3.4: chỉ case OWNER được gọi. `OWNING_ORGANIZATION` bị loại khỏi
+        request — role đó chỉ được hệ thống tự tạo lúc register case (đúng 1
+        owning org / case).
+      tags: [technology-cases]
+      parameters:
+        - $ref: "#/components/parameters/TechnologyCaseId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddCaseOrganizationRequest"
+      responses:
+        "201":
+          description: Linked case organization
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaseOrganizationResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /technology-cases/{id}/transitions:
+    post:
+      operationId: transitionTechnologyCase
+      summary: SUC-07 — transition a technology case's lifecycle status
+      description: |
+        Đã chốt sau review (2026-08-05): Phase 3 chỉ thực sự cho phép target
+        `EVIDENCE_COLLECTION` — mọi target khác trả `CASE_INVALID_TRANSITION`,
+        vì các bước sau (UNDER_ASSESSMENT trở đi) cần dữ liệu Assessment/Gap
+        (Phase 4) chưa tồn tại để guard đúng. Trong thực tế transition này
+        thường xảy ra tự động khi evidence đầu tiên được tạo — endpoint này chủ
+        yếu để hạ tầng sẵn sàng cho Phase 4+.
+      tags: [technology-cases]
+      parameters:
+        - $ref: "#/components/parameters/TechnologyCaseId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransitionCaseRequest"
+      responses:
+        "200":
+          description: Updated technology case
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TechnologyCaseResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/DomainError"
+
+  /technology-cases/{id}/evidence:
+    post:
+      operationId: createEvidence
+      summary: UC-EVD-01 — link a resource version as evidence
+      description: |
+        ĐỀ XUẤT — CẦN REVIEW (đã chốt sau nghiên cứu, xem plan PHẦN C quyết
+        định 5): "case member có quyền ghi" — chọn mọi active case_member trừ
+        VIEWER. Actor phải có quyền đọc `resourceVersionId` (PUBLIC / owner org
+        / active `resource_access_grant`, tái dùng
+        `ResourcesService.assertVisible`). Tạo citation + evidence(ACTIVE) +
+        evidence_citation trong 1 transaction — citation luôn tạo mới, không
+        dedupe (Phase 3 simplification). Evidence đầu tiên của case tự động
+        chuyển case DRAFT→EVIDENCE_COLLECTION trong cùng transaction.
+      tags: [evidence]
+      parameters:
+        - $ref: "#/components/parameters/TechnologyCaseId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEvidenceRequest"
+      responses:
+        "201":
+          description: Created evidence
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvidenceResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/DomainError"
+        "422":
+          $ref: "#/components/responses/DomainError"
 
 components:
   securitySchemes:
@@ -942,6 +1156,13 @@ components:
         type: string
         format: uuid
     AnnotationId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    TechnologyCaseId:
       name: id
       in: path
       required: true
@@ -1025,6 +1246,17 @@ components:
                 - ACCESS_GRANT_NOT_FOUND
                 - ACCESS_GRANT_DUPLICATE
                 - ACCESS_GRANT_ALREADY_REVOKED
+                - CASE_NOT_FOUND
+                - CASE_CREATOR_NOT_VERIFIED_AUTHOR
+                - CASE_OWNER_ALREADY_EXISTS
+                - CASE_MEMBER_ALREADY_EXISTS
+                - CASE_OWNER_NOT_IN_OWNING_ORG
+                - CASE_MEMBER_NOT_ACTIVE_IN_ORGANIZATION
+                - CASE_PARTNER_MEMBER_ORG_NOT_LINKED
+                - CASE_ORGANIZATION_ROLE_NOT_ALLOWED
+                - CASE_INVALID_TRANSITION
+                - EVIDENCE_NOT_FOUND
+                - CASE_EVIDENCE_REQUIRES_CITATION
             message:
               type: string
             details:
@@ -1505,7 +1737,7 @@ components:
           enum: [PUBLIC, ORGANIZATION, CASE_ONLY, APPROVAL_REQUIRED, PRIVATE]
         status:
           type: string
-          description: "ĐỀ XUẤT — CẦN REVIEW (xem Phase 2 plan B.0.1)"
+          description: "Đã chốt sau review (2026-08-05). ARCHIVED/WITHDRAWN không cascade xuống ResourceVersion."
           enum: [DRAFT, ACTIVE, ARCHIVED, WITHDRAWN]
         moderationStatus:
           type: string
@@ -1561,7 +1793,7 @@ components:
           format: date-time
         status:
           type: string
-          description: "ĐỀ XUẤT — CẦN REVIEW (xem Phase 2 plan B.0.1)"
+          description: "Đã chốt sau review (2026-08-05). PUBLISHED -> SUPERSEDED cascade là bắt buộc khi publish version mới hơn."
           enum: [DRAFT, PUBLISHED, SUPERSEDED, WITHDRAWN]
         createdByUserId:
           type: string
@@ -1660,7 +1892,8 @@ components:
       required: [permission]
       description: |
         Exactly one of `recipientUserId` or `recipientOrganizationId` is
-        required (ĐỀ XUẤT — CẦN REVIEW, xem Phase 2 plan B.0.1).
+        required. Grant is created ACTIVE immediately, no PENDING state
+        (đã chốt sau review, 2026-08-05).
       properties:
         recipientUserId:
           type: string
@@ -1712,5 +1945,233 @@ components:
           type: [string, "null"]
           format: uuid
         createdAt:
+          type: string
+          format: date-time
+
+    RegisterTechnologyCaseRequest:
+      type: object
+      required: [owningOrganizationId, title]
+      description: |
+        `summary` maps to `technology_profile.summary` — dbml has no dedicated
+        "technology type" column (schema is the source of truth). Initial
+        resources are out of scope — evidence is added afterwards via
+        `POST /technology-cases/{id}/evidence`.
+      properties:
+        owningOrganizationId:
+          type: string
+          format: uuid
+        title:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+        summary:
+          type: string
+
+    TechnologyCaseResponse:
+      type: object
+      required:
+        [id, owningOrganizationId, title, slug, description, lifecycleStatus,
+         createdByUserId, createdAt, updatedAt, archivedAt, version]
+      properties:
+        id:
+          type: string
+          format: uuid
+        owningOrganizationId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        slug:
+          type: string
+        description:
+          type: [string, "null"]
+        lifecycleStatus:
+          type: string
+          description: Chính thức trong §8 R2M_SPEC_DESIGN_V5_COMPLETE.md.
+          enum:
+            [DRAFT, EVIDENCE_COLLECTION, UNDER_ASSESSMENT, GAP_IDENTIFIED,
+             ROADMAP_DRAFT, ROADMAP_APPROVED, PILOT_READY, TRANSFER_READY,
+             COMMERCIALIZED, ARCHIVED]
+        createdByUserId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        archivedAt:
+          type: [string, "null"]
+          format: date-time
+        version:
+          type: integer
+
+    AddCaseMemberRequest:
+      type: object
+      required: [userId, organizationId, role]
+      properties:
+        userId:
+          type: string
+          format: uuid
+        organizationId:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum: [OWNER, TECHNICAL_MEMBER, CASE_REVIEWER, PARTNER_MEMBER, VIEWER]
+
+    CaseMemberResponse:
+      type: object
+      required:
+        [id, technologyCaseId, userId, organizationId, role, status,
+         invitedByUserId, joinedAt, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        technologyCaseId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        organizationId:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum: [OWNER, TECHNICAL_MEMBER, CASE_REVIEWER, PARTNER_MEMBER, VIEWER]
+        status:
+          type: string
+          enum: [INVITED, ACTIVE, SUSPENDED, LEFT]
+        invitedByUserId:
+          type: [string, "null"]
+          format: uuid
+        joinedAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+
+    AddCaseOrganizationRequest:
+      type: object
+      required: [organizationId, role]
+      description: |
+        `OWNING_ORGANIZATION` bị loại — role đó chỉ được hệ thống tự tạo lúc
+        register case.
+      properties:
+        organizationId:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum: [PARTNER_COMPANY, REVIEW_ORGANIZATION, SUPPORT_ORGANIZATION]
+
+    CaseOrganizationResponse:
+      type: object
+      required: [id, technologyCaseId, organizationId, role, joinedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        technologyCaseId:
+          type: string
+          format: uuid
+        organizationId:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum:
+            [OWNING_ORGANIZATION, PARTNER_COMPANY, REVIEW_ORGANIZATION,
+             SUPPORT_ORGANIZATION]
+        joinedAt:
+          type: string
+          format: date-time
+
+    TransitionCaseRequest:
+      type: object
+      required: [toStatus]
+      properties:
+        toStatus:
+          type: string
+          enum:
+            [DRAFT, EVIDENCE_COLLECTION, UNDER_ASSESSMENT, GAP_IDENTIFIED,
+             ROADMAP_DRAFT, ROADMAP_APPROVED, PILOT_READY, TRANSFER_READY,
+             COMMERCIALIZED, ARCHIVED]
+        reason:
+          type: string
+          maxLength: 2000
+
+    CreateEvidenceRequest:
+      type: object
+      required: [resourceVersionId, title, claim, relevanceNote, citation]
+      properties:
+        resourceVersionId:
+          type: string
+          format: uuid
+        annotationId:
+          type: string
+          format: uuid
+        title:
+          type: string
+          maxLength: 255
+        claim:
+          type: string
+        relevanceNote:
+          type: string
+        citation:
+          type: object
+          required: [snippet]
+          properties:
+            snippet:
+              type: string
+            pageNumber:
+              type: integer
+            sectionLabel:
+              type: string
+              maxLength: 255
+            offsetStart:
+              type: integer
+            offsetEnd:
+              type: integer
+
+    EvidenceResponse:
+      type: object
+      required:
+        [id, technologyCaseId, resourceVersionId, annotationId, title, claim,
+         relevanceNote, status, createdByUserId, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        technologyCaseId:
+          type: string
+          format: uuid
+        resourceVersionId:
+          type: string
+          format: uuid
+        annotationId:
+          type: [string, "null"]
+          format: uuid
+        title:
+          type: string
+        claim:
+          type: string
+        relevanceNote:
+          type: string
+        status:
+          type: string
+          enum: [ACTIVE, SUPERSEDED, REJECTED]
+        createdByUserId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
           type: string
           format: date-time

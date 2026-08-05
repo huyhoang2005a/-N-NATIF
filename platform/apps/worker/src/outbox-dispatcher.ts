@@ -131,6 +131,12 @@ async function handleEvent(db: Database, event: DomainEvent): Promise<void> {
       // Phase 2 simplification (see plan B.0): no notification recipient/UI depends on
       // these yet — same "no reader-facing meaning" treatment as OrganizationRegistered.
       return;
+    case "TechnologyCaseCreated":
+    case "CaseStatusChanged":
+    case "EvidenceLinked":
+      // Phase 3 simplification (see plan PHẦN C): same "no notification yet" treatment
+      // as most Phase 2 events — no reader-facing UI depends on these.
+      return;
     default: {
       const _exhaustive: never = event;
       throw new Error(`Unhandled domain event type: ${JSON.stringify(_exhaustive)}`);

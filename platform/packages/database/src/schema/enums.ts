@@ -165,3 +165,53 @@ export const annotationStatusEnum = pgEnum("annotation_status", [
   "DEPRECATED",
   "REMOVED",
 ]);
+
+// Phase 3 (Technology Case & Evidence) — ported 1:1 from schema_v5_production.dbml.
+
+export const technologyCaseStatusEnum = pgEnum("technology_case_status", [
+  "DRAFT",
+  "EVIDENCE_COLLECTION",
+  "UNDER_ASSESSMENT",
+  "GAP_IDENTIFIED",
+  "ROADMAP_DRAFT",
+  "ROADMAP_APPROVED",
+  "PILOT_READY",
+  "TRANSFER_READY",
+  "COMMERCIALIZED",
+  "ARCHIVED",
+]);
+
+export const caseOriginTypeEnum = pgEnum("case_origin_type", [
+  "MANUAL",
+  "DISCOVERY_RECOMMENDATION",
+  "RESEARCH_PROPOSAL",
+  "IMPORT",
+]);
+
+export const caseOrganizationRoleEnum = pgEnum("case_organization_role", [
+  "OWNING_ORGANIZATION",
+  "PARTNER_COMPANY",
+  "REVIEW_ORGANIZATION",
+  "SUPPORT_ORGANIZATION",
+]);
+
+export const caseMemberRoleEnum = pgEnum("case_member_role", [
+  "OWNER",
+  "TECHNICAL_MEMBER",
+  "CASE_REVIEWER",
+  "PARTNER_MEMBER",
+  "VIEWER",
+]);
+
+export const evidenceStatusEnum = pgEnum("evidence_status", [
+  "ACTIVE",
+  "SUPERSEDED",
+  "REJECTED",
+]);
+
+export const visibilityLevelEnum = pgEnum("visibility_level", [
+  "PUBLIC",
+  "ORGANIZATION_ONLY",
+  "PARTNERS_ONLY",
+  "PRIVATE",
+]);
