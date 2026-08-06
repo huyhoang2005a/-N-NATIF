@@ -102,7 +102,7 @@ export class AssessmentService {
     @Inject(DATABASE) private readonly db: Database,
   ) {}
 
-  /** ĐỀ XUẤT — CẦN REVIEW: đã chốt theo rule 12 CLAUDE.md — chỉ OWNER/TECHNICAL_MEMBER
+  /** Đã chốt sau review (2026-08-06, theo rule 12 CLAUDE.md) — chỉ OWNER/TECHNICAL_MEMBER
    * được tạo/nhập điểm/submit assessment (nhóm "làm"), CASE_REVIEWER không được (sẽ tự
    * duyệt chính bước mình vừa nhập nếu cho phép). */
   private async assertWriteAllowed(technologyCaseId: string, actor: ActorContext): Promise<void> {
@@ -346,7 +346,7 @@ export class AssessmentService {
     return toAssessmentResponse(updated);
   }
 
-  /** ĐỀ XUẤT — CẦN REVIEW: đã chốt theo rule 12 CLAUDE.md — chỉ CASE_REVIEWER được
+  /** Đã chốt sau review (2026-08-06, theo rule 12 CLAUDE.md) — chỉ CASE_REVIEWER được
    * quyết định (KHÔNG gồm OWNER, dù OWNER được phép nhập điểm — tránh owner tự duyệt
    * chính assessment mình nhập). */
   async decide(

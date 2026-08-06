@@ -2871,9 +2871,9 @@ components:
         status:
           type: string
           description: |
-            ĐỀ XUẤT — CẦN REVIEW: dbml không có `CHANGES_REQUESTED` (§8 nhắc
-            nhưng không tồn tại trong enum thật) — "changes requested" tái
-            dùng `DRAFT` (xem plan PHẦN D quyết định 1-2).
+            Đã chốt sau review (2026-08-06): dbml không có `CHANGES_REQUESTED`
+            (§8 nhắc nhưng không tồn tại trong enum thật) — "changes requested"
+            tái dùng `DRAFT` (xem plan PHẦN D quyết định 1-2, README §5).
           enum: [DRAFT, SUBMITTED, APPROVED, SUPERSEDED]
         compositeScore:
           type: [number, "null"]
@@ -3150,11 +3150,13 @@ components:
         status:
           type: string
           description: |
-            ĐỀ XUẤT — CẦN REVIEW: dbml không có `CHANGES_REQUESTED`/`ARCHIVED`
-            (§8 nhắc nhưng không tồn tại trong enum thật) — "changes requested"
-            tái dùng `DRAFT` (xem plan PHẦN D quyết định 1-2). `ACTIVE`/
-            `COMPLETED`/`SUPERSEDED` khai đủ enum nhưng chưa có endpoint nào
-            chạm tới ở Phase 4.
+            Đã chốt sau review (2026-08-06): dbml không có `CHANGES_REQUESTED`/
+            `ARCHIVED` (§8 nhắc nhưng không tồn tại trong enum thật). Review
+            decision map sang 3 nhánh tách biệt (xem plan PHẦN D quyết định
+            1-2, README §5): APPROVED→`APPROVED`, REJECTED→`REJECTED`
+            (terminal), CHANGES_REQUESTED→`DRAFT` (quay lại sửa) — REJECTED
+            không gộp chung DRAFT. `ACTIVE`/`COMPLETED`/`SUPERSEDED` khai đủ
+            enum nhưng chưa có endpoint nào chạm tới ở Phase 4.
           enum:
             [DRAFT, IN_REVIEW, APPROVED, ACTIVE, COMPLETED, REJECTED,
              SUPERSEDED]

@@ -1,14 +1,14 @@
 import { AssessmentStatus, ConflictError, ErrorCode, TransitionTable } from "@r2m/domain";
 
 /**
- * ĐỀ XUẤT — CẦN REVIEW (xem plan PHẦN D quyết định 1-2, packages/domain/src/enums/
- * assessment-gap.enum.ts): §8 R2M_SPEC_DESIGN_V5_COMPLETE.md viết "DRAFT → SUBMITTED →
- * APPROVED / CHANGES_REQUESTED; CHANGES_REQUESTED → DRAFT" nhưng `CHANGES_REQUESTED`
- * không tồn tại trong `AssessmentStatus` enum thật (dbml: DRAFT/SUBMITTED/APPROVED/
- * SUPERSEDED — schema là nguồn sự thật đã khoá). Diễn giải: decision=REJECT đưa
- * assessment quay lại `DRAFT` để sửa (không tạo state mới); `APPROVED → SUPERSEDED` khi
- * có assessment mới được approve cho cùng case (mirror `ResourceVersion.PUBLISHED→
- * SUPERSEDED`, Phase 2).
+ * Đã chốt sau review (2026-08-06, xem plan PHẦN D quyết định 1-2, packages/domain/src/
+ * enums/assessment-gap.enum.ts, README §5): §8 R2M_SPEC_DESIGN_V5_COMPLETE.md viết
+ * "DRAFT → SUBMITTED → APPROVED / CHANGES_REQUESTED; CHANGES_REQUESTED → DRAFT" nhưng
+ * `CHANGES_REQUESTED` không tồn tại trong `AssessmentStatus` enum thật (dbml: DRAFT/
+ * SUBMITTED/APPROVED/SUPERSEDED — schema là nguồn sự thật đã khoá, user xác nhận nguyên
+ * tắc này thắng prose). Diễn giải: decision=REJECT đưa assessment quay lại `DRAFT` để
+ * sửa (không tạo state mới); `APPROVED → SUPERSEDED` khi có assessment mới được approve
+ * cho cùng case (mirror `ResourceVersion.PUBLISHED→SUPERSEDED`, Phase 2).
  *
  * Đặt ở đây (không phải packages/domain) theo đúng ranh giới đã chốt từ Phase 2 — mọi
  * state machine mới, kể cả chính thức, thuộc bounded context của nó.

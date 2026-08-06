@@ -430,7 +430,7 @@ Hạ tầng test thuần tuý, không đụng business logic Phase 1-3. Xem §3.
   **`CASE_REVIEWER` là vai trò "soát" duy nhất** cho `POST /assessments/{id}/decision` và
   `POST /roadmaps/{id}/reviews` — **loại cả `OWNER`** dù UC template/breakdown có gợi ý
   owner cũng approve được, để không ai vừa tạo vừa tự duyệt chính việc mình làm (chi tiết
-  + lý do ở §5 "Phase 4 — điểm tự đề xuất cần review").
+  + lý do ở §5 "Phase 4 — business rule đã chốt sau review").
 - **API**: tạo/nhập điểm/submit/decide assessment (completeness + composite score tái
   tính ở CẢ submit lẫn approve, supersede assessment `APPROVED` cũ cùng case), tạo/
   transition gap (cần ≥1 nguồn support, gap `CRITICAL` phát event `CriticalGapRaised`,
@@ -673,26 +673,33 @@ cuối, không còn đánh dấu "cần review" nữa:
   quyết định "không cascade xuống `ResourceVersion`" đã chốt, chỉ chưa có endpoint gọi
   tới.
 
-### Phase 4 — điểm tự đề xuất cần review
+### Phase 4 — business rule đã chốt sau review (2026-08-06)
 
-4 điểm dưới đây đang đánh dấu `// ĐỀ XUẤT — CẦN REVIEW` trong code vì spec mô tả không đủ
+4 điểm dưới đây từng đánh dấu `// ĐỀ XUẤT — CẦN REVIEW` trong code vì spec mô tả không đủ
 chi tiết hoặc 2 nguồn (`01_workflow_theo_phase.md` §8 prose vs `schema_v5_production.dbml`
-enum) lệch nhau. Đã áp dụng rule 11/12 mới trong `CLAUDE.md` nên độ chắc chắn cao hơn bản
-nháp đầu, nhưng vẫn cần user xác nhận trước khi coi là chốt:
+enum) lệch nhau. User đã review và chốt — code/OpenAPI/`docs/spec/01_workflow_theo_
+phase.md` §4.5 đã cập nhật để phản ánh đúng quyết định cuối, không còn đánh dấu "cần
+review" nữa:
 
 1. **`AssessmentStatus`/`RoadmapStatus` — enum thật (dbml) không có `CHANGES_REQUESTED`/
-   `ARCHIVED`** dù §8 nhắc tới. Đã chọn: dbml khoá (đúng quy ước "schema là nguồn sự
-   thật" toàn dự án), "changes requested" tái dùng giá trị `DRAFT` có sẵn thay vì tạo
-   state mới — cụ thể `AssessmentStatus`: `SUBMITTED→DRAFT` khi decision=REJECT;
-   `RoadmapStatus`: `IN_REVIEW→DRAFT` khi review decision=`CHANGES_REQUESTED` (giá trị
-   này CÓ thật trong `RoadmapReviewDecision`, chỉ không phải giá trị của
-   `RoadmapStatus`). `ACTIVE`/`COMPLETED`/`SUPERSEDED` của `RoadmapStatus` khai đủ enum
-   nhưng chưa có endpoint nào chạm tới ở Phase 4 (giữ đúng tiền lệ khai đủ, mở khoá theo
-   phạm vi phase).
+   `ARCHIVED`** dù §8 nhắc tới. Xác nhận: dbml khoá (đúng quy ước "schema là nguồn sự
+   thật" toàn dự án). `AssessmentStatus`: `SUBMITTED→DRAFT` khi decision=REJECT (chỉ 1
+   nhánh, đúng như đề xuất ban đầu). `RoadmapStatus` — xác nhận lại **đủ 3 nhánh tách
+   biệt**, không gộp `REJECTED` chung `DRAFT` (bản nháp đầu chỉ nêu nhánh
+   `CHANGES_REQUESTED→DRAFT` mà bỏ sót xác nhận rõ nhánh REJECTED, dù code từ đầu đã tách
+   đúng):
+   - decision=APPROVED → `RoadmapStatus.APPROVED`
+   - decision=REJECTED → `RoadmapStatus.REJECTED` (terminal — state đạt tới được thật,
+     không phải khai cho đủ enum rồi bỏ không)
+   - decision=CHANGES_REQUESTED → `RoadmapStatus.DRAFT` (giá trị này CÓ thật trong
+     `RoadmapReviewDecision`, chỉ không phải giá trị của `RoadmapStatus`)
+
+   `ACTIVE`/`COMPLETED`/`SUPERSEDED` của `RoadmapStatus` khai đủ enum nhưng chưa có
+   endpoint nào chạm tới ở Phase 4 (giữ đúng tiền lệ khai đủ, mở khoá theo phạm vi phase).
 2. **Thời điểm case tự chuyển `GAP_IDENTIFIED→ROADMAP_DRAFT`** — breakdown/UC-RDM-01 chỉ
    nói rõ tiền điều kiện tạo roadmap (case đang `GAP_IDENTIFIED`/`ROADMAP_DRAFT`) và thời
    điểm chuyển `ROADMAP_APPROVED` (lúc review pass), không nói rõ lúc nào case chuyển
-   `ROADMAP_DRAFT`. Đã chọn: chuyển khi roadmap **đầu tiên** của case được tạo — mirror
+   `ROADMAP_DRAFT`. Xác nhận: chuyển khi roadmap **đầu tiên** của case được tạo — mirror
    chính xác pattern đã dùng cho `EVIDENCE_COLLECTION` (Phase 3, evidence đầu tiên) và
    `GAP_IDENTIFIED` (gap đầu tiên).
 3. **`POST /assessments/{id}/decision` và `POST /roadmaps/{id}/reviews` chỉ
@@ -705,7 +712,7 @@ nháp đầu, nhưng vẫn cần user xác nhận trước khi coi là chốt:
 4. **Gap chỉ cần ≥1 trong 2 nguồn support: `sourceAssessmentId` hoặc ≥1 `evidenceIds`** —
    không làm `gap_citation` link trực tiếp ở Phase 4 MVP (bảng vẫn tạo đủ theo dbml,
    nhưng chưa có endpoint/logic nào ghi vào đó), vì evidence luôn có ≥1 citation sẵn từ
-   Phase 3, đủ để thoả "gap phải có cơ sở". Đơn giản hoá này chưa có xác nhận từ spec.
+   Phase 3, đủ để thoả "gap phải có cơ sở".
 
 ### Khi bắt đầu Phase 5
 

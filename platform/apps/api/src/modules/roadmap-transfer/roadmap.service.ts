@@ -162,7 +162,7 @@ export class RoadmapService {
     @Inject(DATABASE) private readonly db: Database,
   ) {}
 
-  /** ĐỀ XUẤT — CẦN REVIEW: đã chốt theo rule 12 CLAUDE.md — chỉ OWNER/TECHNICAL_MEMBER
+  /** Đã chốt sau review (2026-08-06, theo rule 12 CLAUDE.md) — chỉ OWNER/TECHNICAL_MEMBER
    * tạo roadmap/milestone/dependency (nhóm "làm"); CASE_REVIEWER bị loại vì sẽ duyệt
    * chính roadmap này ở bước review. */
   private async assertWriteAllowed(technologyCaseId: string, actor: ActorContext): Promise<void> {
@@ -185,9 +185,10 @@ export class RoadmapService {
     }
   }
 
-  /** ĐỀ XUẤT — CẦN REVIEW (xem plan PHẦN D quyết định 3): case chuyển `ROADMAP_DRAFT`
-   * khi roadmap đầu tiên được tạo — breakdown/UC-RDM-01 không nói rõ thời điểm, chọn
-   * mirror pattern `EVIDENCE_COLLECTION`(Phase 3)/`GAP_IDENTIFIED` (đúng tiền lệ). */
+  /** Đã chốt sau review (2026-08-06, xem plan PHẦN D quyết định 3): case chuyển
+   * `ROADMAP_DRAFT` khi roadmap đầu tiên được tạo — breakdown/UC-RDM-01 không nói rõ
+   * thời điểm, chọn mirror pattern `EVIDENCE_COLLECTION`(Phase 3)/`GAP_IDENTIFIED` (đúng
+   * tiền lệ). */
   async create(
     actor: ActorContext,
     technologyCaseId: string,
@@ -506,8 +507,10 @@ export class RoadmapService {
     return toRoadmapResponse(updated);
   }
 
-  /** ĐỀ XUẤT — CẦN REVIEW: đã chốt theo rule 12 CLAUDE.md — chỉ CASE_REVIEWER được
-   * review (KHÔNG gồm OWNER, tránh owner tự tạo roadmap rồi tự duyệt). Port
+  /** Đã chốt sau review (2026-08-06, theo rule 12 CLAUDE.md) — chỉ CASE_REVIEWER được
+   * review (KHÔNG gồm OWNER, tránh owner tự tạo roadmap rồi tự duyệt). `decision`→
+   * `RoadmapStatus` giữ nguyên 3 nhánh tách biệt (xem `domain/roadmap.state-machine.ts`):
+   * APPROVED→APPROVED, REJECTED→REJECTED (terminal), CHANGES_REQUESTED→DRAFT. Port
    * `validate_roadmap_approval` (gate: không CRITICAL gap mở + có ≥1 milestone) sang
    * app layer, không dùng DB trigger (đúng quyết định 6). */
   async review(

@@ -387,6 +387,13 @@ Hình thành Technology Case — trung tâm nghiệp vụ của toàn hệ thố
 - Gap bắt buộc có severity, status, owner; gap phải có cơ sở support (assessment/evidence/citation).
 - `milestone_dependency` không được tạo thành chu trình (DAG bắt buộc).
 - **Không được approve roadmap khi còn gap CRITICAL ở trạng thái mở** (OPEN/IN_PROGRESS) liên kết qua `milestone_gap` — đây là gate nghiệp vụ quan trọng nhất của Phase 4.
+- **State transition — đã chốt sau review (2026-08-06), khớp đúng enum thật trong `schema_v5_production.dbml` §8** (chi tiết + lý do ở implementation README §5; mục này thay thế/làm rõ bảng state machine ở `R2M_SPEC_DESIGN_V5_COMPLETE.md` §8, vốn nhắc tới `CHANGES_REQUESTED`/`ARCHIVED` không tồn tại trong enum thật):
+  - `AssessmentStatus`: `DRAFT → SUBMITTED`; `SUBMITTED → APPROVED` (decision=APPROVE, qua CASE_REVIEWER); `SUBMITTED → DRAFT` (decision=REJECT, để sửa lại — enum thật không có `CHANGES_REQUESTED` nên tái dùng `DRAFT`); `APPROVED → SUPERSEDED` (khi có assessment mới được approve cho cùng case).
+  - `RoadmapStatus`: `DRAFT → IN_REVIEW`; review decision (`RoadmapReviewDecision`, 3 giá trị APPROVED/REJECTED/CHANGES_REQUESTED) map sang `RoadmapStatus` theo đúng 3 nhánh **tách biệt**, không gộp REJECTED chung CHANGES_REQUESTED:
+    - decision=APPROVED → `RoadmapStatus.APPROVED` (chỉ khi qua gate: ≥1 milestone, không còn gap CRITICAL mở)
+    - decision=REJECTED → `RoadmapStatus.REJECTED` (terminal — state đạt tới được thật, không phải khai cho đủ enum)
+    - decision=CHANGES_REQUESTED → `RoadmapStatus.DRAFT` (quay lại sửa)
+  - `ACTIVE`/`COMPLETED`/`SUPERSEDED` của `RoadmapStatus` khai đủ theo enum chính thức nhưng Phase 4 chưa có endpoint nào chạm tới (thuộc phần thực thi roadmap, phase sau).
 
 ### 4.6 Error code liên quan
 `ASSESSMENT_SCORE_OUT_OF_RANGE`, `ASSESSMENT_CRITERION_FRAMEWORK_MISMATCH`, `ASSESSMENT_MISSING_EVIDENCE`, `GAP_SEVERITY_REQUIRED`, `GAP_MISSING_SUPPORT`, `ROADMAP_DEPENDENCY_CYCLE_DETECTED`, `ROADMAP_HAS_UNRESOLVED_CRITICAL_GAPS` (mã lỗi mẫu đã có sẵn trong mục 10 architecture plan).

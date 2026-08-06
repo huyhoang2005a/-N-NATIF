@@ -1,10 +1,10 @@
-/** Đã chốt sau nghiên cứu (xem plan PHẦN D, quyết định 1-2): §8
+/** Đã chốt sau review (2026-08-06, xem plan PHẦN D quyết định 1-2, README §5): §8
  * R2M_SPEC_DESIGN_V5_COMPLETE.md viết "DRAFT → SUBMITTED → APPROVED / CHANGES_REQUESTED;
  * CHANGES_REQUESTED → DRAFT" nhưng `CHANGES_REQUESTED` KHÔNG tồn tại trong enum thật của
- * dbml (schema là nguồn sự thật đã khoá). Diễn giải: "changes requested" (quyết định
- * REJECT) đưa assessment quay lại `DRAFT` để sửa — không tạo state mới. `APPROVED →
- * SUPERSEDED` khi có assessment mới được approve cho cùng case (mirror
- * `ResourceVersion.PUBLISHED→SUPERSEDED`, Phase 2). ĐỀ XUẤT — CẦN REVIEW. */
+ * dbml (schema là nguồn sự thật đã khoá, user xác nhận nguyên tắc này thắng prose).
+ * Diễn giải: "changes requested" (quyết định REJECT) đưa assessment quay lại `DRAFT` để
+ * sửa — không tạo state mới. `APPROVED → SUPERSEDED` khi có assessment mới được approve
+ * cho cùng case (mirror `ResourceVersion.PUBLISHED→SUPERSEDED`, Phase 2). */
 export const AssessmentStatus = {
   DRAFT: "DRAFT",
   SUBMITTED: "SUBMITTED",
