@@ -10,6 +10,7 @@ import { VerificationModule } from "./modules/verification/verification.module";
 import { ResourceCatalogModule } from "./modules/resource-catalog/resource-catalog.module";
 import { TechnologyCaseModule } from "./modules/technology-case/technology-case.module";
 import { AssessmentGapModule } from "./modules/assessment-gap/assessment-gap.module";
+import { RoadmapTransferModule } from "./modules/roadmap-transfer/roadmap-transfer.module";
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { AssessmentGapModule } from "./modules/assessment-gap/assessment-gap.mod
     ResourceCatalogModule,
     TechnologyCaseModule,
     AssessmentGapModule,
+    RoadmapTransferModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

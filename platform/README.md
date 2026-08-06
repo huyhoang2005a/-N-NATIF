@@ -1,8 +1,8 @@
 # R2M — Research-to-Market Platform
 
-Tài liệu tổng hợp cho **Phase 1-3** (Identity & Organization, Verification, Resource
-Catalog & Evidence, Technology Case). Đọc file này trước khi chạy hoặc mở rộng dự án. Với
-business rule/spec gốc, xem `CLAUDE.md` và `docs/spec/`.
+Tài liệu tổng hợp cho **Phase 1-4** (Identity & Organization, Verification, Resource
+Catalog & Evidence, Technology Case, Assessment & Gap + Roadmap). Đọc file này trước khi
+chạy hoặc mở rộng dự án. Với business rule/spec gốc, xem `CLAUDE.md` và `docs/spec/`.
 
 ---
 
@@ -269,6 +269,11 @@ pnpm test:integration
 - `apps/api/test/identity-organization.integration-spec.ts` — HTTP thật qua module từng
   bị bug #5: `GET /v1/me/profile` không token → 401, có token hợp lệ → 200;
   `POST /v1/organizations/register` → 201.
+- `apps/api/test/assessment-gap-roadmap.integration-spec.ts` (Phase 4) — 3 kịch bản HTTP
+  thật: submit assessment trả đúng composite score do server tính; OWNER bị chặn tự duyệt
+  assessment (403 `AUTH_FORBIDDEN`) còn CASE_REVIEWER thì được (rule 12); gap `CRITICAL`
+  chặn roadmap approve (`ROADMAP_HAS_UNRESOLVED_CRITICAL_GAPS`) → resolve gap → approve
+  lại thành công → case lên `ROADMAP_APPROVED`.
 - Config riêng (`apps/api/vitest.integration.config.ts`, không đụng `vitest.config.ts`
   gốc) — dùng `unplugin-swc` thay vì esbuild mặc định của Vitest, **bắt buộc** vì NestJS
   DI thật cần decorator metadata mà esbuild không emit đúng (xem bug #8, cùng lớp với bug
@@ -277,7 +282,7 @@ pnpm test:integration
 
 ---
 
-## 4. Đã làm được (Phase 1-3)
+## 4. Đã làm được (Phase 1-4)
 
 ### Phase 1
 
@@ -402,6 +407,52 @@ Hạ tầng test thuần tuý, không đụng business logic Phase 1-3. Xem §3.
 - `turbo.json` cần khai báo `passThroughEnv` cho task `test:integration` — Turbo v2 mặc
   định sandbox biến môi trường của process con, không tự động truyền `DATABASE_URL`/
   `JWT_*`/`S3_*` dù đã có sẵn trong shell chạy lệnh.
+
+### Phase 4 (Assessment, Gap, Roadmap)
+
+- **Domain & DB**: 15 bảng mới khớp `schema_v5_production.dbml` — 2 bounded context chính
+  thức §9.6/§9.7: `assessment-gap.ts` (`assessment_framework`, `assessment_criterion`,
+  `readiness_assessment`, `assessment_score`, `assessment_score_evidence`,
+  `assessment_score_citation`, `gap_record`, `gap_evidence`, `gap_citation`) và
+  `roadmap.ts` (`roadmap`, `roadmap_milestone`, `roadmap_task`, `milestone_dependency`,
+  `milestone_gap`, `roadmap_review`). Folder `modules/roadmap-transfer/` đặt tên theo
+  bounded context cuối cùng (Roadmap & **Transfer**) dù Phase 4 chỉ làm phần Roadmap —
+  đúng tiền lệ `verification/` (Phase 1 chỉ có phần tổ chức, tên vẫn theo context cuối).
+- **2 business rule phức tạp port nguyên văn từ SQL mẫu sang TypeScript** (không thêm DB
+  trigger phức tạp mới — giữ nhất quán quyết định Phase 3): công thức composite score
+  (`domain/composite-score.ts`, `calculateCompositeScore`) và thuật toán phát hiện chu
+  trình phụ thuộc milestone bằng BFS (`domain/cycle-detection.ts`, `wouldCreateCycle`,
+  port từ `prevent_milestone_dependency_cycle()`). Cả 2 là pure function, viết + pass unit
+  test (9 + 8 test) **trước** khi viết bất kỳ service/endpoint nào gọi tới — đúng yêu cầu
+  mới trong `CLAUDE.md` khi bắt đầu Phase 4.
+- **Rule 11/12 (`CLAUDE.md`) áp dụng trực tiếp vào role mapping** — không còn là suy đoán
+  tự do: `OWNER`/`TECHNICAL_MEMBER` nhập điểm/submit assessment và tạo roadmap;
+  **`CASE_REVIEWER` là vai trò "soát" duy nhất** cho `POST /assessments/{id}/decision` và
+  `POST /roadmaps/{id}/reviews` — **loại cả `OWNER`** dù UC template/breakdown có gợi ý
+  owner cũng approve được, để không ai vừa tạo vừa tự duyệt chính việc mình làm (chi tiết
+  + lý do ở §5 "Phase 4 — điểm tự đề xuất cần review").
+- **API**: tạo/nhập điểm/submit/decide assessment (completeness + composite score tái
+  tính ở CẢ submit lẫn approve, supersede assessment `APPROVED` cũ cùng case), tạo/
+  transition gap (cần ≥1 nguồn support, gap `CRITICAL` phát event `CriticalGapRaised`,
+  gap đầu tiên tự chuyển case `GAP_IDENTIFIED`), tạo roadmap/milestone/task/dependency
+  (chặn cycle + khác roadmap), review roadmap (gate: ≥1 milestone + không còn `CRITICAL`
+  gap `OPEN`/`IN_PROGRESS`, port `validate_roadmap_approval()`). `TechnologyCaseService.
+  applyTransition` (điểm mở rộng đã thiết kế sẵn từ Phase 3) giờ cascade tự động qua 4
+  bước: `EVIDENCE_COLLECTION→UNDER_ASSESSMENT` (submit) → `→GAP_IDENTIFIED` (gap đầu
+  tiên) → `→ROADMAP_DRAFT` (roadmap đầu tiên) → `→ROADMAP_APPROVED` (review pass gate).
+- **Cross-module DI**: `TechnologyCaseModule` thêm `exports: [TechnologyCaseRepository,
+  TechnologyCaseService]` (trước đó không có `exports` nào — đúng lớp bug #5), `AssessmentGapModule`
+  thêm `exports: [GapRepository]` cho `RoadmapTransferModule` đọc gap CRITICAL còn mở.
+- Verify **qua HTTP thật + Postgres thật** (không chỉ unit test mock): 3 kịch bản
+  integration test mới qua NestJS DI container thật (`assessment-gap-roadmap.
+  integration-spec.ts`, 7/7 pass) — submit assessment trả đúng composite score do server
+  tính, OWNER bị chặn tự duyệt assessment (403) còn CASE_REVIEWER thì được, và kịch bản
+  đầy đủ gap CRITICAL chặn roadmap approve → resolve gap → approve lại thành công → case
+  lên `ROADMAP_APPROVED`. Cộng 27 unit test service-level mock DI mới (10 assessment + 7
+  gap + 10 roadmap).
+- **OpenAPI**: thêm 21 path (`assessments`, `gaps`, `roadmaps`, `milestones` + nested dưới
+  `technology-cases`) + 19 schema mới, mở rộng `Error.code` với 21 mã lỗi Phase 4. Validate
+  bằng script `js-yaml`: 319/319 `$ref` resolve đúng.
 
 ### Bug thật đã tìm và sửa trong phiên này (đáng nhớ cho phiên sau)
 
@@ -534,7 +585,7 @@ này không có phát hiện mới đáng ghi lại.
 - **`apps/web` chưa có test nào** (không unit test component, không E2E). Có thể thêm
   Playwright cho luồng đăng ký/đăng nhập chính.
 - **Không dùng Redis/BullMQ** dù đã có trong `docker-compose.yml` — `apps/worker` là
-  poll loop đơn giản, đủ cho Phase 1-3 nhưng cần chuyển sang BullMQ khi có job cần
+  poll loop đơn giản, đủ cho Phase 1-4 nhưng cần chuyển sang BullMQ khi có job cần
   backoff/retry thật (ingestion, embedding thật — Phase 2 chỉ tạo
   `resource_ingestion_job` ở trạng thái `QUEUED`, không có worker xử lý).
 - **Chưa có ingestion pipeline thật** (extract/chunk/embedding) — `POST /resources`/
@@ -622,12 +673,46 @@ cuối, không còn đánh dấu "cần review" nữa:
   quyết định "không cascade xuống `ResourceVersion`" đã chốt, chỉ chưa có endpoint gọi
   tới.
 
-### Khi bắt đầu Phase 4
+### Phase 4 — điểm tự đề xuất cần review
 
-Theo đúng thứ tự trong `CLAUDE.md` — **không nhảy cóc module**: Phase 4 là Assessment,
-Gap, Roadmap. Case phải ở `EVIDENCE_COLLECTION` mới bắt đầu assessment được (đã sẵn sàng
-từ Phase 3). Trước khi code, đọc lại đúng thứ tự đã quy định ở rule 10 trong
-`CLAUDE.md`: `01_workflow_theo_phase.md` (mục Phase 4) → `03_activity_diagrams.md` (mục
-Phase 4) → `02_usecase_diagram.md` → đối chiếu `R2M_SPEC_DESIGN_V5_COMPLETE.md`. Đặc
-biệt chú ý invariant "client không quyết định composite score" (UC-ASM-01) và guard
-"không approve roadmap khi còn CRITICAL gap mở".
+4 điểm dưới đây đang đánh dấu `// ĐỀ XUẤT — CẦN REVIEW` trong code vì spec mô tả không đủ
+chi tiết hoặc 2 nguồn (`01_workflow_theo_phase.md` §8 prose vs `schema_v5_production.dbml`
+enum) lệch nhau. Đã áp dụng rule 11/12 mới trong `CLAUDE.md` nên độ chắc chắn cao hơn bản
+nháp đầu, nhưng vẫn cần user xác nhận trước khi coi là chốt:
+
+1. **`AssessmentStatus`/`RoadmapStatus` — enum thật (dbml) không có `CHANGES_REQUESTED`/
+   `ARCHIVED`** dù §8 nhắc tới. Đã chọn: dbml khoá (đúng quy ước "schema là nguồn sự
+   thật" toàn dự án), "changes requested" tái dùng giá trị `DRAFT` có sẵn thay vì tạo
+   state mới — cụ thể `AssessmentStatus`: `SUBMITTED→DRAFT` khi decision=REJECT;
+   `RoadmapStatus`: `IN_REVIEW→DRAFT` khi review decision=`CHANGES_REQUESTED` (giá trị
+   này CÓ thật trong `RoadmapReviewDecision`, chỉ không phải giá trị của
+   `RoadmapStatus`). `ACTIVE`/`COMPLETED`/`SUPERSEDED` của `RoadmapStatus` khai đủ enum
+   nhưng chưa có endpoint nào chạm tới ở Phase 4 (giữ đúng tiền lệ khai đủ, mở khoá theo
+   phạm vi phase).
+2. **Thời điểm case tự chuyển `GAP_IDENTIFIED→ROADMAP_DRAFT`** — breakdown/UC-RDM-01 chỉ
+   nói rõ tiền điều kiện tạo roadmap (case đang `GAP_IDENTIFIED`/`ROADMAP_DRAFT`) và thời
+   điểm chuyển `ROADMAP_APPROVED` (lúc review pass), không nói rõ lúc nào case chuyển
+   `ROADMAP_DRAFT`. Đã chọn: chuyển khi roadmap **đầu tiên** của case được tạo — mirror
+   chính xác pattern đã dùng cho `EVIDENCE_COLLECTION` (Phase 3, evidence đầu tiên) và
+   `GAP_IDENTIFIED` (gap đầu tiên).
+3. **`POST /assessments/{id}/decision` và `POST /roadmaps/{id}/reviews` chỉ
+   `CASE_REVIEWER`, loại cả `OWNER`** — dù UC-ASM-01 nói "Reviewer/owner approve... theo
+   policy" và bảng endpoint §4.4 ghi actor "Case Technical Member/Owner" cho vài bước, ghi
+   chú Phase 4 mới trong `CLAUDE.md` xác định rõ CASE_REVIEWER là vai trò "soát" duy nhất
+   — cho OWNER vừa nhập/tạo vừa tự duyệt chính việc mình vừa làm đúng kiểu xung đột
+   separation-of-duties mà rule 12 cảnh báo (cùng lý do Phase 3 đã loại `CASE_REVIEWER`
+   khỏi việc link evidence — 2 quyết định đối xứng, tách 2 nhóm "làm" vs "soát" rõ ràng).
+4. **Gap chỉ cần ≥1 trong 2 nguồn support: `sourceAssessmentId` hoặc ≥1 `evidenceIds`** —
+   không làm `gap_citation` link trực tiếp ở Phase 4 MVP (bảng vẫn tạo đủ theo dbml,
+   nhưng chưa có endpoint/logic nào ghi vào đó), vì evidence luôn có ≥1 citation sẵn từ
+   Phase 3, đủ để thoả "gap phải có cơ sở". Đơn giản hoá này chưa có xác nhận từ spec.
+
+### Khi bắt đầu Phase 5
+
+Phase 5 là **Company & Discovery** (`01_workflow_theo_phase.md`, mục "Phase 5 — Company &
+Discovery"). Theo đúng thứ tự rule 10 `CLAUDE.md` — **không nhảy cóc module**: đọc
+`01_workflow_theo_phase.md` (mục Phase 5) → `03_activity_diagrams.md` (mục Phase 5) →
+`02_usecase_diagram.md` → đối chiếu `R2M_SPEC_DESIGN_V5_COMPLETE.md` trước khi code. Lưu ý
+riêng: dòng 201 `01_workflow_theo_phase.md` nhắc job sinh embedding cho chunk resource
+"phục vụ Phase 5 — recommendation & semantic retrieval" — kiểm tra job đó đã tồn tại từ
+Phase 2 (`ResourceIngestionQueued`) hay cần bổ sung mới trước khi dùng cho recommendation.

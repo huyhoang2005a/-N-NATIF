@@ -17,5 +17,8 @@ import { GapService } from "./gap.service";
   imports: [AuditModule, JobsModule, TechnologyCaseModule],
   controllers: [AssessmentGapCaseController, AssessmentsController, GapsController],
   providers: [AssessmentFrameworkRepository, AssessmentRepository, AssessmentService, GapRepository, GapService],
+  // Exported for `modules/roadmap-transfer` — RoadmapService reads open CRITICAL gaps
+  // for the approval gate (`validate_roadmap_approval` ported to app layer).
+  exports: [GapRepository],
 })
 export class AssessmentGapModule {}

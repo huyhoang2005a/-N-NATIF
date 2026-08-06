@@ -137,6 +137,13 @@ async function handleEvent(db: Database, event: DomainEvent): Promise<void> {
       // Phase 3 simplification (see plan PHẦN C): same "no notification yet" treatment
       // as most Phase 2 events — no reader-facing UI depends on these.
       return;
+    case "AssessmentSubmitted":
+    case "AssessmentApproved":
+    case "CriticalGapRaised":
+    case "RoadmapApproved":
+      // Phase 4 simplification (see plan PHẦN D quyết định 9): không notification —
+      // đúng tiền lệ Phase 2/3, chỉ giữ event cho audit/outbox, chưa có UI đọc.
+      return;
     default: {
       const _exhaustive: never = event;
       throw new Error(`Unhandled domain event type: ${JSON.stringify(_exhaustive)}`);

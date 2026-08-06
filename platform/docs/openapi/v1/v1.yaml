@@ -1,15 +1,16 @@
 openapi: 3.1.0
 info:
   title: R2M Platform API
-  version: "1.1.0"
+  version: "1.2.0"
   description: |
     Living document for the `/v1` API surface, versioned by API version — not by
     internal phase name (see B.0 in the Phase 2 implementation plan). Currently
     covers Identity & Organization, Verification (organization + author),
-    Resource Catalog & Evidence, and Technology Case (Phase 1-3). Endpoints for
-    Assessment/Gap/Roadmap, Company & Discovery, and Transfer (architecture plan
-    §9) land here as those phases are implemented — do not fork this file per
-    phase.
+    Resource Catalog & Evidence, Technology Case (Phase 1-3), and Assessment &
+    Gap + Roadmap (Phase 4 — Transfer half of Roadmap & Transfer lands in Phase
+    6, same module/tag reused, not renamed). Endpoints for Company & Discovery
+    (architecture plan §9) land here as those phases are implemented — do not
+    fork this file per phase.
 
     Error responses always use the unified envelope from architecture plan §10,
     with a stable `code` from `packages/domain/src/errors/error-codes.ts` — see
@@ -31,6 +32,9 @@ tags:
   - name: resource-access-grants
   - name: technology-cases
   - name: evidence
+  - name: assessments
+  - name: gaps
+  - name: roadmaps
 
 paths:
   /auth/login:
@@ -1118,6 +1122,615 @@ paths:
         "422":
           $ref: "#/components/responses/DomainError"
 
+  /technology-cases/{id}/assessments:
+    post:
+      operationId: createAssessment
+      summary: UC-ASM-01 — start a readiness assessment
+      description: |
+        Đã chốt sau review (2026-08-06, rule 12 CLAUDE.md): chỉ `OWNER`/
+        `TECHNICAL_MEMBER` được tạo/nhập điểm/submit assessment — `CASE_REVIEWER`
+        chỉ quyết định (`/decision`), tránh tự duyệt chính bước mình nhập.
+        `frameworkId` không truyền → dùng framework `ACTIVE` version mới nhất.
+      tags: [assessments]
+      parameters:
+        - $ref: "#/components/parameters/TechnologyCaseId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAssessmentRequest"
+      responses:
+        "201":
+          description: Created assessment, status DRAFT
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadinessAssessmentResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/DomainError"
+    get:
+      operationId: listAssessments
+      summary: List readiness assessments for a case
+      description: Path tự đặt ngoài catalogue §13.2 (đúng tiền lệ Phase 3 — read endpoint).
+      tags: [assessments]
+      parameters:
+        - $ref: "#/components/parameters/TechnologyCaseId"
+      responses:
+        "200":
+          description: Assessments for this case, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReadinessAssessmentResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/DomainError"
+
+  /technology-cases/{id}/gaps:
+    post:
+      operationId: createGap
+      summary: UC-GAP-01 — record a gap
+      description: |
+        Actor: `OWNER`/`TECHNICAL_MEMBER`/`CASE_REVIEWER` (UC-GAP-01 liệt kê vai
+        trò thay phiên, không phải AND — rule 11 CLAUDE.md). Cần ≥1 nguồn support
+        (`sourceAssessmentId` hoặc ≥1 `evidenceIds`) — `GAP_MISSING_SUPPORT` nếu
+        thiếu (quyết định 11, plan PHẦN D). Gap `CRITICAL` phát event
+        `CriticalGapRaised`. Gap đầu tiên sau assessment tự chuyển case
+        `UNDER_ASSESSMENT` → `GAP_IDENTIFIED`.
+      tags: [gaps]
+      parameters:
+        - $ref: "#/components/parameters/TechnologyCaseId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateGapRequest"
+      responses:
+        "201":
+          description: Created gap, status OPEN
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GapResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/DomainError"
+        "409":
+          $ref: "#/components/responses/DomainError"
+    get:
+      operationId: listGaps
+      summary: List gaps for a case
+      description: Path tự đặt ngoài catalogue §13.2 (đúng tiền lệ Phase 3 — read endpoint).
+      tags: [gaps]
+      parameters:
+        - $ref: "#/components/parameters/TechnologyCaseId"
+      responses:
+        "200":
+          description: Gaps for this case, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GapResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/DomainError"
+
+  /assessments/{id}:
+    get:
+      operationId: getAssessment
+      summary: Get a readiness assessment by id
+      tags: [assessments]
+      parameters:
+        - $ref: "#/components/parameters/AssessmentId"
+      responses:
+        "200":
+          description: Readiness assessment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadinessAssessmentResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/DomainError"
+
+  /assessments/{id}/scores/{criterionId}:
+    put:
+      operationId: upsertAssessmentScore
+      summary: UC-ASM-01 — enter/edit a criterion score
+      description: |
+        Chỉ khi assessment đang `DRAFT` (`ASSESSMENT_INVALID_TRANSITION` nếu
+        không). Semantics PUT: thay hết bộ `evidenceIds`/`citationIds` cũ, không
+        cộng dồn. `criterionId` phải thuộc đúng `frameworkId` của assessment
+        (`ASSESSMENT_CRITERION_FRAMEWORK_MISMATCH`), điểm phải trong
+        `[minScore, maxScore]` của criterion (`ASSESSMENT_SCORE_OUT_OF_RANGE`).
+      tags: [assessments]
+      parameters:
+        - $ref: "#/components/parameters/AssessmentId"
+        - name: criterionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpsertAssessmentScoreRequest"
+      responses:
+        "200":
+          description: Upserted score
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssessmentScoreResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/DomainError"
+        "409":
+          $ref: "#/components/responses/DomainError"
+
+  /assessments/{id}/submit:
+    post:
+      operationId: submitAssessment
+      summary: UC-ASM-01 — submit an assessment for review
+      description: |
+        Port `validate_and_calculate_assessment_submission()` (SQL mẫu) sang app
+        layer: cần ≥1 score (`ASSESSMENT_HAS_NO_SCORES`), mỗi criterion
+        `requiresEvidence`/`requiresCitation` phải có đủ link
+        (`ASSESSMENT_SCORE_MISSING_EVIDENCE`/`ASSESSMENT_SCORE_MISSING_CITATION`).
+        `compositeScore` luôn tính lại ở server (công thức chính thức port từ
+        SQL) — client không được tự truyền. Case `EVIDENCE_COLLECTION` tự
+        chuyển `UNDER_ASSESSMENT`; event `AssessmentSubmitted`.
+      tags: [assessments]
+      parameters:
+        - $ref: "#/components/parameters/AssessmentId"
+      responses:
+        "201":
+          description: Submitted assessment with server-computed compositeScore
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadinessAssessmentResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/DomainError"
+        "409":
+          $ref: "#/components/responses/DomainError"
+
+  /assessments/{id}/decision:
+    post:
+      operationId: decideAssessment
+      summary: UC-ASM-01 — approve or reject a submitted assessment
+      description: |
+        Đã chốt sau review (2026-08-06, rule 12 CLAUDE.md): chỉ `CASE_REVIEWER`
+        được gọi — KHÔNG gồm `OWNER`, dù OWNER được nhập điểm (tránh tự duyệt
+        chính assessment mình nhập). `APPROVE`: tái tính + validate completeness,
+        supersede assessment `APPROVED` cũ cùng case (nếu có), event
+        `AssessmentApproved`. `REJECT` (`reason` bắt buộc): quay lại `DRAFT` để
+        sửa, không phát event.
+      tags: [assessments]
+      parameters:
+        - $ref: "#/components/parameters/AssessmentId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssessmentDecisionRequest"
+      responses:
+        "201":
+          description: Decided assessment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadinessAssessmentResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/DomainError"
+        "409":
+          $ref: "#/components/responses/DomainError"
+
+  /gaps/{id}:
+    get:
+      operationId: getGap
+      summary: Get a gap by id
+      tags: [gaps]
+      parameters:
+        - $ref: "#/components/parameters/GapId"
+      responses:
+        "200":
+          description: Gap
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GapResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/DomainError"
+    patch:
+      operationId: updateGap
+      summary: Update a gap's descriptive fields
+      description: Path tự đặt ngoài catalogue §13.2 — có trong UC-GAP-01 API list.
+      tags: [gaps]
+      parameters:
+        - $ref: "#/components/parameters/GapId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateGapRequest"
+      responses:
+        "200":
+          description: Updated gap
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GapResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/DomainError"
+        "409":
+          $ref: "#/components/responses/DomainError"
+
+  /gaps/{id}/transition:
+    post:
+      operationId: transitionGap
+      summary: Transition a gap's status
+      description: |
+        Actor: người tạo gap, case `OWNER`, `CASE_REVIEWER`, hoặc chính
+        `gap.ownerUserId` được gán. `resolutionNote` bắt buộc khi target là
+        `RESOLVED`/`ACCEPTED_RISK`/`CLOSED` (`chk_gap_resolution_fields`). Không
+        nhảy state — `OPEN` phải qua `IN_PROGRESS` trước khi `RESOLVED`.
+      tags: [gaps]
+      parameters:
+        - $ref: "#/components/parameters/GapId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransitionGapRequest"
+      responses:
+        "201":
+          description: Transitioned gap
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GapResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/DomainError"
+        "409":
+          $ref: "#/components/responses/DomainError"
+
+  /technology-cases/{id}/roadmaps:
+    post:
+      operationId: createRoadmap
+      summary: UC-RDM-01 — start a new roadmap version for a case
+      description: |
+        Actor: `OWNER`/`TECHNICAL_MEMBER` (rule 12 — `CASE_REVIEWER` loại vì sẽ
+        review chính roadmap này). `versionNo` tự tăng theo case. Roadmap đầu
+        tiên tự chuyển case `GAP_IDENTIFIED` → `ROADMAP_DRAFT` (ĐỀ XUẤT — CẦN
+        REVIEW, xem plan PHẦN D quyết định 3).
+      tags: [roadmaps]
+      parameters:
+        - $ref: "#/components/parameters/TechnologyCaseId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRoadmapRequest"
+      responses:
+        "201":
+          description: Created roadmap, status DRAFT
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoadmapResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/DomainError"
+    get:
+      operationId: listRoadmaps
+      summary: List roadmap versions for a case
+      description: Path tự đặt ngoài catalogue §13.2 (đúng tiền lệ Phase 3 — read endpoint).
+      tags: [roadmaps]
+      parameters:
+        - $ref: "#/components/parameters/TechnologyCaseId"
+      responses:
+        "200":
+          description: Roadmaps for this case, newest version first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RoadmapResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/DomainError"
+
+  /roadmaps/{id}:
+    get:
+      operationId: getRoadmap
+      summary: Get a roadmap by id
+      tags: [roadmaps]
+      parameters:
+        - $ref: "#/components/parameters/RoadmapId"
+      responses:
+        "200":
+          description: Roadmap
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoadmapResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/DomainError"
+
+  /roadmaps/{id}/milestones:
+    post:
+      operationId: createMilestone
+      summary: UC-RDM-01 — add a milestone to a DRAFT roadmap
+      description: Chỉ khi roadmap đang `DRAFT` (`ROADMAP_INVALID_TRANSITION` nếu không).
+      tags: [roadmaps]
+      parameters:
+        - $ref: "#/components/parameters/RoadmapId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMilestoneRequest"
+      responses:
+        "201":
+          description: Created milestone
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoadmapMilestoneResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/DomainError"
+        "409":
+          $ref: "#/components/responses/DomainError"
+    get:
+      operationId: listMilestones
+      summary: List milestones for a roadmap
+      description: Path tự đặt ngoài catalogue §13.2 (đúng tiền lệ Phase 3 — read endpoint).
+      tags: [roadmaps]
+      parameters:
+        - $ref: "#/components/parameters/RoadmapId"
+      responses:
+        "200":
+          description: Milestones, ordered by sortOrder
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RoadmapMilestoneResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/DomainError"
+
+  /roadmaps/{id}/dependencies:
+    post:
+      operationId: createMilestoneDependency
+      summary: UC-RDM-01 — link two milestones with a dependency edge
+      description: |
+        Port `prevent_milestone_dependency_cycle()` (SQL mẫu) sang app layer —
+        BFS trên toàn bộ `milestone_dependency` hiện có của roadmap trước khi
+        thêm edge mới (`MILESTONE_DEPENDENCY_CYCLE_DETECTED`). Cả 2 milestone
+        phải thuộc cùng roadmap (`MILESTONE_DEPENDENCIES_MUST_BE_IN_SAME_ROADMAP`).
+      tags: [roadmaps]
+      parameters:
+        - $ref: "#/components/parameters/RoadmapId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDependencyRequest"
+      responses:
+        "201":
+          description: Created dependency edge
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MilestoneDependencyResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/DomainError"
+        "409":
+          $ref: "#/components/responses/DomainError"
+
+  /roadmaps/{id}/submit:
+    post:
+      operationId: submitRoadmap
+      summary: UC-RDM-01 — submit a roadmap for review
+      description: Chuyển `DRAFT` → `IN_REVIEW`.
+      tags: [roadmaps]
+      parameters:
+        - $ref: "#/components/parameters/RoadmapId"
+      responses:
+        "201":
+          description: Submitted roadmap
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoadmapResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/DomainError"
+        "409":
+          $ref: "#/components/responses/DomainError"
+
+  /roadmaps/{id}/reviews:
+    post:
+      operationId: reviewRoadmap
+      summary: UC-RDM-01 — review (approve/reject/request changes) an IN_REVIEW roadmap
+      description: |
+        Đã chốt sau review (2026-08-06, rule 12 CLAUDE.md): chỉ `CASE_REVIEWER`
+        được gọi — KHÔNG gồm `OWNER` (tránh tự tạo roadmap rồi tự duyệt). Port
+        `validate_roadmap_approval()` (SQL mẫu): `decision=APPROVED` chỉ pass
+        khi roadmap có ≥1 milestone (`ROADMAP_HAS_NO_MILESTONES`) và không còn
+        gap `CRITICAL` ở `OPEN`/`IN_PROGRESS`
+        (`ROADMAP_HAS_UNRESOLVED_CRITICAL_GAPS`). Khi pass: roadmap `APPROVED`,
+        event `RoadmapApproved`, case `ROADMAP_DRAFT` → `ROADMAP_APPROVED`.
+        `CHANGES_REQUESTED` → roadmap quay lại `DRAFT` (đúng
+        `RoadmapReviewDecision`, không phải `RoadmapStatus` — xem plan PHẦN D
+        quyết định 1-2). `REJECTED` → roadmap `REJECTED` (terminal).
+      tags: [roadmaps]
+      parameters:
+        - $ref: "#/components/parameters/RoadmapId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRoadmapReviewRequest"
+      responses:
+        "201":
+          description: Reviewed roadmap
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoadmapResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/DomainError"
+        "409":
+          $ref: "#/components/responses/DomainError"
+
+  /milestones/{id}/tasks:
+    post:
+      operationId: createMilestoneTask
+      summary: UC-RDM-01 — add a task under a milestone
+      description: |
+        Path tự đặt ngoài catalogue §13.2 (breakdown Sprint 4.4 yêu cầu, xem plan
+        PHẦN D quyết định 8). Chỉ khi roadmap chứa milestone đang `DRAFT`.
+      tags: [roadmaps]
+      parameters:
+        - $ref: "#/components/parameters/MilestoneId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTaskRequest"
+      responses:
+        "201":
+          description: Created task
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoadmapTaskResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/DomainError"
+        "409":
+          $ref: "#/components/responses/DomainError"
+
+  /milestones/{id}/gaps:
+    post:
+      operationId: linkMilestoneGap
+      summary: UC-RDM-01 — link a gap to a milestone (mitigation tracking)
+      description: |
+        Path tự đặt ngoài catalogue §13.2 (breakdown Sprint 4.4 yêu cầu, xem plan
+        PHẦN D quyết định 8). Gap phải thuộc cùng case với roadmap.
+      tags: [roadmaps]
+      parameters:
+        - $ref: "#/components/parameters/MilestoneId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LinkMilestoneGapRequest"
+      responses:
+        "201":
+          description: Linked (NestJS default POST status — handler returns void, no body)
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/DomainError"
+        "409":
+          $ref: "#/components/responses/DomainError"
+
 components:
   securitySchemes:
     bearerAuth:
@@ -1166,6 +1779,34 @@ components:
         type: string
         format: uuid
     TechnologyCaseId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    AssessmentId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    GapId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    RoadmapId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    MilestoneId:
       name: id
       in: path
       required: true
@@ -1261,6 +1902,27 @@ components:
                 - EVIDENCE_NOT_FOUND
                 - CASE_EVIDENCE_REQUIRES_CITATION
                 - CASE_EVIDENCE_ROLE_NOT_ALLOWED
+                - ASSESSMENT_NOT_FOUND
+                - ASSESSMENT_HAS_NO_SCORES
+                - ASSESSMENT_SCORE_OUT_OF_RANGE
+                - ASSESSMENT_CRITERION_NOT_FOUND
+                - ASSESSMENT_CRITERION_FRAMEWORK_MISMATCH
+                - ASSESSMENT_SCORE_MISSING_EVIDENCE
+                - ASSESSMENT_SCORE_MISSING_CITATION
+                - ASSESSMENT_INVALID_TRANSITION
+                - ASSESSMENT_FRAMEWORK_NOT_FOUND
+                - GAP_NOT_FOUND
+                - GAP_SEVERITY_REQUIRED
+                - GAP_MISSING_SUPPORT
+                - GAP_RESOLUTION_NOTE_REQUIRED
+                - GAP_INVALID_TRANSITION
+                - ROADMAP_NOT_FOUND
+                - MILESTONE_NOT_FOUND
+                - MILESTONE_DEPENDENCY_CYCLE_DETECTED
+                - MILESTONE_DEPENDENCIES_MUST_BE_IN_SAME_ROADMAP
+                - ROADMAP_HAS_NO_MILESTONES
+                - ROADMAP_HAS_UNRESOLVED_CRITICAL_GAPS
+                - ROADMAP_INVALID_TRANSITION
             message:
               type: string
             details:
@@ -2179,3 +2841,544 @@ components:
         updatedAt:
           type: string
           format: date-time
+
+    CreateAssessmentRequest:
+      type: object
+      description: |
+        `frameworkId` không truyền → dùng framework `ACTIVE` version mới nhất
+        (`ASSESSMENT_FRAMEWORK_NOT_FOUND` nếu không có framework nào ACTIVE).
+      properties:
+        frameworkId:
+          type: string
+          format: uuid
+
+    ReadinessAssessmentResponse:
+      type: object
+      required:
+        [id, technologyCaseId, frameworkId, status, compositeScore,
+         createdByUserId, submittedByUserId, approvedByUserId, submittedAt,
+         approvedAt, createdAt, updatedAt, version]
+      properties:
+        id:
+          type: string
+          format: uuid
+        technologyCaseId:
+          type: string
+          format: uuid
+        frameworkId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          description: |
+            ĐỀ XUẤT — CẦN REVIEW: dbml không có `CHANGES_REQUESTED` (§8 nhắc
+            nhưng không tồn tại trong enum thật) — "changes requested" tái
+            dùng `DRAFT` (xem plan PHẦN D quyết định 1-2).
+          enum: [DRAFT, SUBMITTED, APPROVED, SUPERSEDED]
+        compositeScore:
+          type: [number, "null"]
+          description: |
+            Luôn tính lại ở server (công thức port nguyên văn từ
+            `validate_and_calculate_assessment_submission()` SQL mẫu) —
+            `null` khi assessment còn DRAFT chưa submit lần nào.
+        createdByUserId:
+          type: string
+          format: uuid
+        submittedByUserId:
+          type: [string, "null"]
+          format: uuid
+        approvedByUserId:
+          type: [string, "null"]
+          format: uuid
+        submittedAt:
+          type: [string, "null"]
+          format: date-time
+        approvedAt:
+          type: [string, "null"]
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        version:
+          type: integer
+
+    UpsertAssessmentScoreRequest:
+      type: object
+      required: [score, rationale]
+      description: |
+        PUT semantics: `evidenceIds`/`citationIds` thay hết bộ link cũ, không
+        cộng dồn. `requiresEvidence`/`requiresCitation` của criterion validate
+        ở service (không phải zod — cần đọc criterion từ DB), không phải ở đây.
+      properties:
+        score:
+          type: number
+        rationale:
+          type: string
+          minLength: 1
+        evidenceIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          default: []
+        citationIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          default: []
+
+    AssessmentScoreResponse:
+      type: object
+      required:
+        [id, assessmentId, criterionId, score, rationale, evidenceIds,
+         citationIds, createdByUserId, updatedByUserId, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        assessmentId:
+          type: string
+          format: uuid
+        criterionId:
+          type: string
+          format: uuid
+        score:
+          type: number
+        rationale:
+          type: string
+        evidenceIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        citationIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        createdByUserId:
+          type: string
+          format: uuid
+        updatedByUserId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    AssessmentDecisionRequest:
+      type: object
+      required: [decision]
+      description: |
+        Đã chốt sau review (2026-08-06, rule 12 CLAUDE.md): chỉ `CASE_REVIEWER`
+        được gọi endpoint này — validate ở service, không phải ở đây.
+      properties:
+        decision:
+          type: string
+          enum: [APPROVE, REJECT]
+        reason:
+          type: string
+          maxLength: 2000
+          description: Bắt buộc khi `decision=REJECT`.
+
+    CreateGapRequest:
+      type: object
+      required: [title, description, severity]
+      description: |
+        Đã chốt (plan PHẦN D quyết định 11): cần ≥1 nguồn support trong số
+        {`sourceAssessmentId` set, ≥1 `evidenceIds`} — validate ở service
+        (`GAP_MISSING_SUPPORT`), không phải zod.
+      properties:
+        title:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+          minLength: 1
+        category:
+          type: string
+          maxLength: 120
+        severity:
+          type: string
+          enum: [LOW, MEDIUM, HIGH, CRITICAL]
+        ownerUserId:
+          type: string
+          format: uuid
+        dueDate:
+          type: string
+          format: date
+        sourceAssessmentId:
+          type: string
+          format: uuid
+        sourceAssessmentScoreId:
+          type: string
+          format: uuid
+        evidenceIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          default: []
+
+    UpdateGapRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+          minLength: 1
+        category:
+          type: string
+          maxLength: 120
+        ownerUserId:
+          type: string
+          format: uuid
+        dueDate:
+          type: string
+          format: date
+
+    TransitionGapRequest:
+      type: object
+      required: [toStatus]
+      description: |
+        `resolutionNote` bắt buộc khi `toStatus` là
+        `RESOLVED`/`ACCEPTED_RISK`/`CLOSED` (`chk_gap_resolution_fields`).
+      properties:
+        toStatus:
+          type: string
+          enum: [OPEN, IN_PROGRESS, RESOLVED, ACCEPTED_RISK, CLOSED]
+        resolutionNote:
+          type: string
+          minLength: 1
+
+    GapResponse:
+      type: object
+      required:
+        [id, technologyCaseId, sourceAssessmentId, sourceAssessmentScoreId,
+         title, description, category, severity, status, ownerUserId, dueDate,
+         createdByUserId, resolvedByUserId, resolvedAt, resolutionNote,
+         createdAt, updatedAt, version]
+      properties:
+        id:
+          type: string
+          format: uuid
+        technologyCaseId:
+          type: string
+          format: uuid
+        sourceAssessmentId:
+          type: [string, "null"]
+          format: uuid
+        sourceAssessmentScoreId:
+          type: [string, "null"]
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          type: [string, "null"]
+        severity:
+          type: string
+          enum: [LOW, MEDIUM, HIGH, CRITICAL]
+        status:
+          type: string
+          enum: [OPEN, IN_PROGRESS, RESOLVED, ACCEPTED_RISK, CLOSED]
+        ownerUserId:
+          type: [string, "null"]
+          format: uuid
+        dueDate:
+          type: [string, "null"]
+          format: date
+        createdByUserId:
+          type: string
+          format: uuid
+        resolvedByUserId:
+          type: [string, "null"]
+          format: uuid
+        resolvedAt:
+          type: [string, "null"]
+          format: date-time
+        resolutionNote:
+          type: [string, "null"]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        version:
+          type: integer
+
+    CreateRoadmapRequest:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+          maxLength: 255
+        objective:
+          type: string
+
+    RoadmapResponse:
+      type: object
+      required:
+        [id, technologyCaseId, versionNo, title, objective, status,
+         createdByUserId, submittedByUserId, approvedByUserId, submittedAt,
+         approvedAt, createdAt, updatedAt, version]
+      properties:
+        id:
+          type: string
+          format: uuid
+        technologyCaseId:
+          type: string
+          format: uuid
+        versionNo:
+          type: integer
+        title:
+          type: string
+        objective:
+          type: [string, "null"]
+        status:
+          type: string
+          description: |
+            ĐỀ XUẤT — CẦN REVIEW: dbml không có `CHANGES_REQUESTED`/`ARCHIVED`
+            (§8 nhắc nhưng không tồn tại trong enum thật) — "changes requested"
+            tái dùng `DRAFT` (xem plan PHẦN D quyết định 1-2). `ACTIVE`/
+            `COMPLETED`/`SUPERSEDED` khai đủ enum nhưng chưa có endpoint nào
+            chạm tới ở Phase 4.
+          enum:
+            [DRAFT, IN_REVIEW, APPROVED, ACTIVE, COMPLETED, REJECTED,
+             SUPERSEDED]
+        createdByUserId:
+          type: string
+          format: uuid
+        submittedByUserId:
+          type: [string, "null"]
+          format: uuid
+        approvedByUserId:
+          type: [string, "null"]
+          format: uuid
+        submittedAt:
+          type: [string, "null"]
+          format: date-time
+        approvedAt:
+          type: [string, "null"]
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        version:
+          type: integer
+
+    CreateMilestoneRequest:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+        priority:
+          type: string
+          enum: [LOW, MEDIUM, HIGH, CRITICAL]
+        startDate:
+          type: string
+          format: date
+        dueDate:
+          type: string
+          format: date
+        ownerUserId:
+          type: string
+          format: uuid
+
+    RoadmapMilestoneResponse:
+      type: object
+      required:
+        [id, roadmapId, title, description, status, priority, startDate,
+         dueDate, ownerUserId, sortOrder, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        roadmapId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: [string, "null"]
+        status:
+          type: string
+          enum: [NOT_STARTED, IN_PROGRESS, BLOCKED, COMPLETED, CANCELLED]
+        priority:
+          type: string
+          enum: [LOW, MEDIUM, HIGH, CRITICAL]
+        startDate:
+          type: [string, "null"]
+          format: date
+        dueDate:
+          type: [string, "null"]
+          format: date
+        ownerUserId:
+          type: [string, "null"]
+          format: uuid
+        sortOrder:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateTaskRequest:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+        priority:
+          type: string
+          enum: [LOW, MEDIUM, HIGH, CRITICAL]
+        assigneeUserId:
+          type: string
+          format: uuid
+        startDate:
+          type: string
+          format: date
+        dueDate:
+          type: string
+          format: date
+
+    RoadmapTaskResponse:
+      type: object
+      required:
+        [id, milestoneId, title, description, status, priority,
+         assigneeUserId, startDate, dueDate, completedAt, sortOrder,
+         createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        milestoneId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: [string, "null"]
+        status:
+          type: string
+          enum: [TODO, IN_PROGRESS, BLOCKED, DONE, CANCELLED]
+        priority:
+          type: string
+          enum: [LOW, MEDIUM, HIGH, CRITICAL]
+        assigneeUserId:
+          type: [string, "null"]
+          format: uuid
+        startDate:
+          type: [string, "null"]
+          format: date
+        dueDate:
+          type: [string, "null"]
+          format: date
+        completedAt:
+          type: [string, "null"]
+          format: date-time
+        sortOrder:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateDependencyRequest:
+      type: object
+      required: [predecessorMilestoneId, successorMilestoneId]
+      description: |
+        Port `prevent_milestone_dependency_cycle()` (SQL mẫu) sang app layer —
+        validate ở service (`MILESTONE_DEPENDENCY_CYCLE_DETECTED`), không phải
+        zod (cần đọc toàn bộ dependency hiện có của roadmap).
+      properties:
+        predecessorMilestoneId:
+          type: string
+          format: uuid
+        successorMilestoneId:
+          type: string
+          format: uuid
+        dependencyType:
+          type: string
+          enum:
+            [FINISH_TO_START, START_TO_START, FINISH_TO_FINISH,
+             START_TO_FINISH]
+        lagDays:
+          type: integer
+
+    MilestoneDependencyResponse:
+      type: object
+      required:
+        [id, predecessorMilestoneId, successorMilestoneId, dependencyType,
+         lagDays, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        predecessorMilestoneId:
+          type: string
+          format: uuid
+        successorMilestoneId:
+          type: string
+          format: uuid
+        dependencyType:
+          type: string
+          enum:
+            [FINISH_TO_START, START_TO_START, FINISH_TO_FINISH,
+             START_TO_FINISH]
+        lagDays:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    LinkMilestoneGapRequest:
+      type: object
+      required: [gapRecordId]
+      properties:
+        gapRecordId:
+          type: string
+          format: uuid
+
+    CreateRoadmapReviewRequest:
+      type: object
+      required: [decision]
+      description: |
+        Đã chốt sau review (2026-08-06, rule 12 CLAUDE.md): chỉ `CASE_REVIEWER`
+        được gọi endpoint này — validate ở service, không phải ở đây.
+        `decision=APPROVED` phải qua gate (`ROADMAP_HAS_NO_MILESTONES`/
+        `ROADMAP_HAS_UNRESOLVED_CRITICAL_GAPS`) — port `validate_roadmap_
+        approval()` SQL mẫu sang app layer.
+      properties:
+        decision:
+          type: string
+          enum: [APPROVED, REJECTED, CHANGES_REQUESTED]
+        comment:
+          type: string
+          maxLength: 2000
