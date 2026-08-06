@@ -5,5 +5,7 @@ export * from "./author";
 export * from "./verification";
 export * from "./resource";
 export * from "./technology-case";
+export * from "./assessment-gap";
+export * from "./roadmap";
 export * from "./platform-ops";
 export * from "./relations";

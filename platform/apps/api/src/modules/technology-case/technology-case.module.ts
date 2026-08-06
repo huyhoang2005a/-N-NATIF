@@ -17,5 +17,11 @@ import { EvidenceService } from "./evidence.service";
   imports: [AuditModule, JobsModule, ResourceCatalogModule],
   controllers: [TechnologyCasesController],
   providers: [TechnologyCaseRepository, TechnologyCaseService, EvidenceRepository, EvidenceService],
+  // Exported for `modules/assessment-gap` and `modules/roadmap-transfer` (Phase 4) —
+  // both reuse `TechnologyCaseService.applyTransition` for the case lifecycle cascades
+  // (UNDER_ASSESSMENT/GAP_IDENTIFIED/ROADMAP_DRAFT/ROADMAP_APPROVED) exactly the way
+  // `EvidenceService` already does for EVIDENCE_COLLECTION — same DI-export requirement
+  // as the aggregator modules, see README "Bug thật đã tìm và sửa" #5.
+  exports: [TechnologyCaseRepository, TechnologyCaseService],
 })
 export class TechnologyCaseModule {}

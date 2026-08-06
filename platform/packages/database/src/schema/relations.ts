@@ -24,6 +24,25 @@ import {
   technologyCase,
   technologyProfile,
 } from "./technology-case";
+import {
+  assessmentCriterion,
+  assessmentFramework,
+  assessmentScore,
+  assessmentScoreCitation,
+  assessmentScoreEvidence,
+  gapCitation,
+  gapEvidence,
+  gapRecord,
+  readinessAssessment,
+} from "./assessment-gap";
+import {
+  milestoneDependency,
+  milestoneGap,
+  roadmap,
+  roadmapMilestone,
+  roadmapReview,
+  roadmapTask,
+} from "./roadmap";
 import type { outboxEvent } from "./platform-ops";
 import { auditLog, idempotencyKey, notification } from "./platform-ops";
 
@@ -360,6 +379,225 @@ export const evidenceCitationRelations = relations(evidenceCitation, ({ one }) =
   citation: one(citation, {
     fields: [evidenceCitation.citationId],
     references: [citation.id],
+  }),
+}));
+
+export const assessmentFrameworkRelations = relations(assessmentFramework, ({ one, many }) => ({
+  createdBy: one(userAccount, {
+    fields: [assessmentFramework.createdByUserId],
+    references: [userAccount.id],
+  }),
+  criteria: many(assessmentCriterion),
+  assessments: many(readinessAssessment),
+}));
+
+export const assessmentCriterionRelations = relations(assessmentCriterion, ({ one, many }) => ({
+  framework: one(assessmentFramework, {
+    fields: [assessmentCriterion.frameworkId],
+    references: [assessmentFramework.id],
+  }),
+  scores: many(assessmentScore),
+}));
+
+export const readinessAssessmentRelations = relations(readinessAssessment, ({ one, many }) => ({
+  technologyCase: one(technologyCase, {
+    fields: [readinessAssessment.technologyCaseId],
+    references: [technologyCase.id],
+  }),
+  framework: one(assessmentFramework, {
+    fields: [readinessAssessment.frameworkId],
+    references: [assessmentFramework.id],
+  }),
+  createdBy: one(userAccount, {
+    fields: [readinessAssessment.createdByUserId],
+    references: [userAccount.id],
+  }),
+  submittedBy: one(userAccount, {
+    fields: [readinessAssessment.submittedByUserId],
+    references: [userAccount.id],
+  }),
+  approvedBy: one(userAccount, {
+    fields: [readinessAssessment.approvedByUserId],
+    references: [userAccount.id],
+  }),
+  scores: many(assessmentScore),
+  gaps: many(gapRecord),
+}));
+
+export const assessmentScoreRelations = relations(assessmentScore, ({ one, many }) => ({
+  assessment: one(readinessAssessment, {
+    fields: [assessmentScore.assessmentId],
+    references: [readinessAssessment.id],
+  }),
+  criterion: one(assessmentCriterion, {
+    fields: [assessmentScore.criterionId],
+    references: [assessmentCriterion.id],
+  }),
+  createdBy: one(userAccount, {
+    fields: [assessmentScore.createdByUserId],
+    references: [userAccount.id],
+  }),
+  updatedBy: one(userAccount, {
+    fields: [assessmentScore.updatedByUserId],
+    references: [userAccount.id],
+  }),
+  evidenceLinks: many(assessmentScoreEvidence),
+  citationLinks: many(assessmentScoreCitation),
+}));
+
+export const assessmentScoreEvidenceRelations = relations(assessmentScoreEvidence, ({ one }) => ({
+  assessmentScore: one(assessmentScore, {
+    fields: [assessmentScoreEvidence.assessmentScoreId],
+    references: [assessmentScore.id],
+  }),
+  evidence: one(evidence, {
+    fields: [assessmentScoreEvidence.evidenceId],
+    references: [evidence.id],
+  }),
+}));
+
+export const assessmentScoreCitationRelations = relations(assessmentScoreCitation, ({ one }) => ({
+  assessmentScore: one(assessmentScore, {
+    fields: [assessmentScoreCitation.assessmentScoreId],
+    references: [assessmentScore.id],
+  }),
+  citation: one(citation, {
+    fields: [assessmentScoreCitation.citationId],
+    references: [citation.id],
+  }),
+}));
+
+export const gapRecordRelations = relations(gapRecord, ({ one, many }) => ({
+  technologyCase: one(technologyCase, {
+    fields: [gapRecord.technologyCaseId],
+    references: [technologyCase.id],
+  }),
+  sourceAssessment: one(readinessAssessment, {
+    fields: [gapRecord.sourceAssessmentId],
+    references: [readinessAssessment.id],
+  }),
+  sourceAssessmentScore: one(assessmentScore, {
+    fields: [gapRecord.sourceAssessmentScoreId],
+    references: [assessmentScore.id],
+  }),
+  owner: one(userAccount, {
+    fields: [gapRecord.ownerUserId],
+    references: [userAccount.id],
+  }),
+  createdBy: one(userAccount, {
+    fields: [gapRecord.createdByUserId],
+    references: [userAccount.id],
+  }),
+  resolvedBy: one(userAccount, {
+    fields: [gapRecord.resolvedByUserId],
+    references: [userAccount.id],
+  }),
+  evidenceLinks: many(gapEvidence),
+  citationLinks: many(gapCitation),
+  milestoneLinks: many(milestoneGap),
+}));
+
+export const gapEvidenceRelations = relations(gapEvidence, ({ one }) => ({
+  gap: one(gapRecord, {
+    fields: [gapEvidence.gapRecordId],
+    references: [gapRecord.id],
+  }),
+  evidence: one(evidence, {
+    fields: [gapEvidence.evidenceId],
+    references: [evidence.id],
+  }),
+}));
+
+export const gapCitationRelations = relations(gapCitation, ({ one }) => ({
+  gap: one(gapRecord, {
+    fields: [gapCitation.gapRecordId],
+    references: [gapRecord.id],
+  }),
+  citation: one(citation, {
+    fields: [gapCitation.citationId],
+    references: [citation.id],
+  }),
+}));
+
+export const roadmapRelations = relations(roadmap, ({ one, many }) => ({
+  technologyCase: one(technologyCase, {
+    fields: [roadmap.technologyCaseId],
+    references: [technologyCase.id],
+  }),
+  createdBy: one(userAccount, {
+    fields: [roadmap.createdByUserId],
+    references: [userAccount.id],
+  }),
+  submittedBy: one(userAccount, {
+    fields: [roadmap.submittedByUserId],
+    references: [userAccount.id],
+  }),
+  approvedBy: one(userAccount, {
+    fields: [roadmap.approvedByUserId],
+    references: [userAccount.id],
+  }),
+  milestones: many(roadmapMilestone),
+  reviews: many(roadmapReview),
+}));
+
+export const roadmapMilestoneRelations = relations(roadmapMilestone, ({ one, many }) => ({
+  roadmap: one(roadmap, {
+    fields: [roadmapMilestone.roadmapId],
+    references: [roadmap.id],
+  }),
+  owner: one(userAccount, {
+    fields: [roadmapMilestone.ownerUserId],
+    references: [userAccount.id],
+  }),
+  tasks: many(roadmapTask),
+  gapLinks: many(milestoneGap),
+  predecessorDependencies: many(milestoneDependency, { relationName: "predecessorMilestone" }),
+  successorDependencies: many(milestoneDependency, { relationName: "successorMilestone" }),
+}));
+
+export const roadmapTaskRelations = relations(roadmapTask, ({ one }) => ({
+  milestone: one(roadmapMilestone, {
+    fields: [roadmapTask.milestoneId],
+    references: [roadmapMilestone.id],
+  }),
+  assignee: one(userAccount, {
+    fields: [roadmapTask.assigneeUserId],
+    references: [userAccount.id],
+  }),
+}));
+
+export const milestoneDependencyRelations = relations(milestoneDependency, ({ one }) => ({
+  predecessor: one(roadmapMilestone, {
+    fields: [milestoneDependency.predecessorMilestoneId],
+    references: [roadmapMilestone.id],
+    relationName: "predecessorMilestone",
+  }),
+  successor: one(roadmapMilestone, {
+    fields: [milestoneDependency.successorMilestoneId],
+    references: [roadmapMilestone.id],
+    relationName: "successorMilestone",
+  }),
+}));
+
+export const milestoneGapRelations = relations(milestoneGap, ({ one }) => ({
+  milestone: one(roadmapMilestone, {
+    fields: [milestoneGap.milestoneId],
+    references: [roadmapMilestone.id],
+  }),
+  gap: one(gapRecord, {
+    fields: [milestoneGap.gapRecordId],
+    references: [gapRecord.id],
+  }),
+}));
+
+export const roadmapReviewRelations = relations(roadmapReview, ({ one }) => ({
+  roadmap: one(roadmap, {
+    fields: [roadmapReview.roadmapId],
+    references: [roadmap.id],
+  }),
+  reviewer: one(userAccount, {
+    fields: [roadmapReview.reviewerUserId],
+    references: [userAccount.id],
   }),
 }));
 

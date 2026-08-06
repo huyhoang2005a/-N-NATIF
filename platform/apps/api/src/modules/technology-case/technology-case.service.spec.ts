@@ -211,13 +211,13 @@ describe("TechnologyCaseService.addMember (§3.5)", () => {
 });
 
 describe("TechnologyCaseService.transition (SUC-07)", () => {
-  it("refuses any target other than EVIDENCE_COLLECTION — later steps need Phase 4+ data", async () => {
+  it("refuses a target beyond ROADMAP_APPROVED — Phase 6 (Transfer) data doesn't exist yet", async () => {
     const { service, repository } = buildService();
     vi.mocked(repository.findById).mockResolvedValue(existingCase as never);
     vi.mocked(repository.findActiveMembership).mockResolvedValue({ role: "OWNER" } as never);
 
     await expect(
-      service.transition(verifiedAuthorInOrg, "case-1", "UNDER_ASSESSMENT", undefined, null),
+      service.transition(verifiedAuthorInOrg, "case-1", "PILOT_READY", undefined, null),
     ).rejects.toMatchObject({ code: "CASE_INVALID_TRANSITION" });
   });
 

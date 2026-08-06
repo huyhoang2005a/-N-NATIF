@@ -156,6 +156,35 @@ export interface EvidenceLinkedEvent {
   createdByUserId: string;
 }
 
+export interface AssessmentSubmittedEvent {
+  type: "AssessmentSubmitted";
+  assessmentId: string;
+  technologyCaseId: string;
+  compositeScore: number;
+  submittedByUserId: string;
+}
+
+export interface AssessmentApprovedEvent {
+  type: "AssessmentApproved";
+  assessmentId: string;
+  technologyCaseId: string;
+  approvedByUserId: string;
+}
+
+export interface CriticalGapRaisedEvent {
+  type: "CriticalGapRaised";
+  gapRecordId: string;
+  technologyCaseId: string;
+  createdByUserId: string;
+}
+
+export interface RoadmapApprovedEvent {
+  type: "RoadmapApproved";
+  roadmapId: string;
+  technologyCaseId: string;
+  approvedByUserId: string;
+}
+
 export type DomainEvent =
   | OrganizationRegisteredEvent
   | OrganizationVerificationRequestedEvent
@@ -177,4 +206,8 @@ export type DomainEvent =
   | ResourceAccessRevokedEvent
   | TechnologyCaseCreatedEvent
   | CaseStatusChangedEvent
-  | EvidenceLinkedEvent;
+  | EvidenceLinkedEvent
+  | AssessmentSubmittedEvent
+  | AssessmentApprovedEvent
+  | CriticalGapRaisedEvent
+  | RoadmapApprovedEvent;

@@ -215,3 +215,79 @@ export const visibilityLevelEnum = pgEnum("visibility_level", [
   "PARTNERS_ONLY",
   "PRIVATE",
 ]);
+
+// Phase 4 (Assessment, Gap, Roadmap) — ported 1:1 from schema_v5_production.dbml.
+
+export const assessmentStatusEnum = pgEnum("assessment_status", [
+  "DRAFT",
+  "SUBMITTED",
+  "APPROVED",
+  "SUPERSEDED",
+]);
+
+export const frameworkStatusEnum = pgEnum("framework_status", [
+  "DRAFT",
+  "ACTIVE",
+  "RETIRED",
+]);
+
+export const gapSeverityEnum = pgEnum("gap_severity", [
+  "LOW",
+  "MEDIUM",
+  "HIGH",
+  "CRITICAL",
+]);
+
+export const gapStatusEnum = pgEnum("gap_status", [
+  "OPEN",
+  "IN_PROGRESS",
+  "RESOLVED",
+  "ACCEPTED_RISK",
+  "CLOSED",
+]);
+
+export const roadmapStatusEnum = pgEnum("roadmap_status", [
+  "DRAFT",
+  "IN_REVIEW",
+  "APPROVED",
+  "ACTIVE",
+  "COMPLETED",
+  "REJECTED",
+  "SUPERSEDED",
+]);
+
+export const roadmapReviewDecisionEnum = pgEnum("roadmap_review_decision", [
+  "APPROVED",
+  "REJECTED",
+  "CHANGES_REQUESTED",
+]);
+
+export const milestoneStatusEnum = pgEnum("milestone_status", [
+  "NOT_STARTED",
+  "IN_PROGRESS",
+  "BLOCKED",
+  "COMPLETED",
+  "CANCELLED",
+]);
+
+export const taskStatusEnum = pgEnum("task_status", [
+  "TODO",
+  "IN_PROGRESS",
+  "BLOCKED",
+  "DONE",
+  "CANCELLED",
+]);
+
+export const priorityLevelEnum = pgEnum("priority_level", [
+  "LOW",
+  "MEDIUM",
+  "HIGH",
+  "CRITICAL",
+]);
+
+export const dependencyTypeEnum = pgEnum("dependency_type", [
+  "FINISH_TO_START",
+  "START_TO_START",
+  "FINISH_TO_FINISH",
+  "START_TO_FINISH",
+]);

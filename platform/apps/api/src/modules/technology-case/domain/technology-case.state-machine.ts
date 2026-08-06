@@ -7,10 +7,11 @@ import { ConflictError, ErrorCode, TechnologyCaseStatus, TransitionTable } from 
  * packages/domain/README.md) — mọi state machine mới, kể cả chính thức, thuộc về bounded
  * context của nó, không phải shared kernel.
  *
- * Khai báo đủ 10 trạng thái nối tiếp để dùng lại ở Phase 4-6, nhưng Phase 3
- * (`TechnologyCaseService.transition`) chỉ thực sự cho phép gọi tới
- * `EVIDENCE_COLLECTION` — các bước sau cần dữ liệu Assessment/Gap (Phase 4) chưa tồn
- * tại để guard đúng (vd không cho `ROADMAP_APPROVED` khi còn gap CRITICAL).
+ * Khai báo đủ 10 trạng thái nối tiếp để dùng lại ở Phase 4-6. Phase 3 chỉ thực sự cho
+ * phép gọi tới `EVIDENCE_COLLECTION`; Phase 4 mở thêm `UNDER_ASSESSMENT`/
+ * `GAP_IDENTIFIED`/`ROADMAP_DRAFT`/`ROADMAP_APPROVED` (xem `SUPPORTED_TRANSITION_
+ * TARGETS`) — các bước sau `ROADMAP_APPROVED` (PILOT_READY trở đi) cần dữ liệu Transfer
+ * (Phase 6) chưa tồn tại để guard đúng.
  */
 const technologyCaseTransitions = new TransitionTable<TechnologyCaseStatus>({
   [TechnologyCaseStatus.DRAFT]: [TechnologyCaseStatus.EVIDENCE_COLLECTION],
@@ -39,7 +40,14 @@ export function assertCaseTransition(from: TechnologyCaseStatus, to: TechnologyC
   }
 }
 
-/** Phase 3 chỉ implement guard/side-effect cho transition này — mọi target khác bị
- * chặn ở tầng service (`TechnologyCaseService.transition`) trước khi gọi tới đây, dù
- * bảng transition phía trên đã đúng theo spec đầy đủ. */
-export const PHASE_3_SUPPORTED_TARGET = TechnologyCaseStatus.EVIDENCE_COLLECTION;
+/** Target thực sự có guard/side-effect implement tới Phase 4 — mọi target khác (từ
+ * `PILOT_READY` trở đi, thuộc Phase 6 Transfer) bị chặn ở tầng service
+ * (`TechnologyCaseService.applyTransition`) trước khi gọi tới đây, dù bảng transition
+ * phía trên đã đúng theo spec đầy đủ. */
+export const SUPPORTED_TRANSITION_TARGETS: readonly TechnologyCaseStatus[] = [
+  TechnologyCaseStatus.EVIDENCE_COLLECTION,
+  TechnologyCaseStatus.UNDER_ASSESSMENT,
+  TechnologyCaseStatus.GAP_IDENTIFIED,
+  TechnologyCaseStatus.ROADMAP_DRAFT,
+  TechnologyCaseStatus.ROADMAP_APPROVED,
+];

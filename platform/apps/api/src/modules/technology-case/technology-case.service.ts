@@ -25,7 +25,7 @@ import { DATABASE } from "../../database/database.module";
 import { slugify } from "../identity-organization/organizations/slug.util";
 import { AuditService } from "../platform-operations/audit/audit.service";
 import { OutboxService } from "../platform-operations/jobs/outbox.service";
-import { PHASE_3_SUPPORTED_TARGET, assertCaseTransition } from "./domain/technology-case.state-machine";
+import { SUPPORTED_TRANSITION_TARGETS, assertCaseTransition } from "./domain/technology-case.state-machine";
 import { TechnologyCaseRepository } from "./technology-case.repository";
 
 interface TechnologyCaseRow {
@@ -385,10 +385,10 @@ export class TechnologyCaseService {
     reason: string | undefined,
     requestIdHeader: string | null,
   ): Promise<TechnologyCaseRow> {
-    if (toStatus !== PHASE_3_SUPPORTED_TARGET) {
+    if (!SUPPORTED_TRANSITION_TARGETS.includes(toStatus)) {
       throw new ConflictError(
         ErrorCode.CASE_INVALID_TRANSITION,
-        `Phase 3 only supports transitioning to ${PHASE_3_SUPPORTED_TARGET} — later lifecycle steps require Phase 4+ data that doesn't exist yet.`,
+        `Transitioning to ${toStatus} is not supported yet — later lifecycle steps (Phase 6 Transfer) require data that doesn't exist yet.`,
         { toStatus },
       );
     }

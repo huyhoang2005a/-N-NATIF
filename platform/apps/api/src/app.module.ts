@@ -9,6 +9,7 @@ import { PlatformOperationsModule } from "./modules/platform-operations/platform
 import { VerificationModule } from "./modules/verification/verification.module";
 import { ResourceCatalogModule } from "./modules/resource-catalog/resource-catalog.module";
 import { TechnologyCaseModule } from "./modules/technology-case/technology-case.module";
+import { AssessmentGapModule } from "./modules/assessment-gap/assessment-gap.module";
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { TechnologyCaseModule } from "./modules/technology-case/technology-case.
     VerificationModule,
     ResourceCatalogModule,
     TechnologyCaseModule,
+    AssessmentGapModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
