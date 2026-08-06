@@ -205,3 +205,40 @@ r2m-v5/
 - Logic dùng chung nhiều bounded context nằm ở `packages/domain` (shared kernel).
   Logic đặc thù 1 bounded context nằm ở `modules/<context>/domain/`.
 
+## Quy tắc UI/Frontend (áp dụng khi làm apps/web)
+
+1. **Component dùng chung nằm ở 1 nơi duy nhất**
+   (apps/web/components/ui/) — không copy-paste Card/StatusPill/Button... ra
+   nhiều page. Nếu 1 page cần UI pattern chưa có trong components/ui/, thêm
+   vào đó trước, không viết inline riêng cho page đó.
+
+2. **Token màu/font đã khóa** (xem docs/design/) — accent chính indigo-700,
+   citation chip amber + font-mono, status rail 5 tone (gray/blue/green/
+   amber/red). Không tự thêm màu mới ngoài bộ này trừ khi có lý do rõ ràng
+   và được xác nhận trước.
+
+3. **Status tone phải map đúng enum thật trong schema**, không suy diễn.
+   Mỗi enum cần 1 bảng mapping tường minh (status → tone) đặt cùng chỗ với
+   StatusPill, không rải rác if/else khắp nơi.
+
+4. **Server Component mặc định**, chỉ thêm "use client" ở phần thật sự cần
+   tương tác (form, tab, filter). Không biến cả trang thành Client Component
+   chỉ vì 1 nút bên trong cần onClick.
+
+5. **Không hard-code dữ liệu mẫu trong code production.** Mọi danh sách/chi
+   tiết fetch qua API thật. Nếu API của phase đó chưa có, hiển thị trạng
+   thái "Sắp ra mắt", không dựng UI với dữ liệu giả rồi để đó.
+
+6. **Empty state và error state bắt buộc cho mọi trang fetch dữ liệu** — viết
+   theo giọng sản phẩm, nêu rõ vấn đề và hành động tiếp theo, không dùng
+   "No data"/"Error" chung chung.
+
+7. **Giao diện hiển thị theo đúng role thật của user đăng nhập** — không có
+   khái niệm "chọn xem như vai trò khác" trong app thật (khác file tham
+   chiếu docs/design/, nơi role switcher chỉ để demo).
+
+8. **Citation chip chỉ dùng ở nơi có citation thật** (evidence, recommendation
+   có citation_id trỏ resource_version) — không dùng trang trí ở chỗ khác dù
+   trông hợp mắt.
+   
+   | Tham khảo hướng thiết kế UI trước khi dựng page mới | `docs/design/` (5 file .jsx) + docs/design/README.md 

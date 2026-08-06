@@ -91,6 +91,13 @@ export class RoadmapRepository {
     return firstOrThrow(rows, "createTask: insert returned no row");
   }
 
+  async listTasksByMilestone(milestoneId: string) {
+    return this.db.query.roadmapTask.findMany({
+      where: eq(schema.roadmapTask.milestoneId, milestoneId),
+      orderBy: [schema.roadmapTask.sortOrder],
+    });
+  }
+
   /** Toàn bộ edge `milestone_dependency` hiện có của 1 roadmap — dùng cho cycle
    * detection (`domain/cycle-detection.ts`). `milestone_dependency` không có cột
    * `roadmap_id` trực tiếp nên lọc qua tập milestone id của roadmap trước. */
@@ -113,8 +120,24 @@ export class RoadmapRepository {
     return firstOrThrow(rows, "createMilestoneGapLink: insert returned no row");
   }
 
+  /** Join sang `gap_record` (quan hệ `milestoneGapRelations.gap` đã có sẵn) — UI cần đủ
+   * thông tin gap, không chỉ id. */
+  async listGapLinksByMilestone(milestoneId: string) {
+    return this.db.query.milestoneGap.findMany({
+      where: eq(schema.milestoneGap.milestoneId, milestoneId),
+      with: { gap: true },
+    });
+  }
+
   async createReview(values: typeof schema.roadmapReview.$inferInsert, tx: Database) {
     const rows = await tx.insert(schema.roadmapReview).values(values).returning();
     return firstOrThrow(rows, "createReview: insert returned no row");
+  }
+
+  async listReviewsByRoadmap(roadmapId: string) {
+    return this.db.query.roadmapReview.findMany({
+      where: eq(schema.roadmapReview.roadmapId, roadmapId),
+      orderBy: [desc(schema.roadmapReview.createdAt)],
+    });
   }
 }

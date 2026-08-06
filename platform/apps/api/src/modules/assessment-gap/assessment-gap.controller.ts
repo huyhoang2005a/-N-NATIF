@@ -97,6 +97,11 @@ export class AssessmentsController {
     return this.assessmentService.upsertScore(actor, id, criterionId, body, requestId(req));
   }
 
+  @Get(":id/scores")
+  listScores(@CurrentActor() actor: ActorContext, @Param("id") id: string): Promise<AssessmentScoreResponse[]> {
+    return this.assessmentService.listScores(actor, id);
+  }
+
   @Post(":id/submit")
   submit(
     @CurrentActor() actor: ActorContext,

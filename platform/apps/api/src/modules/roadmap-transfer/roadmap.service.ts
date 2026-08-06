@@ -4,10 +4,12 @@ import type {
   CreateRoadmapRequest,
   CreateRoadmapReviewRequest,
   CreateTaskRequest,
+  GapResponse,
   LinkMilestoneGapRequest,
   MilestoneDependencyResponse,
   RoadmapMilestoneResponse,
   RoadmapResponse,
+  RoadmapReviewResponse,
   RoadmapTaskResponse,
 } from "@r2m/contracts";
 import type { ActorContext } from "@r2m/authz";
@@ -28,6 +30,7 @@ import { OutboxService } from "../platform-operations/jobs/outbox.service";
 import { TechnologyCaseRepository } from "../technology-case/technology-case.repository";
 import { TechnologyCaseService } from "../technology-case/technology-case.service";
 import { GapRepository } from "../assessment-gap/gap.repository";
+import { toGapResponse } from "../assessment-gap/gap.service";
 import { wouldCreateCycle } from "./domain/cycle-detection";
 import { assertRoadmapTransition } from "./domain/roadmap.state-machine";
 import { RoadmapRepository } from "./roadmap.repository";
@@ -144,6 +147,24 @@ function toDependencyResponse(row: {
     successorMilestoneId: row.successorMilestoneId,
     dependencyType: row.dependencyType,
     lagDays: row.lagDays,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+function toReviewResponse(row: {
+  id: string;
+  roadmapId: string;
+  reviewerUserId: string;
+  decision: string;
+  comment: string | null;
+  createdAt: Date;
+}): RoadmapReviewResponse {
+  return {
+    id: row.id,
+    roadmapId: row.roadmapId,
+    reviewerUserId: row.reviewerUserId,
+    decision: row.decision,
+    comment: row.comment,
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -651,5 +672,63 @@ export class RoadmapService {
     await this.caseService.assertVisible(actor, technologyCase);
     const rows = await this.repository.listMilestonesByRoadmap(roadmapId);
     return rows.map(toMilestoneResponse);
+  }
+
+  async listDependencies(actor: ActorContext, roadmapId: string): Promise<MilestoneDependencyResponse[]> {
+    const roadmap = await this.repository.findById(roadmapId);
+    if (!roadmap) {
+      throw new NotFoundError(ErrorCode.ROADMAP_NOT_FOUND, "Roadmap not found.");
+    }
+    const technologyCase = await this.caseRepository.findById(roadmap.technologyCaseId);
+    if (!technologyCase) {
+      throw new NotFoundError(ErrorCode.CASE_NOT_FOUND, "Technology case not found.");
+    }
+    await this.caseService.assertVisible(actor, technologyCase);
+    const rows = await this.repository.findDependencyEdgesByRoadmap(roadmapId);
+    return rows.map(toDependencyResponse);
+  }
+
+  async listReviews(actor: ActorContext, roadmapId: string): Promise<RoadmapReviewResponse[]> {
+    const roadmap = await this.repository.findById(roadmapId);
+    if (!roadmap) {
+      throw new NotFoundError(ErrorCode.ROADMAP_NOT_FOUND, "Roadmap not found.");
+    }
+    const technologyCase = await this.caseRepository.findById(roadmap.technologyCaseId);
+    if (!technologyCase) {
+      throw new NotFoundError(ErrorCode.CASE_NOT_FOUND, "Technology case not found.");
+    }
+    await this.caseService.assertVisible(actor, technologyCase);
+    const rows = await this.repository.listReviewsByRoadmap(roadmapId);
+    return rows.map(toReviewResponse);
+  }
+
+  private async findMilestoneOrThrow(milestoneId: string) {
+    const milestone = await this.repository.findMilestoneById(milestoneId);
+    if (!milestone) {
+      throw new NotFoundError(ErrorCode.MILESTONE_NOT_FOUND, "Milestone not found.");
+    }
+    const roadmap = await this.repository.findById(milestone.roadmapId);
+    if (!roadmap) {
+      throw new NotFoundError(ErrorCode.ROADMAP_NOT_FOUND, "Roadmap not found.");
+    }
+    const technologyCase = await this.caseRepository.findById(roadmap.technologyCaseId);
+    if (!technologyCase) {
+      throw new NotFoundError(ErrorCode.CASE_NOT_FOUND, "Technology case not found.");
+    }
+    return { milestone, roadmap, technologyCase };
+  }
+
+  async listMilestoneTasks(actor: ActorContext, milestoneId: string): Promise<RoadmapTaskResponse[]> {
+    const { technologyCase } = await this.findMilestoneOrThrow(milestoneId);
+    await this.caseService.assertVisible(actor, technologyCase);
+    const rows = await this.repository.listTasksByMilestone(milestoneId);
+    return rows.map(toTaskResponse);
+  }
+
+  async listMilestoneGaps(actor: ActorContext, milestoneId: string): Promise<GapResponse[]> {
+    const { technologyCase } = await this.findMilestoneOrThrow(milestoneId);
+    await this.caseService.assertVisible(actor, technologyCase);
+    const rows = await this.repository.listGapLinksByMilestone(milestoneId);
+    return rows.map((row) => toGapResponse(row.gap));
   }
 }

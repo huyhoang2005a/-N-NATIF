@@ -60,6 +60,9 @@ export function SiteHeader() {
             <Link href="/dashboard" className="nav-link">
               Bảng điều khiển
             </Link>
+            <Link href="/technology-cases" className="nav-link">
+              Technology Case
+            </Link>
             {session.me.platformRole !== "USER" && (
               <Link href="/platform/organization-verifications" className="nav-link">
                 Xét duyệt tổ chức

@@ -457,6 +457,20 @@ export class AssessmentService {
     return toAssessmentResponse(updated);
   }
 
+  async listScores(actor: ActorContext, assessmentId: string): Promise<AssessmentScoreResponse[]> {
+    const assessment = await this.repository.findById(assessmentId);
+    if (!assessment) {
+      throw new NotFoundError(ErrorCode.ASSESSMENT_NOT_FOUND, "Assessment not found.");
+    }
+    const technologyCase = await this.caseRepository.findById(assessment.technologyCaseId);
+    if (!technologyCase) {
+      throw new NotFoundError(ErrorCode.CASE_NOT_FOUND, "Technology case not found.");
+    }
+    await this.caseService.assertVisible(actor, technologyCase);
+    const rows = await this.repository.findScoresWithCriteriaByAssessment(assessmentId);
+    return rows.map((row) => toScoreResponse(row));
+  }
+
   async getById(actor: ActorContext, id: string): Promise<ReadinessAssessmentResponse> {
     const assessment = await this.repository.findById(id);
     if (!assessment) {

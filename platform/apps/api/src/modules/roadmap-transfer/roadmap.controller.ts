@@ -4,10 +4,12 @@ import type {
   CreateRoadmapRequest,
   CreateRoadmapReviewRequest,
   CreateTaskRequest,
+  GapResponse,
   LinkMilestoneGapRequest,
   MilestoneDependencyResponse,
   RoadmapMilestoneResponse,
   RoadmapResponse,
+  RoadmapReviewResponse,
   RoadmapTaskResponse,
 } from "@r2m/contracts";
 import {
@@ -92,6 +94,15 @@ export class RoadmapsController {
     return this.roadmapService.createDependency(actor, id, body, requestId(req));
   }
 
+  /** Path tự đặt ngoài catalogue §13.2 (read). */
+  @Get(":id/dependencies")
+  listDependencies(
+    @CurrentActor() actor: ActorContext,
+    @Param("id") id: string,
+  ): Promise<MilestoneDependencyResponse[]> {
+    return this.roadmapService.listDependencies(actor, id);
+  }
+
   @Post(":id/submit")
   submit(
     @CurrentActor() actor: ActorContext,
@@ -110,6 +121,15 @@ export class RoadmapsController {
     @Req() req: Request,
   ): Promise<RoadmapResponse> {
     return this.roadmapService.review(actor, id, body, requestId(req));
+  }
+
+  /** Path tự đặt ngoài catalogue §13.2 (read). */
+  @Get(":id/reviews")
+  listReviews(
+    @CurrentActor() actor: ActorContext,
+    @Param("id") id: string,
+  ): Promise<RoadmapReviewResponse[]> {
+    return this.roadmapService.listReviews(actor, id);
   }
 }
 
@@ -130,6 +150,12 @@ export class MilestonesController {
     return this.roadmapService.createTask(actor, id, body, requestId(req));
   }
 
+  /** Path tự đặt ngoài catalogue §13.2 (read). */
+  @Get(":id/tasks")
+  listTasks(@CurrentActor() actor: ActorContext, @Param("id") id: string): Promise<RoadmapTaskResponse[]> {
+    return this.roadmapService.listMilestoneTasks(actor, id);
+  }
+
   @Post(":id/gaps")
   @UsePipes(new ZodValidationPipe(LinkMilestoneGapRequestSchema))
   linkGap(
@@ -139,5 +165,11 @@ export class MilestonesController {
     @Req() req: Request,
   ): Promise<void> {
     return this.roadmapService.linkMilestoneGap(actor, id, body, requestId(req));
+  }
+
+  /** Path tự đặt ngoài catalogue §13.2 (read). */
+  @Get(":id/gaps")
+  listGaps(@CurrentActor() actor: ActorContext, @Param("id") id: string): Promise<GapResponse[]> {
+    return this.roadmapService.listMilestoneGaps(actor, id);
   }
 }

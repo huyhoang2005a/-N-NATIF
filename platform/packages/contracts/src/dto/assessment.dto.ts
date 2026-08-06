@@ -48,6 +48,35 @@ export interface AssessmentScoreResponse {
   updatedAt: string;
 }
 
+export interface AssessmentFrameworkResponse {
+  id: string;
+  code: string;
+  name: string;
+  versionNo: number;
+  description: string | null;
+  status: string;
+  createdByUserId: string;
+  createdAt: string;
+  activatedAt: string | null;
+  retiredAt: string | null;
+}
+
+export interface AssessmentCriterionResponse {
+  id: string;
+  frameworkId: string;
+  categoryCode: string;
+  criterionCode: string;
+  title: string;
+  description: string;
+  guidance: string | null;
+  minScore: number;
+  maxScore: number;
+  weight: number;
+  requiresEvidence: boolean;
+  requiresCitation: boolean;
+  sortOrder: number;
+}
+
 export interface ReadinessAssessmentResponse {
   id: string;
   technologyCaseId: string;

@@ -1,7 +1,7 @@
 import type { Database } from "@r2m/database";
 import { schema } from "@r2m/database";
 import { Inject, Injectable } from "@nestjs/common";
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { DATABASE } from "../../database/database.module";
 
 function firstOrThrow<T>(rows: T[], message: string): T {
@@ -30,6 +30,13 @@ export class EvidenceRepository {
 
   async findById(id: string) {
     return this.db.query.evidence.findFirst({ where: eq(schema.evidence.id, id) });
+  }
+
+  async listByCase(technologyCaseId: string) {
+    return this.db.query.evidence.findMany({
+      where: eq(schema.evidence.technologyCaseId, technologyCaseId),
+      orderBy: [desc(schema.evidence.createdAt)],
+    });
   }
 
   /** Called BEFORE inserting the new evidence row, inside the same transaction, to

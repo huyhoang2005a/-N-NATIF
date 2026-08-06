@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: R2M Platform API
-  version: "1.2.0"
+  version: "1.3.0"
   description: |
     Living document for the `/v1` API surface, versioned by API version — not by
     internal phase name (see B.0 in the Phase 2 implementation plan). Currently
@@ -32,6 +32,7 @@ tags:
   - name: resource-access-grants
   - name: technology-cases
   - name: evidence
+  - name: assessment-frameworks
   - name: assessments
   - name: gaps
   - name: roadmaps
@@ -1017,6 +1018,28 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "409":
           $ref: "#/components/responses/DomainError"
+    get:
+      operationId: listCaseMembers
+      summary: List a technology case's members
+      description: Path tự đặt ngoài catalogue §13.2 (đúng tiền lệ Phase 3 — read endpoint).
+      tags: [technology-cases]
+      parameters:
+        - $ref: "#/components/parameters/TechnologyCaseId"
+      responses:
+        "200":
+          description: Case members
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CaseMemberResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/DomainError"
 
   /technology-cases/{id}/organizations:
     post:
@@ -1046,6 +1069,28 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+    get:
+      operationId: listCaseOrganizations
+      summary: List a technology case's linked organizations
+      description: Path tự đặt ngoài catalogue §13.2 (đúng tiền lệ Phase 3 — read endpoint).
+      tags: [technology-cases]
+      parameters:
+        - $ref: "#/components/parameters/TechnologyCaseId"
+      responses:
+        "200":
+          description: Linked organizations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CaseOrganizationResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/DomainError"
 
   /technology-cases/{id}/transitions:
     post:
@@ -1120,6 +1165,28 @@ paths:
         "404":
           $ref: "#/components/responses/DomainError"
         "422":
+          $ref: "#/components/responses/DomainError"
+    get:
+      operationId: listCaseEvidence
+      summary: List a technology case's evidence
+      description: Path tự đặt ngoài catalogue §13.2 (đúng tiền lệ Phase 3 — read endpoint).
+      tags: [evidence]
+      parameters:
+        - $ref: "#/components/parameters/TechnologyCaseId"
+      responses:
+        "200":
+          description: Evidence for this case, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EvidenceResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
           $ref: "#/components/responses/DomainError"
 
   /technology-cases/{id}/assessments:
@@ -1361,6 +1428,78 @@ paths:
         "404":
           $ref: "#/components/responses/DomainError"
         "409":
+          $ref: "#/components/responses/DomainError"
+
+  /assessments/{id}/scores:
+    get:
+      operationId: listAssessmentScores
+      summary: List an assessment's entered criterion scores
+      description: |
+        Path tự đặt ngoài catalogue §13.2 — trả `score` join sẵn `criterionId`/
+        `evidenceIds`/`citationIds`, dùng để UI biết tiêu chí nào đã nhập điểm
+        trước khi submit.
+      tags: [assessments]
+      parameters:
+        - $ref: "#/components/parameters/AssessmentId"
+      responses:
+        "200":
+          description: Scores entered so far
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AssessmentScoreResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/DomainError"
+
+  /assessment-frameworks/{id}:
+    get:
+      operationId: getAssessmentFramework
+      summary: Get an assessment framework by id
+      description: Path tự đặt ngoài catalogue §13.2 — UI cần tên/version framework của assessment.
+      tags: [assessment-frameworks]
+      parameters:
+        - $ref: "#/components/parameters/AssessmentFrameworkId"
+      responses:
+        "200":
+          description: Assessment framework
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssessmentFrameworkResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "404":
+          $ref: "#/components/responses/DomainError"
+
+  /assessment-frameworks/{id}/criteria:
+    get:
+      operationId: listAssessmentFrameworkCriteria
+      summary: List a framework's scoring criteria
+      description: |
+        Path tự đặt ngoài catalogue §13.2 — UI cần danh sách criterion (min/max/
+        weight/requiresEvidence/requiresCitation) để dựng form nhập điểm trước
+        khi có score nào được nhập.
+      tags: [assessment-frameworks]
+      parameters:
+        - $ref: "#/components/parameters/AssessmentFrameworkId"
+      responses:
+        "200":
+          description: Framework criteria, ordered by sortOrder
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AssessmentCriterionResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "404":
           $ref: "#/components/responses/DomainError"
 
   /gaps/{id}:
@@ -1606,6 +1745,28 @@ paths:
           $ref: "#/components/responses/DomainError"
         "409":
           $ref: "#/components/responses/DomainError"
+    get:
+      operationId: listMilestoneDependencies
+      summary: List a roadmap's milestone dependency edges
+      description: Path tự đặt ngoài catalogue §13.2 (đúng tiền lệ Phase 3 — read endpoint).
+      tags: [roadmaps]
+      parameters:
+        - $ref: "#/components/parameters/RoadmapId"
+      responses:
+        "200":
+          description: Dependency edges
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MilestoneDependencyResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/DomainError"
 
   /roadmaps/{id}/submit:
     post:
@@ -1670,6 +1831,28 @@ paths:
           $ref: "#/components/responses/DomainError"
         "409":
           $ref: "#/components/responses/DomainError"
+    get:
+      operationId: listRoadmapReviews
+      summary: List a roadmap's review history
+      description: Path tự đặt ngoài catalogue §13.2 (đúng tiền lệ Phase 3 — read endpoint).
+      tags: [roadmaps]
+      parameters:
+        - $ref: "#/components/parameters/RoadmapId"
+      responses:
+        "200":
+          description: Reviews, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RoadmapReviewResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/DomainError"
 
   /milestones/{id}/tasks:
     post:
@@ -1702,6 +1885,28 @@ paths:
           $ref: "#/components/responses/DomainError"
         "409":
           $ref: "#/components/responses/DomainError"
+    get:
+      operationId: listMilestoneTasks
+      summary: List a milestone's tasks
+      description: Path tự đặt ngoài catalogue §13.2 (đúng tiền lệ Phase 3 — read endpoint).
+      tags: [roadmaps]
+      parameters:
+        - $ref: "#/components/parameters/MilestoneId"
+      responses:
+        "200":
+          description: Tasks, ordered by sortOrder
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RoadmapTaskResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/DomainError"
 
   /milestones/{id}/gaps:
     post:
@@ -1729,6 +1934,28 @@ paths:
         "404":
           $ref: "#/components/responses/DomainError"
         "409":
+          $ref: "#/components/responses/DomainError"
+    get:
+      operationId: listMilestoneGaps
+      summary: List gaps linked to a milestone
+      description: Path tự đặt ngoài catalogue §13.2 (đúng tiền lệ Phase 3 — read endpoint).
+      tags: [roadmaps]
+      parameters:
+        - $ref: "#/components/parameters/MilestoneId"
+      responses:
+        "200":
+          description: Linked gaps
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GapResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
           $ref: "#/components/responses/DomainError"
 
 components:
@@ -1807,6 +2034,13 @@ components:
         type: string
         format: uuid
     MilestoneId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    AssessmentFrameworkId:
       name: id
       in: path
       required: true
@@ -2842,6 +3076,75 @@ components:
           type: string
           format: date-time
 
+    AssessmentFrameworkResponse:
+      type: object
+      required:
+        [id, code, name, versionNo, description, status, createdByUserId,
+         createdAt, activatedAt, retiredAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        name:
+          type: string
+        versionNo:
+          type: integer
+        description:
+          type: [string, "null"]
+        status:
+          type: string
+          enum: [DRAFT, ACTIVE, RETIRED]
+        createdByUserId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        activatedAt:
+          type: [string, "null"]
+          format: date-time
+        retiredAt:
+          type: [string, "null"]
+          format: date-time
+
+    AssessmentCriterionResponse:
+      type: object
+      required:
+        [id, frameworkId, categoryCode, criterionCode, title, description,
+         guidance, minScore, maxScore, weight, requiresEvidence,
+         requiresCitation, sortOrder]
+      properties:
+        id:
+          type: string
+          format: uuid
+        frameworkId:
+          type: string
+          format: uuid
+        categoryCode:
+          type: string
+        criterionCode:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        guidance:
+          type: [string, "null"]
+        minScore:
+          type: number
+        maxScore:
+          type: number
+        weight:
+          type: number
+        requiresEvidence:
+          type: boolean
+        requiresCitation:
+          type: boolean
+        sortOrder:
+          type: integer
+
     CreateAssessmentRequest:
       type: object
       description: |
@@ -3384,3 +3687,25 @@ components:
         comment:
           type: string
           maxLength: 2000
+
+    RoadmapReviewResponse:
+      type: object
+      required: [id, roadmapId, reviewerUserId, decision, comment, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        roadmapId:
+          type: string
+          format: uuid
+        reviewerUserId:
+          type: string
+          format: uuid
+        decision:
+          type: string
+          enum: [APPROVED, REJECTED, CHANGES_REQUESTED]
+        comment:
+          type: [string, "null"]
+        createdAt:
+          type: string
+          format: date-time

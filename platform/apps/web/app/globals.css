@@ -28,9 +28,10 @@
 
   --shadow-card: 0 1px 2px rgba(18, 33, 59, 0.06), 0 16px 32px -20px rgba(18, 33, 59, 0.28);
 
-  --font-display: "Fraunces", ui-serif, Georgia, serif;
-  --font-body: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+  /* --font-display/--font-body/--font-mono KHÔNG khai báo cứng ở đây — do
+     next/font/google inject qua class trên <html> (xem layout.tsx). Khai báo cứng ở
+     đây từng đè mất giá trị inject (globals.css load sau CSS của next/font trong
+     cascade nên luôn thắng dù cùng specificity với :root). */
 }
 
 * {
@@ -800,4 +801,406 @@ select {
     grid-template-columns: 1fr;
     gap: var(--space-6);
   }
+}
+
+/* ============================================================
+   Design system v2 — token bổ sung + component nền tảng dùng
+   chung, bắt đầu từ trang Technology Case Detail (đã duyệt
+   token system 2026-08-06). Không đổi token/class cũ ở trên để
+   không phá các trang chưa redesign (login/register/dashboard/
+   organization-verifications) — 2 hệ song song cho tới khi lan
+   dần sang các trang khác.
+   ============================================================ */
+
+:root {
+  --surface-0: #ffffff;
+  --surface-50: #f3f6f8;
+  --surface-200: #e1e7eb;
+
+  --brand-50: #e7f1f3;
+  --brand-600: #0f6472;
+  --brand-700: #0a4a54;
+
+  --status-ok: #1a7a5e;
+  --status-ok-bg: #e6f4ee;
+  --status-pending: #a6740f;
+  --status-pending-bg: #fbf0dc;
+  --status-danger: #b3261e;
+  --status-danger-bg: #fbe9e7;
+  --status-neutral: #5b6b76;
+  --status-neutral-bg: #eef1f3;
+
+  --ink-600: #4c5f6b;
+  --ink-300: #8496a1;
+}
+
+/* ---------- buttons (v2) — .ui-btn không bao giờ gạch chân;
+   .ui-link là biến thể DUY NHẤT có underline, dùng cho link chữ
+   trong câu, không phải cho hành động. ---------- */
+
+.ui-btn {
+  appearance: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 9px 16px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-decoration: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.ui-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.ui-btn--primary {
+  background: var(--brand-600);
+  color: #ffffff;
+}
+.ui-btn--primary:hover:not(:disabled) {
+  background: var(--brand-700);
+}
+
+.ui-btn--secondary {
+  background: var(--surface-0);
+  border-color: var(--surface-200);
+  color: var(--ink-900);
+}
+.ui-btn--secondary:hover:not(:disabled) {
+  border-color: var(--brand-600);
+  color: var(--brand-700);
+}
+
+.ui-btn--ghost {
+  background: transparent;
+  color: var(--ink-600);
+}
+.ui-btn--ghost:hover:not(:disabled) {
+  background: var(--surface-50);
+  color: var(--ink-900);
+}
+
+.ui-btn--danger {
+  background: var(--status-danger-bg);
+  color: var(--status-danger);
+}
+.ui-btn--danger:hover:not(:disabled) {
+  background: var(--status-danger);
+  color: #ffffff;
+}
+
+.ui-btn--sm {
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+.ui-link {
+  color: var(--brand-600);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  font-weight: 500;
+}
+.ui-link:hover {
+  color: var(--brand-700);
+}
+
+/* ---------- status badge (v2) — tone chung cho mọi enum status ---------- */
+
+.ui-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  padding: 3px 9px;
+  border-radius: 5px;
+  white-space: nowrap;
+}
+
+.ui-badge--ok {
+  background: var(--status-ok-bg);
+  color: var(--status-ok);
+}
+.ui-badge--pending {
+  background: var(--status-pending-bg);
+  color: var(--status-pending);
+}
+.ui-badge--danger {
+  background: var(--status-danger-bg);
+  color: var(--status-danger);
+  font-weight: 700;
+}
+.ui-badge--neutral {
+  background: var(--status-neutral-bg);
+  color: var(--status-neutral);
+}
+
+/* ---------- card / section (v2) — viền mảnh phẳng, không đổ bóng ---------- */
+
+.ui-card {
+  background: var(--surface-0);
+  border: 1px solid var(--surface-200);
+  border-radius: var(--radius-sm);
+}
+
+.ui-card__header {
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--surface-200);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.ui-card__title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-600);
+}
+
+.ui-card__body {
+  padding: var(--space-5);
+}
+
+.ui-card + .ui-card {
+  margin-top: var(--space-5);
+}
+
+.ui-card-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-5);
+}
+
+@media (max-width: 760px) {
+  .ui-card-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- table (v2) — dày đặc, quét nhanh, không phải card to ---------- */
+
+.ui-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.ui-table th {
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-400);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--surface-200);
+}
+
+.ui-table td {
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--surface-200);
+  vertical-align: top;
+}
+
+.ui-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.ui-table tbody tr:hover td {
+  background: var(--surface-50);
+}
+
+/* ---------- empty state (v2) ---------- */
+
+.ui-empty {
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+  color: var(--ink-400);
+  font-size: 14px;
+}
+
+/* ---------- provenance rail (v2) — signature: vệt định vị trích
+   dẫn, ẩn dụ vạch chia caliper. Dùng cho mọi khối nội dung có
+   bằng chứng/evidence đi kèm. ---------- */
+
+.rail {
+  position: relative;
+  padding-left: var(--space-5);
+}
+
+.rail::before {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  background: var(--brand-600);
+  border-radius: 1px;
+}
+
+.rail-item {
+  position: relative;
+  padding: var(--space-3) 0;
+}
+
+.rail-item + .rail-item {
+  border-top: 1px solid var(--surface-200);
+}
+
+.rail-item::before {
+  content: "";
+  position: absolute;
+  left: calc(-1 * var(--space-5) + 3px);
+  top: 18px;
+  width: 10px;
+  height: 2px;
+  background: var(--brand-600);
+}
+
+.rail-item__claim {
+  font-size: 14px;
+  color: var(--ink-900);
+}
+
+.rail-item__locator {
+  margin-top: var(--space-1);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--brand-600);
+}
+
+.rail-item__locator::before {
+  content: "⌐";
+}
+
+/* ---------- roadmap mini-timeline (v2) ---------- */
+
+.rm-timeline {
+  display: flex;
+  align-items: flex-start;
+  overflow-x: auto;
+  padding: var(--space-2) 0;
+}
+
+.rm-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 104px;
+  flex-shrink: 0;
+}
+
+.rm-step__dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--surface-200);
+  background: var(--surface-0);
+  flex-shrink: 0;
+}
+
+.rm-step--done .rm-step__dot {
+  background: var(--status-ok);
+  border-color: var(--status-ok);
+}
+
+.rm-step--current .rm-step__dot {
+  background: var(--brand-600);
+  border-color: var(--brand-600);
+  box-shadow: 0 0 0 3px var(--brand-50);
+}
+
+.rm-step--blocked .rm-step__dot {
+  background: var(--status-danger);
+  border-color: var(--status-danger);
+}
+
+.rm-step__label {
+  margin-top: var(--space-2);
+  font-size: 12px;
+  color: var(--ink-700);
+  text-align: center;
+  padding: 0 4px;
+}
+
+.rm-connector {
+  flex: 1;
+  height: 2px;
+  background: var(--surface-200);
+  min-width: 24px;
+  margin-top: 6px;
+}
+
+.rm-connector--done {
+  background: var(--status-ok);
+}
+
+/* ---------- meter (composite score bar) ---------- */
+
+.ui-meter {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--surface-200);
+  overflow: hidden;
+}
+
+.ui-meter__fill {
+  height: 100%;
+  background: var(--brand-600);
+  border-radius: 999px;
+}
+
+/* ---------- disclosure (toggle form ẩn/hiện, thay vì form luôn mở) ---------- */
+
+.ui-disclosure summary {
+  cursor: pointer;
+  list-style: none;
+  color: var(--brand-600);
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.ui-disclosure summary::-webkit-details-marker {
+  display: none;
+}
+
+.ui-disclosure summary::before {
+  content: "▸";
+  font-size: 11px;
+  transition: transform 0.15s ease;
+}
+
+.ui-disclosure[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.ui-disclosure__body {
+  margin-top: var(--space-4);
+}
+
+.ui-mt-4 {
+  margin-top: var(--space-4);
 }

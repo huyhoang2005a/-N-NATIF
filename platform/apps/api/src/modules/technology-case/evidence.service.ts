@@ -193,4 +193,14 @@ export class EvidenceService {
 
     return toEvidenceResponse(evidence);
   }
+
+  async listByCase(actor: ActorContext, technologyCaseId: string): Promise<EvidenceResponse[]> {
+    const technologyCase = await this.caseRepository.findById(technologyCaseId);
+    if (!technologyCase) {
+      throw new NotFoundError(ErrorCode.CASE_NOT_FOUND, "Technology case not found.");
+    }
+    await this.caseService.assertVisible(actor, technologyCase);
+    const rows = await this.evidenceRepository.listByCase(technologyCaseId);
+    return rows.map(toEvidenceResponse);
+  }
 }

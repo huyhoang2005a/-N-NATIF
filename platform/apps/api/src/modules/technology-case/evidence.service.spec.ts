@@ -46,6 +46,7 @@ function buildService() {
     createEvidenceCitation: vi.fn().mockResolvedValue(undefined),
     findById: vi.fn(),
     hasAnyEvidence: vi.fn().mockResolvedValue(false),
+    listByCase: vi.fn(),
   } as unknown as EvidenceRepository;
 
   const caseRepository = {
@@ -55,6 +56,7 @@ function buildService() {
 
   const caseService = {
     applyTransition: vi.fn().mockResolvedValue(undefined),
+    assertVisible: vi.fn().mockResolvedValue(undefined),
   } as unknown as TechnologyCaseService;
 
   const resourcesRepository = {
@@ -256,5 +258,38 @@ describe("EvidenceService.create (UC-EVD-01)", () => {
     const result = await service.create(owner, "case-1", createInput, null);
 
     expect(result.id).toBe("evidence-3");
+  });
+});
+
+describe("EvidenceService.listByCase", () => {
+  it("refuses when the case does not exist", async () => {
+    const { service, caseRepository } = buildService();
+    vi.mocked(caseRepository.findById).mockResolvedValue(undefined);
+
+    await expect(service.listByCase(owner, "case-1")).rejects.toMatchObject({ code: "CASE_NOT_FOUND" });
+  });
+
+  it("returns evidence for a visible case", async () => {
+    const { service, caseRepository, evidenceRepository } = buildService();
+    vi.mocked(caseRepository.findById).mockResolvedValue(draftCase as never);
+    vi.mocked(evidenceRepository.listByCase).mockResolvedValue([
+      {
+        id: "evidence-1",
+        technologyCaseId: "case-1",
+        resourceVersionId: "ver-1",
+        annotationId: null,
+        title: "Benchmark result",
+        claim: "Model achieves 95% accuracy",
+        relevanceNote: "Directly supports readiness for pilot",
+        status: "ACTIVE",
+        createdByUserId: owner.userId,
+        createdAt: new Date("2024-01-01T00:00:00Z"),
+        updatedAt: new Date("2024-01-01T00:00:00Z"),
+      },
+    ] as never);
+
+    const result = await service.listByCase(owner, "case-1");
+    expect(result).toHaveLength(1);
+    expect(result[0]?.id).toBe("evidence-1");
   });
 });

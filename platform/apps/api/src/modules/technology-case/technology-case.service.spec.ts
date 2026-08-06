@@ -36,6 +36,8 @@ function buildService() {
     findById: vi.fn(),
     findBySlugInOrganization: vi.fn().mockResolvedValue(undefined),
     listVisible: vi.fn(),
+    listMembers: vi.fn(),
+    listOrganizations: vi.fn(),
     findActiveOwner: vi.fn(),
     findActiveMembership: vi.fn(),
     findExistingMember: vi.fn().mockResolvedValue(undefined),
@@ -245,5 +247,50 @@ describe("TechnologyCaseService.transition (SUC-07)", () => {
     );
     expect(auditService.write).toHaveBeenCalled();
     expect(result.lifecycleStatus).toBe("EVIDENCE_COLLECTION");
+  });
+});
+
+describe("TechnologyCaseService.listMembers / listOrganizations", () => {
+  it("listMembers refuses when the case does not exist", async () => {
+    const { service, repository } = buildService();
+    vi.mocked(repository.findById).mockResolvedValue(undefined);
+
+    await expect(service.listMembers(verifiedAuthorInOrg, "case-1")).rejects.toMatchObject({
+      code: "CASE_NOT_FOUND",
+    });
+  });
+
+  it("listMembers returns members for a visible case", async () => {
+    const { service, repository } = buildService();
+    vi.mocked(repository.findById).mockResolvedValue(existingCase as never);
+    vi.mocked(repository.findActiveMembership).mockResolvedValue({ role: "OWNER" } as never);
+    vi.mocked(repository.listMembers).mockResolvedValue([
+      {
+        id: "member-1",
+        technologyCaseId: "case-1",
+        userId: "author-1",
+        organizationId: "org-1",
+        role: "OWNER",
+        status: "ACTIVE",
+        invitedByUserId: null,
+        joinedAt: new Date("2024-01-01T00:00:00Z"),
+        createdAt: new Date("2024-01-01T00:00:00Z"),
+      },
+    ] as never);
+
+    const result = await service.listMembers(verifiedAuthorInOrg, "case-1");
+    expect(result).toHaveLength(1);
+    expect(result[0]?.role).toBe("OWNER");
+  });
+
+  it("listOrganizations refuses an actor with no visibility into the case", async () => {
+    const { service, repository } = buildService();
+    vi.mocked(repository.findById).mockResolvedValue(existingCase as never);
+    vi.mocked(repository.findActiveMembership).mockResolvedValue(undefined);
+    vi.mocked(repository.hasOrganizationLink).mockResolvedValue(false);
+
+    await expect(service.listOrganizations(unverifiedUser, "case-1")).rejects.toMatchObject({
+      code: "AUTH_FORBIDDEN",
+    });
   });
 });

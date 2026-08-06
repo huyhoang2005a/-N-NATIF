@@ -276,3 +276,41 @@ describe("AssessmentService.decide (rule 12 — separation of duties)", () => {
     expect(result.status).toBe("DRAFT");
   });
 });
+
+describe("AssessmentService.listScores", () => {
+  it("refuses when the assessment does not exist", async () => {
+    const { service, repository } = buildService();
+    vi.mocked(repository.findById).mockResolvedValue(undefined);
+
+    await expect(service.listScores(owner, "assessment-1")).rejects.toMatchObject({
+      code: "ASSESSMENT_NOT_FOUND",
+    });
+  });
+
+  it("returns scores joined with criterion details", async () => {
+    const { service, repository, caseRepository } = buildService();
+    vi.mocked(repository.findById).mockResolvedValue(draftAssessment as never);
+    vi.mocked(caseRepository.findById).mockResolvedValue(evidenceCollectionCase as never);
+    vi.mocked(repository.findScoresWithCriteriaByAssessment).mockResolvedValue([
+      {
+        id: "score-1",
+        assessmentId: "assessment-1",
+        criterionId: "criterion-1",
+        score: "8",
+        rationale: "Strong prototype",
+        createdByUserId: "owner-1",
+        updatedByUserId: "owner-1",
+        createdAt: new Date("2024-01-01T00:00:00Z"),
+        updatedAt: new Date("2024-01-01T00:00:00Z"),
+        criterion,
+        evidenceLinks: [{ evidenceId: "ev-1" }],
+        citationLinks: [],
+      },
+    ] as never);
+
+    const result = await service.listScores(owner, "assessment-1");
+    expect(result).toHaveLength(1);
+    expect(result[0]?.score).toBe(8);
+    expect(result[0]?.evidenceIds).toEqual(["ev-1"]);
+  });
+});

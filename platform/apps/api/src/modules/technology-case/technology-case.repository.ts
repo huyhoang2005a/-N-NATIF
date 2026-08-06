@@ -93,6 +93,20 @@ export class TechnologyCaseRepository {
     });
   }
 
+  async listMembers(technologyCaseId: string) {
+    return this.db.query.caseMember.findMany({
+      where: eq(schema.caseMember.technologyCaseId, technologyCaseId),
+      orderBy: [schema.caseMember.createdAt],
+    });
+  }
+
+  async listOrganizations(technologyCaseId: string) {
+    return this.db.query.caseOrganization.findMany({
+      where: eq(schema.caseOrganization.technologyCaseId, technologyCaseId),
+      orderBy: [schema.caseOrganization.joinedAt],
+    });
+  }
+
   async findActiveOwner(technologyCaseId: string) {
     return this.db.query.caseMember.findFirst({
       where: and(

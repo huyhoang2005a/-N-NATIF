@@ -66,7 +66,10 @@ function buildService() {
     findDependencyEdgesByRoadmap: vi.fn().mockResolvedValue([]),
     createDependency: vi.fn(),
     createMilestoneGapLink: vi.fn(),
+    listGapLinksByMilestone: vi.fn(),
     createReview: vi.fn().mockResolvedValue({ id: "review-1" }),
+    listReviewsByRoadmap: vi.fn(),
+    listTasksByMilestone: vi.fn(),
   } as unknown as RoadmapRepository;
 
   const caseRepository = {
@@ -272,5 +275,83 @@ describe("RoadmapService.review (rule 12 + critical-gap gate)", () => {
 
     expect(outboxService.append).not.toHaveBeenCalled();
     expect(result.status).toBe("DRAFT");
+  });
+});
+
+describe("RoadmapService read endpoints (dependencies/reviews/milestone tasks/milestone gaps)", () => {
+  it("listDependencies refuses when the roadmap does not exist", async () => {
+    const { service, repository } = buildService();
+    vi.mocked(repository.findById).mockResolvedValue(undefined);
+
+    await expect(service.listDependencies(owner, "roadmap-1")).rejects.toMatchObject({
+      code: "ROADMAP_NOT_FOUND",
+    });
+  });
+
+  it("listReviews returns the roadmap's review history", async () => {
+    const { service, repository, caseRepository } = buildService();
+    vi.mocked(repository.findById).mockResolvedValue(draftRoadmap as never);
+    vi.mocked(caseRepository.findById).mockResolvedValue(gapIdentifiedCase as never);
+    vi.mocked(repository.listReviewsByRoadmap).mockResolvedValue([
+      {
+        id: "review-1",
+        roadmapId: "roadmap-1",
+        reviewerUserId: "reviewer-1",
+        decision: "CHANGES_REQUESTED",
+        comment: "Add milestone dates",
+        createdAt: new Date("2024-01-01T00:00:00Z"),
+      },
+    ] as never);
+
+    const result = await service.listReviews(owner, "roadmap-1");
+    expect(result).toHaveLength(1);
+    expect(result[0]?.decision).toBe("CHANGES_REQUESTED");
+  });
+
+  it("listMilestoneTasks refuses when the milestone does not exist", async () => {
+    const { service, repository } = buildService();
+    vi.mocked(repository.findMilestoneById).mockResolvedValue(undefined);
+
+    await expect(service.listMilestoneTasks(owner, "milestone-a")).rejects.toMatchObject({
+      code: "MILESTONE_NOT_FOUND",
+    });
+  });
+
+  it("listMilestoneGaps returns the gaps linked to a milestone", async () => {
+    const { service, repository, caseRepository } = buildService();
+    vi.mocked(repository.findMilestoneById).mockResolvedValue(milestoneA as never);
+    vi.mocked(repository.findById).mockResolvedValue(draftRoadmap as never);
+    vi.mocked(caseRepository.findById).mockResolvedValue(gapIdentifiedCase as never);
+    vi.mocked(repository.listGapLinksByMilestone).mockResolvedValue([
+      {
+        id: "link-1",
+        milestoneId: "milestone-a",
+        gapRecordId: "gap-1",
+        gap: {
+          id: "gap-1",
+          technologyCaseId: "case-1",
+          sourceAssessmentId: null,
+          sourceAssessmentScoreId: null,
+          title: "Missing IP filing",
+          description: "No patent filed yet",
+          category: null,
+          severity: "CRITICAL",
+          status: "OPEN",
+          ownerUserId: null,
+          dueDate: null,
+          createdByUserId: "owner-1",
+          resolvedByUserId: null,
+          resolvedAt: null,
+          resolutionNote: null,
+          createdAt: new Date("2024-01-01T00:00:00Z"),
+          updatedAt: new Date("2024-01-01T00:00:00Z"),
+          version: 1,
+        },
+      },
+    ] as never);
+
+    const result = await service.listMilestoneGaps(owner, "milestone-a");
+    expect(result).toHaveLength(1);
+    expect(result[0]?.id).toBe("gap-1");
   });
 });

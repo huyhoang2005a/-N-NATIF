@@ -26,7 +26,7 @@ const WRITE_ROLES: readonly string[] = [
 ];
 const RESOLUTION_STATUSES: readonly string[] = [GapStatus.RESOLVED, GapStatus.ACCEPTED_RISK, GapStatus.CLOSED];
 
-function toGapResponse(row: {
+export function toGapResponse(row: {
   id: string;
   technologyCaseId: string;
   sourceAssessmentId: string | null;

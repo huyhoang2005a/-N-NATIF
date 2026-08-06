@@ -55,6 +55,19 @@ export class TechnologyCasesController {
     return this.technologyCaseService.getById(actor, id);
   }
 
+  @Get(":id/members")
+  listMembers(@CurrentActor() actor: ActorContext, @Param("id") id: string): Promise<CaseMemberResponse[]> {
+    return this.technologyCaseService.listMembers(actor, id);
+  }
+
+  @Get(":id/organizations")
+  listOrganizations(
+    @CurrentActor() actor: ActorContext,
+    @Param("id") id: string,
+  ): Promise<CaseOrganizationResponse[]> {
+    return this.technologyCaseService.listOrganizations(actor, id);
+  }
+
   @Post(":id/members")
   @UsePipes(new ZodValidationPipe(AddCaseMemberRequestSchema))
   addMember(
@@ -97,5 +110,10 @@ export class TechnologyCasesController {
     @Req() req: Request,
   ): Promise<EvidenceResponse> {
     return this.evidenceService.create(actor, id, body, requestId(req));
+  }
+
+  @Get(":id/evidence")
+  listEvidence(@CurrentActor() actor: ActorContext, @Param("id") id: string): Promise<EvidenceResponse[]> {
+    return this.evidenceService.listByCase(actor, id);
   }
 }

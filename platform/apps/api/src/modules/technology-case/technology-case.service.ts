@@ -229,6 +229,20 @@ export class TechnologyCaseService {
     return rows.map(toCaseResponse);
   }
 
+  async listMembers(actor: ActorContext, technologyCaseId: string): Promise<CaseMemberResponse[]> {
+    const technologyCase = await this.findByIdOrThrow(technologyCaseId);
+    await this.assertVisible(actor, technologyCase);
+    const rows = await this.repository.listMembers(technologyCaseId);
+    return rows.map(toMemberResponse);
+  }
+
+  async listOrganizations(actor: ActorContext, technologyCaseId: string): Promise<CaseOrganizationResponse[]> {
+    const technologyCase = await this.findByIdOrThrow(technologyCaseId);
+    await this.assertVisible(actor, technologyCase);
+    const rows = await this.repository.listOrganizations(technologyCaseId);
+    return rows.map(toOrganizationResponse);
+  }
+
   /** §3.5: OWNER/ORG_ADMIN của owning organization có thể mời member; PARTNER_MEMBER
    * phải thuộc org đã có role PARTNER_COMPANY trong case; user được mời phải là active
    * member của organizationId khai báo; đúng 1 OWNER active tại mọi thời điểm. */
