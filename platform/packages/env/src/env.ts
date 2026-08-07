@@ -20,6 +20,13 @@ const envSchema = z.object({
   JWT_ACCESS_TTL_SECONDS: z.coerce.number().int().positive().default(900),
   JWT_REFRESH_SECRET: z.string().min(16, "JWT_REFRESH_SECRET must be at least 16 chars"),
   JWT_REFRESH_TTL_SECONDS: z.coerce.number().int().positive().default(2592000),
+
+  // --- Email (Resend) — optional so the worker can fall back to a console-logging
+  // EmailSender until RESEND_API_KEY is filled in (see apps/worker/src/main.ts). ---
+  RESEND_API_KEY: z.string().min(1).optional(),
+  EMAIL_FROM_ADDRESS: z.string().email().optional(),
+  EMAIL_FROM_NAME: z.string().min(1).optional(),
+  WEB_APP_URL: z.string().min(1).default("http://localhost:3001"),
 });
 
 export type AppEnv = z.infer<typeof envSchema>;

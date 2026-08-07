@@ -23,6 +23,9 @@ export interface ActorContext {
   /** `UNVERIFIED` when the actor has no `author_profile` row yet (not every user goes
    * through author verification — see JwtAuthGuard). */
   authorVerificationStatus: AuthorVerificationStatus;
+  /** `user_account.email_verified_at IS NOT NULL`, re-read fresh per request like the rest
+   * of ActorContext — see JwtAuthGuard. */
+  isEmailVerified: boolean;
 }
 
 export function findActiveMembership(

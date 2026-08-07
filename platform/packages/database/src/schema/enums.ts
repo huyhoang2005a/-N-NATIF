@@ -54,6 +54,9 @@ export const membershipStatusEnum = pgEnum("membership_status", [
   "ACTIVE",
   "SUSPENDED",
   "LEFT",
+  // Additive (2026-08-07): self-service join request awaiting ORG_OWNER/ORG_ADMIN decision
+  // — distinct from INVITED (owner-initiated, awaiting invitee acceptance).
+  "PENDING_APPROVAL",
 ]);
 
 export const verificationRequestStatusEnum = pgEnum("verification_request_status", [

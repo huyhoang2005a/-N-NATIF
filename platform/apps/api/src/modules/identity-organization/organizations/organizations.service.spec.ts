@@ -4,6 +4,8 @@ import { OrganizationsService } from "./organizations.service";
 import type { OrganizationsRepository } from "./organizations.repository";
 import type { AuditService } from "../../platform-operations/audit/audit.service";
 import type { OutboxService } from "../../platform-operations/jobs/outbox.service";
+import type { EmailVerificationRepository } from "../email-verification/email-verification.repository";
+import type { S3Service } from "../../../common/storage/s3.service";
 
 const registerRequest = {
   organizationName: "Acme Research Unit",
@@ -11,6 +13,15 @@ const registerRequest = {
   ownerEmail: "owner@acme.example",
   ownerPassword: "supersecret1",
   ownerDisplayName: "Owner Name",
+  documentType: "TAX_DOCUMENT" as const,
+};
+
+const documentUpload = {
+  documentType: "TAX_DOCUMENT",
+  buffer: Buffer.from("test"),
+  originalFilename: "doc.pdf",
+  mimeType: "application/pdf",
+  sizeBytes: 4,
 };
 
 function buildService() {
@@ -44,32 +55,48 @@ function buildService() {
       leftAt: null,
     }),
     createVerificationRequest: vi.fn().mockResolvedValue({ id: "verification-1" }),
+    createVerificationDocument: vi.fn().mockResolvedValue({ id: "doc-1" }),
+    findOrganizationByDomain: vi.fn().mockResolvedValue(null),
     findById: vi.fn(),
     findMemberById: vi.fn(),
     findMemberByUserId: vi.fn(),
+    findMemberWithUserById: vi.fn().mockResolvedValue(undefined),
+    listMembers: vi.fn(),
     listMembersForActiveOrganizations: vi.fn(),
+    listPendingMembershipsForUser: vi.fn(),
     updateOrganizationMember: vi.fn(),
   } as unknown as OrganizationsRepository;
 
   const auditService = { write: vi.fn().mockResolvedValue(undefined) } as unknown as AuditService;
   const outboxService = { append: vi.fn().mockResolvedValue(undefined) } as unknown as OutboxService;
+  const emailVerificationRepository = {
+    createToken: vi.fn().mockResolvedValue({
+      row: { id: "token-1", expiresAt: new Date() },
+      rawToken: "raw-token",
+    }),
+  } as unknown as EmailVerificationRepository;
+  const s3Service = {
+    uploadVerificationDocument: vi.fn().mockResolvedValue(undefined),
+  } as unknown as S3Service;
   const db = { transaction: vi.fn((cb: (tx: unknown) => Promise<unknown>) => cb({})) };
 
   const service = new OrganizationsService(
     organizationsRepository,
     auditService,
     outboxService,
+    emailVerificationRepository,
+    s3Service,
     db as never,
   );
 
-  return { service, organizationsRepository, auditService, outboxService };
+  return { service, organizationsRepository, auditService, outboxService, emailVerificationRepository, s3Service };
 }
 
 describe("OrganizationsService.register (UC-ORG-01)", () => {
   it("creates the user + organization + owner membership + verification request atomically", async () => {
     const { service, organizationsRepository, outboxService } = buildService();
 
-    const result = await service.register(registerRequest, "req-1");
+    const result = await service.register(registerRequest, documentUpload, "req-1");
 
     expect(result.slug).toBe("acme-research-unit");
     expect(organizationsRepository.createOrganizationMember).toHaveBeenCalledWith(
@@ -89,7 +116,7 @@ describe("OrganizationsService.register (UC-ORG-01)", () => {
     const { service, organizationsRepository } = buildService();
     vi.mocked(organizationsRepository.findBySlug).mockResolvedValue({ id: "existing" } as never);
 
-    await expect(service.register(registerRequest, null)).rejects.toMatchObject({
+    await expect(service.register(registerRequest, documentUpload, null)).rejects.toMatchObject({
       code: "ORG_ALREADY_EXISTS",
     });
   });
@@ -98,7 +125,7 @@ describe("OrganizationsService.register (UC-ORG-01)", () => {
     const { service, organizationsRepository } = buildService();
     vi.mocked(organizationsRepository.findUserByEmail).mockResolvedValue({ id: "existing" } as never);
 
-    await expect(service.register(registerRequest, null)).rejects.toMatchObject({
+    await expect(service.register(registerRequest, documentUpload, null)).rejects.toMatchObject({
       code: "AUTH_EMAIL_ALREADY_REGISTERED",
     });
   });
@@ -110,12 +137,14 @@ describe("OrganizationsService member management (SUC-02)", () => {
     platformRole: "USER",
     memberships: [{ organizationId: "org-1", role: "ORG_OWNER", status: "ACTIVE" }],
     authorVerificationStatus: "UNVERIFIED",
+    isEmailVerified: true,
   };
   const plainMemberActor: ActorContext = {
     userId: "member-1",
     platformRole: "USER",
     memberships: [{ organizationId: "org-1", role: "MEMBER", status: "ACTIVE" }],
     authorVerificationStatus: "UNVERIFIED",
+    isEmailVerified: true,
   };
 
   let deps: ReturnType<typeof buildService>;

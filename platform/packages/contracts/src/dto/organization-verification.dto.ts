@@ -1,4 +1,30 @@
 import { z } from "zod";
+import { ALLOWED_DOCUMENT_MIME_TYPES, MAX_DOCUMENT_SIZE_BYTES } from "./author.dto";
+
+/**
+ * Minimum-qualifying document types for organization verification (mục 1 of the
+ * "vá lỗ hổng xác minh" plan, 2026-08-07): a resubmission or open-request attachment must
+ * be one of these to close VERIFICATION_MISSING_DOCUMENT — other VerificationDocumentType
+ * values are not accepted through these two endpoints, since their only purpose is to
+ * satisfy the minimum requirement (no supplementary-document upload was requested).
+ */
+export const MinimumOrganizationVerificationDocumentTypeSchema = z.enum([
+  "TAX_DOCUMENT",
+  "ORGANIZATION_LETTER",
+]);
+export type MinimumOrganizationVerificationDocumentType = z.infer<
+  typeof MinimumOrganizationVerificationDocumentTypeSchema
+>;
+
+/** Multipart form field alongside the uploaded file — see OrganizationVerificationRequestController. */
+export const SubmitOrganizationVerificationDocumentSchema = z.object({
+  documentType: MinimumOrganizationVerificationDocumentTypeSchema,
+});
+export type SubmitOrganizationVerificationDocumentRequest = z.infer<
+  typeof SubmitOrganizationVerificationDocumentSchema
+>;
+
+export { ALLOWED_DOCUMENT_MIME_TYPES, MAX_DOCUMENT_SIZE_BYTES };
 
 /**
  * UC-VER-02 invariant (applied to organization verification, SUC-03): a reject decision
@@ -27,4 +53,14 @@ export interface OrganizationVerificationRequestResponse {
   reviewerNote: string | null;
   submittedAt: string;
   reviewedAt: string | null;
+}
+
+/** Reviewer-facing document listing — each entry carries its own ready-to-use signed
+ * download URL so the client never needs a second round trip per document. */
+export interface OrganizationVerificationDocumentResponse {
+  id: string;
+  documentType: string;
+  originalFilename: string;
+  downloadUrl: string;
+  expiresIn: number;
 }

@@ -11,12 +11,14 @@ const manager: ActorContext = {
   platformRole: "USER",
   memberships: [{ organizationId: "org-1", role: "ORG_ADMIN", status: "ACTIVE" }],
   authorVerificationStatus: "UNVERIFIED",
+  isEmailVerified: true,
 };
 const outsider: ActorContext = {
   userId: "outsider-1",
   platformRole: "USER",
   memberships: [],
   authorVerificationStatus: "UNVERIFIED",
+  isEmailVerified: true,
 };
 
 function buildService() {

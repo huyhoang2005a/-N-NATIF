@@ -13,3 +13,5 @@ export * from "./errors/domain-error";
 export * from "./state-machines/transition-table";
 export * from "./state-machines/organization.state-machine";
 export * from "./state-machines/verification-request.state-machine";
+
+export * from "./ports/email-sender.port";

@@ -13,12 +13,14 @@ const owner: ActorContext = {
   platformRole: "USER",
   memberships: [{ organizationId: "org-1", role: "MEMBER", status: "ACTIVE" }],
   authorVerificationStatus: "VERIFIED",
+  isEmailVerified: true,
 };
 const reviewer: ActorContext = {
   userId: "reviewer-1",
   platformRole: "USER",
   memberships: [{ organizationId: "org-1", role: "MEMBER", status: "ACTIVE" }],
   authorVerificationStatus: "VERIFIED",
+  isEmailVerified: true,
 };
 
 const gapIdentifiedCase = {

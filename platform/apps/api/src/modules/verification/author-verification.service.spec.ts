@@ -11,12 +11,14 @@ const author: ActorContext = {
   platformRole: "USER",
   memberships: [],
   authorVerificationStatus: "UNVERIFIED",
+  isEmailVerified: true,
 };
 const reviewer: ActorContext = {
   userId: "reviewer-1",
   platformRole: "PLATFORM_REVIEWER",
   memberships: [],
   authorVerificationStatus: "UNVERIFIED",
+  isEmailVerified: true,
 };
 
 function buildService() {

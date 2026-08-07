@@ -5,18 +5,21 @@ import type { VerificationRepository } from "./verification.repository";
 import type { OrganizationsRepository } from "../identity-organization/organizations/organizations.repository";
 import type { AuditService } from "../platform-operations/audit/audit.service";
 import type { OutboxService } from "../platform-operations/jobs/outbox.service";
+import type { S3Service } from "../../common/storage/s3.service";
 
 const reviewer: ActorContext = {
   userId: "reviewer-1",
   platformRole: "PLATFORM_REVIEWER",
   memberships: [],
   authorVerificationStatus: "UNVERIFIED",
+  isEmailVerified: true,
 };
 const plainUser: ActorContext = {
   userId: "user-1",
   platformRole: "USER",
   memberships: [],
   authorVerificationStatus: "UNVERIFIED",
+  isEmailVerified: true,
 };
 
 function buildService() {
@@ -26,7 +29,10 @@ function buildService() {
     claim: vi.fn(),
     decide: vi.fn(),
     hasOpenRequest: vi.fn(),
+    findOpenRequest: vi.fn(),
     createResubmission: vi.fn(),
+    createDocument: vi.fn(),
+    countDocuments: vi.fn().mockResolvedValue(1),
   } as unknown as VerificationRepository;
 
   const organizationsRepository = {
@@ -37,6 +43,9 @@ function buildService() {
 
   const auditService = { write: vi.fn().mockResolvedValue(undefined) } as unknown as AuditService;
   const outboxService = { append: vi.fn().mockResolvedValue(undefined) } as unknown as OutboxService;
+  const s3Service = {
+    uploadVerificationDocument: vi.fn().mockResolvedValue(undefined),
+  } as unknown as S3Service;
   const db = { transaction: vi.fn((cb: (tx: unknown) => Promise<unknown>) => cb({})) };
 
   const service = new VerificationService(
@@ -44,10 +53,11 @@ function buildService() {
     organizationsRepository,
     auditService,
     outboxService,
+    s3Service,
     db as never,
   );
 
-  return { service, verificationRepository, organizationsRepository, auditService, outboxService };
+  return { service, verificationRepository, organizationsRepository, auditService, outboxService, s3Service };
 }
 
 describe("VerificationService (organization verification, UC-VER-02 pattern)", () => {
@@ -157,6 +167,14 @@ describe("VerificationService (organization verification, UC-VER-02 pattern)", (
         expect.objectContaining({ type: "OrganizationVerificationRejected", reason: "Tax code mismatch." }),
         {},
       );
+    });
+
+    it("refuses to approve when no verification_document is attached", async () => {
+      vi.mocked(deps.verificationRepository.countDocuments).mockResolvedValue(0);
+
+      await expect(
+        deps.service.decide(reviewer, "req-1", { decision: "APPROVE" }, null),
+      ).rejects.toMatchObject({ code: "VERIFICATION_MISSING_DOCUMENT" });
     });
 
     it("refuses to decide when the caller never claimed the request", async () => {

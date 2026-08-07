@@ -1,5 +1,7 @@
+import { randomUUID, createHash } from "node:crypto";
 import type {
   OrganizationVerificationDecisionRequest,
+  OrganizationVerificationDocumentResponse,
   OrganizationVerificationRequestResponse,
 } from "@r2m/contracts";
 import type { ActorContext } from "@r2m/authz";
@@ -15,9 +17,18 @@ import {
 import { Inject, Injectable } from "@nestjs/common";
 import { OrganizationsRepository } from "../identity-organization/organizations/organizations.repository";
 import { DATABASE } from "../../database/database.module";
+import { S3Service } from "../../common/storage/s3.service";
 import { AuditService } from "../platform-operations/audit/audit.service";
 import { OutboxService } from "../platform-operations/jobs/outbox.service";
 import { VerificationRepository } from "./verification.repository";
+
+export interface OrganizationVerificationDocumentUpload {
+  documentType: string;
+  buffer: Buffer;
+  originalFilename: string;
+  mimeType: string;
+  sizeBytes: number;
+}
 
 function toResponse(request: {
   id: string;
@@ -49,6 +60,7 @@ export class VerificationService {
     private readonly organizationsRepository: OrganizationsRepository,
     private readonly auditService: AuditService,
     private readonly outboxService: OutboxService,
+    private readonly s3Service: S3Service,
     @Inject(DATABASE) private readonly db: Database,
   ) {}
 
@@ -56,6 +68,29 @@ export class VerificationService {
     assertPlatformReviewerOrAdmin(actor);
     const rows = await this.verificationRepository.listPending();
     return rows.map(toResponse);
+  }
+
+  /** Reviewer-only: each document gets its own freshly-signed download URL so the client
+   * never links to a URL that may have already expired by the time it's clicked. */
+  async listDocuments(actor: ActorContext, requestId: string): Promise<OrganizationVerificationDocumentResponse[]> {
+    assertPlatformReviewerOrAdmin(actor);
+    const existing = await this.verificationRepository.findById(requestId);
+    if (!existing) {
+      throw new NotFoundError(ErrorCode.VERIFICATION_REQUEST_NOT_FOUND, "Verification request not found.");
+    }
+    const documents = await this.verificationRepository.listDocuments(requestId);
+    return Promise.all(
+      documents.map(async (doc) => {
+        const { url, expiresIn } = await this.s3Service.createVerificationDownloadUrl(doc.storageObjectKey);
+        return {
+          id: doc.id,
+          documentType: doc.documentType,
+          originalFilename: doc.originalFilename ?? "",
+          downloadUrl: url,
+          expiresIn,
+        };
+      }),
+    );
   }
 
   async claim(actor: ActorContext, requestId: string): Promise<OrganizationVerificationRequestResponse> {
@@ -108,6 +143,16 @@ export class VerificationService {
     const org = await this.organizationsRepository.findById(existing.organizationId);
     if (!org) {
       throw new NotFoundError(ErrorCode.ORG_NOT_FOUND, "Organization not found.");
+    }
+
+    if (decision.decision === "APPROVE") {
+      const documentCount = await this.verificationRepository.countDocuments(requestId);
+      if (documentCount === 0) {
+        throw new ConflictError(
+          ErrorCode.VERIFICATION_MISSING_DOCUMENT,
+          "Cannot approve: no verification_document is attached to this request.",
+        );
+      }
     }
 
     const newOrgStatus = decision.decision === "APPROVE" ? "ACTIVE" : "REJECTED";
@@ -185,17 +230,43 @@ export class VerificationService {
     return toResponse(updatedRequest);
   }
 
-  async resubmit(
-    actor: ActorContext,
-    organizationId: string,
-  ): Promise<OrganizationVerificationRequestResponse> {
-    const membership = await this.organizationsRepository.findMemberByUserId(organizationId, actor.userId);
+  private assertSubmitterMembership(actor: ActorContext, membership: { status: string; role: string } | undefined): void {
     if (!membership || membership.status !== "ACTIVE" || membership.role === "MEMBER") {
       throw new ForbiddenError(
         ErrorCode.AUTH_FORBIDDEN,
-        "Only an active ORG_OWNER or ORG_ADMIN may request re-verification.",
+        "Only an active ORG_OWNER or ORG_ADMIN may submit organization verification documents.",
       );
     }
+    if (!actor.isEmailVerified) {
+      throw new ForbiddenError(
+        ErrorCode.AUTH_EMAIL_NOT_VERIFIED,
+        "Verify your email address before submitting an organization verification request.",
+      );
+    }
+  }
+
+  private async storeDocument(
+    organizationId: string,
+    document: OrganizationVerificationDocumentUpload,
+  ): Promise<{
+    storageObjectKey: string;
+    checksumSha256: string;
+  }> {
+    const safeFilename = document.originalFilename.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const storageObjectKey = `organization-verification/${organizationId}/${randomUUID()}_${safeFilename}`;
+    await this.s3Service.uploadVerificationDocument(storageObjectKey, document.buffer, document.mimeType);
+    const checksumSha256 = createHash("sha256").update(document.buffer).digest("hex");
+    return { storageObjectKey, checksumSha256 };
+  }
+
+  async resubmit(
+    actor: ActorContext,
+    organizationId: string,
+    document: OrganizationVerificationDocumentUpload,
+    requestIdHeader: string | null,
+  ): Promise<OrganizationVerificationRequestResponse> {
+    const membership = await this.organizationsRepository.findMemberByUserId(organizationId, actor.userId);
+    this.assertSubmitterMembership(actor, membership);
     const org = await this.organizationsRepository.findById(organizationId);
     if (!org) {
       throw new NotFoundError(ErrorCode.ORG_NOT_FOUND, "Organization not found.");
@@ -213,22 +284,99 @@ export class VerificationService {
       );
     }
 
-    const created = await this.verificationRepository.createResubmission(organizationId, actor.userId);
-    await this.auditService.write({
-      actorUserId: actor.userId,
-      scopeOrganizationId: organizationId,
-      action: "organization_verification_request.resubmit",
-      entityType: "organization_verification_request",
-      entityId: created.id,
-      afterData: created,
-    });
-    await this.outboxService.append("organization", organizationId, {
-      type: "OrganizationVerificationRequested",
-      organizationId,
-      verificationRequestId: created.id,
-      submittedByUserId: actor.userId,
+    const { storageObjectKey, checksumSha256 } = await this.storeDocument(organizationId, document);
+
+    const created = await this.db.transaction(async (tx) => {
+      const request = await this.verificationRepository.createResubmission(organizationId, actor.userId, tx);
+      await this.verificationRepository.createDocument(
+        {
+          organizationVerificationRequestId: request.id,
+          documentType: document.documentType,
+          storageObjectKey,
+          originalFilename: document.originalFilename,
+          mimeType: document.mimeType,
+          sizeBytes: document.sizeBytes,
+          checksumSha256,
+        },
+        tx,
+      );
+      await this.auditService.write(
+        {
+          actorUserId: actor.userId,
+          scopeOrganizationId: organizationId,
+          requestId: requestIdHeader,
+          action: "organization_verification_request.resubmit",
+          entityType: "organization_verification_request",
+          entityId: request.id,
+          afterData: request,
+        },
+        tx,
+      );
+      await this.outboxService.append(
+        "organization",
+        organizationId,
+        {
+          type: "OrganizationVerificationRequested",
+          organizationId,
+          verificationRequestId: request.id,
+          submittedByUserId: actor.userId,
+        },
+        tx,
+      );
+      return request;
     });
 
     return toResponse(created);
+  }
+
+  /** Attaches a document to the organization's currently open request — covers the
+   * request created implicitly by `OrganizationsService.register()` (no client "create"
+   * call exists for it) as well as adding extra evidence while PENDING/IN_REVIEW. */
+  async attachDocument(
+    actor: ActorContext,
+    organizationId: string,
+    document: OrganizationVerificationDocumentUpload,
+    requestIdHeader: string | null,
+  ): Promise<OrganizationVerificationRequestResponse> {
+    const membership = await this.organizationsRepository.findMemberByUserId(organizationId, actor.userId);
+    this.assertSubmitterMembership(actor, membership);
+
+    const openRequest = await this.verificationRepository.findOpenRequest(organizationId);
+    if (!openRequest) {
+      throw new NotFoundError(
+        ErrorCode.VERIFICATION_REQUEST_NOT_FOUND,
+        "This organization has no open verification request to attach a document to.",
+      );
+    }
+
+    const { storageObjectKey, checksumSha256 } = await this.storeDocument(organizationId, document);
+
+    await this.db.transaction(async (tx) => {
+      await this.verificationRepository.createDocument(
+        {
+          organizationVerificationRequestId: openRequest.id,
+          documentType: document.documentType,
+          storageObjectKey,
+          originalFilename: document.originalFilename,
+          mimeType: document.mimeType,
+          sizeBytes: document.sizeBytes,
+          checksumSha256,
+        },
+        tx,
+      );
+      await this.auditService.write(
+        {
+          actorUserId: actor.userId,
+          scopeOrganizationId: organizationId,
+          requestId: requestIdHeader,
+          action: "organization_verification_request.attach_document",
+          entityType: "organization_verification_request",
+          entityId: openRequest.id,
+        },
+        tx,
+      );
+    });
+
+    return toResponse(openRequest);
   }
 }

@@ -13,6 +13,12 @@ export async function notify(
     dedupeKey?: string;
   },
 ): Promise<void> {
+  // `onConflictDoNothing` matters for retry-safety: a case in `handleEvent` typically does
+  // notify() THEN an email send — if the email send throws, the outbox row is retried and
+  // this same notify() call runs again with the same dedupeKey. Without this, the retry's
+  // plain INSERT hits `uq_notification_dedupe` (recipient_user_id, dedupe_key) and throws,
+  // which masks the real (email-send) failure and burns all retry attempts into
+  // DEAD_LETTER on a duplicate-key error instead of the actual problem.
   await db.insert(schema.notification).values({
     recipientUserId: input.recipientUserId,
     scopeOrganizationId: input.scopeOrganizationId ?? null,
@@ -20,7 +26,7 @@ export async function notify(
     title: input.title,
     message: input.message,
     dedupeKey: input.dedupeKey ?? null,
-  });
+  }).onConflictDoNothing();
 }
 
 export async function findActiveOrgOwnerUserId(
@@ -35,6 +41,20 @@ export async function findActiveOrgOwnerUserId(
     ),
   });
   return owner?.userId;
+}
+
+export async function findUserEmail(db: Database, userId: string): Promise<string | undefined> {
+  const user = await db.query.userAccount.findFirst({ where: eq(schema.userAccount.id, userId) });
+  return user?.primaryEmail;
+}
+
+export async function listActiveOrgOwnersAndAdmins(db: Database, organizationId: string): Promise<string[]> {
+  const members = await db.query.organizationMember.findMany({
+    where: and(eq(schema.organizationMember.organizationId, organizationId), eq(schema.organizationMember.status, "ACTIVE")),
+  });
+  return members
+    .filter((member) => member.role === "ORG_OWNER" || member.role === "ORG_ADMIN")
+    .map((member) => member.userId);
 }
 
 export async function listActivePlatformReviewerIds(db: Database): Promise<string[]> {

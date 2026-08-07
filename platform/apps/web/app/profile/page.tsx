@@ -9,16 +9,25 @@ import type {
   MeResponse,
   OrganizationMemberResponse,
   OrganizationResponse,
+  OrganizationVerificationRequestResponse,
+  PendingMembershipResponse,
   UpdateProfileRequest,
   UserProfileResponse,
 } from "@r2m/contracts";
+import { ALLOWED_DOCUMENT_MIME_TYPES, MAX_DOCUMENT_SIZE_BYTES } from "@r2m/contracts";
 import { ApiError, authFetch, SessionExpiredError } from "../../lib/api-client";
 import { describeErrorCode } from "../../lib/error-messages";
-import { ORG_STATUS_LABELS, ORG_TYPE_LABELS, PLATFORM_ROLE_LABELS, VERIFICATION_REQUEST_STATUS_LABELS } from "../../lib/labels";
+import {
+  ORG_STATUS_LABELS,
+  ORG_TYPE_LABELS,
+  ORG_VERIFICATION_DOCUMENT_TYPE_LABELS,
+  PLATFORM_ROLE_LABELS,
+  VERIFICATION_REQUEST_STATUS_LABELS,
+} from "../../lib/labels";
 import { navForPersona, personaOf } from "../../lib/nav";
 import { getAccessToken } from "../../lib/session";
 import { toneOf, ORGANIZATION_STATUS_TONE, VERIFICATION_REQUEST_STATUS_TONE } from "../../lib/tone";
-import { Card, GhostButton, PrimaryButton, SectionHeader, SelectField, Shell, StatusPill, TextField } from "../../components/ui";
+import { Card, FileField, GhostButton, PrimaryButton, SectionHeader, SelectField, Shell, StatusPill, TextField } from "../../components/ui";
 
 const DOCUMENT_TYPE_OPTIONS = [
   { value: "IDENTITY_DOCUMENT", label: "Giấy tờ tuỳ thân" },
@@ -27,6 +36,13 @@ const DOCUMENT_TYPE_OPTIONS = [
   { value: "TAX_DOCUMENT", label: "Giấy tờ thuế" },
   { value: "OTHER", label: "Khác" },
 ];
+
+const ORG_DOCUMENT_TYPE_OPTIONS = Object.entries(ORG_VERIFICATION_DOCUMENT_TYPE_LABELS).map(([value, label]) => ({
+  value,
+  label,
+}));
+
+const RESEND_COOLDOWN_SECONDS = 60;
 
 const INVITE_ROLE_OPTIONS = [
   { value: "MEMBER", label: "Thành viên" },
@@ -38,6 +54,7 @@ export default function ProfilePage() {
   const [me, setMe] = useState<MeResponse | null>(null);
   const [profile, setProfile] = useState<UserProfileResponse | null>(null);
   const [organizations, setOrganizations] = useState<OrganizationResponse[] | null>(null);
+  const [pendingMemberships, setPendingMemberships] = useState<PendingMembershipResponse[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [editing, setEditing] = useState(false);
@@ -61,11 +78,13 @@ export default function ProfilePage() {
       authFetch<MeResponse>("/me"),
       authFetch<UserProfileResponse>("/me/profile"),
       authFetch<OrganizationResponse[]>("/organizations"),
+      authFetch<PendingMembershipResponse[]>("/me/pending-memberships"),
     ])
-      .then(([meResponse, profileResponse, orgs]) => {
+      .then(([meResponse, profileResponse, orgs, pendingMemberships]) => {
         setMe(meResponse);
         setProfile(profileResponse);
         setOrganizations(orgs);
+        setPendingMemberships(pendingMemberships);
         setEditForm({
           displayName: profileResponse.displayName,
           firstName: profileResponse.firstName ?? "",
@@ -157,23 +176,117 @@ export default function ProfilePage() {
 
   const [orgActionBusy, setOrgActionBusy] = useState<string | null>(null);
   const [orgActionError, setOrgActionError] = useState<string | null>(null);
-  const [resubmitted, setResubmitted] = useState(false);
   const [inviteForm, setInviteForm] = useState({ email: "", role: "MEMBER" });
   const [inviteResult, setInviteResult] = useState<OrganizationMemberResponse | null>(null);
 
-  function onResubmitVerification(organizationId: string) {
-    setOrgActionBusy("resubmit");
-    setOrgActionError(null);
-    authFetch(`/organizations/${organizationId}/verification-requests`, { method: "POST" })
-      .then(() => setResubmitted(true))
+  const [pendingMembers, setPendingMembers] = useState<OrganizationMemberResponse[] | null>(null);
+  const [memberActionBusy, setMemberActionBusy] = useState<string | null>(null);
+  const [memberActionError, setMemberActionError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!organizations || organizations.length === 0) return;
+    const primaryOrgId = organizations[0]!.id;
+    authFetch<OrganizationMemberResponse[]>(`/organizations/${primaryOrgId}/members`)
+      .then((members) => setPendingMembers(members.filter((m) => m.status === "PENDING_APPROVAL")))
+      // Not owner/admin (AUTH_FORBIDDEN) or any other failure — just don't show the
+      // section, no need to surface an error for something the actor isn't meant to see.
+      .catch(() => setPendingMembers(null));
+  }, [organizations]);
+
+  function onDecideJoinRequest(organizationId: string, memberId: string, decision: "ACTIVE" | "LEFT") {
+    setMemberActionBusy(memberId);
+    setMemberActionError(null);
+    authFetch<OrganizationMemberResponse>(`/organizations/${organizationId}/members/${memberId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: decision }),
+    })
+      .then((updated) => {
+        setPendingMembers((prev) => (prev ? prev.filter((m) => m.id !== updated.id) : prev));
+      })
       .catch((err) => {
         if (err instanceof SessionExpiredError) {
           router.push("/login");
           return;
         }
-        setOrgActionError(err instanceof ApiError ? describeErrorCode(err.code) : "Nộp lại hồ sơ thất bại.");
+        setMemberActionError(err instanceof ApiError ? describeErrorCode(err.code) : "Thao tác thất bại.");
       })
-      .finally(() => setOrgActionBusy(null));
+      .finally(() => setMemberActionBusy(null));
+  }
+
+  const [orgDocForm, setOrgDocForm] = useState({ documentType: "TAX_DOCUMENT" });
+  const [orgDocFile, setOrgDocFile] = useState<File | null>(null);
+  const [orgDocStatus, setOrgDocStatus] = useState<"idle" | "loading">("idle");
+  const [orgDocError, setOrgDocError] = useState<string | null>(null);
+  const [orgDocResult, setOrgDocResult] = useState<OrganizationVerificationRequestResponse | null>(null);
+
+  function onSubmitOrgDocument(organizationId: string, mode: "resubmit" | "attach", event: React.FormEvent) {
+    event.preventDefault();
+    if (!orgDocFile) {
+      setOrgDocError("Vui lòng chọn tệp tài liệu.");
+      return;
+    }
+    setOrgDocStatus("loading");
+    setOrgDocError(null);
+    const formData = new FormData();
+    formData.append("documentType", orgDocForm.documentType);
+    formData.append("file", orgDocFile);
+    const path =
+      mode === "resubmit"
+        ? `/organizations/${organizationId}/verification-requests`
+        : `/organizations/${organizationId}/verification-requests/documents`;
+    authFetch<OrganizationVerificationRequestResponse>(path, { method: "POST", body: formData })
+      .then((result) => {
+        setOrgDocResult(result);
+        setOrgDocFile(null);
+      })
+      .catch((err) => {
+        if (err instanceof SessionExpiredError) {
+          router.push("/login");
+          return;
+        }
+        setOrgDocError(err instanceof ApiError ? describeErrorCode(err.code) : "Nộp tài liệu thất bại.");
+      })
+      .finally(() => setOrgDocStatus("idle"));
+  }
+
+  const [resendStatus, setResendStatus] = useState<"idle" | "loading">("idle");
+  const [resendError, setResendError] = useState<string | null>(null);
+  const [resendCooldownUntil, setResendCooldownUntil] = useState<number | null>(null);
+  const [, setResendTick] = useState(0);
+
+  useEffect(() => {
+    if (resendCooldownUntil === null) return;
+    const interval = setInterval(() => {
+      if (Date.now() >= resendCooldownUntil) {
+        setResendCooldownUntil(null);
+      } else {
+        setResendTick((t) => t + 1);
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [resendCooldownUntil]);
+
+  const resendSecondsLeft = resendCooldownUntil ? Math.max(0, Math.ceil((resendCooldownUntil - Date.now()) / 1000)) : 0;
+
+  function onResendVerificationEmail() {
+    setResendStatus("loading");
+    setResendError(null);
+    authFetch("/email-verifications/resend", { method: "POST" })
+      .then(() => {
+        setResendCooldownUntil(Date.now() + RESEND_COOLDOWN_SECONDS * 1000);
+      })
+      .catch((err) => {
+        if (err instanceof SessionExpiredError) {
+          router.push("/login");
+          return;
+        }
+        if (err instanceof ApiError && err.code === "AUTH_EMAIL_VERIFICATION_RATE_LIMITED") {
+          setResendCooldownUntil(Date.now() + RESEND_COOLDOWN_SECONDS * 1000);
+          return;
+        }
+        setResendError(err instanceof ApiError ? describeErrorCode(err.code) : "Gửi email xác thực thất bại.");
+      })
+      .finally(() => setResendStatus("idle"));
   }
 
   function onInviteMember(organizationId: string, event: React.FormEvent) {
@@ -238,6 +351,36 @@ export default function ProfilePage() {
       <div className="uikit-stack" style={{ maxWidth: 640 }}>
         <h1 style={{ fontSize: 22 }}>Hồ sơ tài khoản</h1>
 
+        {!me.emailVerified && (
+          <Card>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "var(--space-4)", flexWrap: "wrap" }}>
+              <div>
+                <StatusPill tone="amber">Email chưa xác thực</StatusPill>
+                <p style={{ marginTop: "var(--space-2)", fontSize: 13, color: "var(--uikit-slate-500)" }}>
+                  Kiểm tra hộp thư {me.primaryEmail} và bấm vào liên kết xác thực. Cần xác thực
+                  email trước khi nộp tài liệu xác minh tổ chức hoặc tác giả.
+                </p>
+              </div>
+              <GhostButton
+                icon={RefreshCw}
+                disabled={resendStatus === "loading" || resendCooldownUntil !== null}
+                onClick={onResendVerificationEmail}
+              >
+                {resendCooldownUntil !== null
+                  ? `Đã gửi — thử lại sau ${resendSecondsLeft}s`
+                  : resendStatus === "loading"
+                    ? "Đang gửi…"
+                    : "Gửi lại email xác thực"}
+              </GhostButton>
+            </div>
+            {resendError && (
+              <p className="uikit-alert-error" role="alert" style={{ marginTop: "var(--space-3)" }}>
+                {resendError}
+              </p>
+            )}
+          </Card>
+        )}
+
         <Card>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "var(--space-4)" }}>
@@ -289,9 +432,23 @@ export default function ProfilePage() {
           )}
         </Card>
 
+        {organizations.length === 0 &&
+          pendingMemberships.map((pm) => (
+            <Card key={pm.organizationId}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <p style={{ fontWeight: 600, fontSize: 14 }}>{pm.organizationName}</p>
+                <StatusPill tone="amber">Yêu cầu tham gia đang chờ duyệt</StatusPill>
+              </div>
+              <p style={{ marginTop: "var(--space-2)", fontSize: 13, color: "var(--uikit-slate-500)" }}>
+                Bạn sẽ nhận được thông báo khi quản trị viên tổ chức xử lý yêu cầu này.
+              </p>
+            </Card>
+          ))}
+
         {organizations.length > 0 && (() => {
           const primaryOrg = organizations[0]!;
           return (
+            <>
             <Card>
               <SectionHeader title="Tổ chức của tôi" />
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -310,14 +467,51 @@ export default function ProfilePage() {
                 </p>
               )}
 
-              {primaryOrg.status === "REJECTED" && (
-                <div style={{ marginTop: "var(--space-4)" }}>
-                  {resubmitted ? (
-                    <StatusPill tone="amber">Đã nộp lại — chờ kiểm định viên duyệt</StatusPill>
+              {(primaryOrg.status === "REJECTED" || primaryOrg.status === "IN_REVIEW") && (
+                <div style={{ marginTop: "var(--space-4)", paddingTop: "var(--space-4)", borderTop: "1px solid var(--uikit-slate-100)" }}>
+                  <p style={{ fontSize: 12, fontWeight: 600, color: "var(--uikit-slate-500)", marginBottom: "var(--space-3)" }}>
+                    {primaryOrg.status === "REJECTED" ? "Nộp lại hồ sơ xác minh" : "Bổ sung tài liệu (tuỳ chọn)"}
+                  </p>
+                  {orgDocResult ? (
+                    <StatusPill tone="amber">Đã nộp tài liệu — chờ kiểm định viên duyệt</StatusPill>
+                  ) : !me.emailVerified ? (
+                    <p style={{ fontSize: 13, color: "var(--uikit-slate-500)" }}>
+                      Xác thực email (xem thông báo phía trên) trước khi nộp tài liệu xác minh.
+                    </p>
                   ) : (
-                    <GhostButton icon={RefreshCw} disabled={orgActionBusy === "resubmit"} onClick={() => onResubmitVerification(primaryOrg.id)}>
-                      {orgActionBusy === "resubmit" ? "Đang nộp…" : "Nộp lại hồ sơ xác minh"}
-                    </GhostButton>
+                    <form
+                      onSubmit={(e) => onSubmitOrgDocument(primaryOrg.id, primaryOrg.status === "REJECTED" ? "resubmit" : "attach", e)}
+                      className="uikit-stack"
+                    >
+                      <p style={{ fontSize: 13, color: "var(--uikit-slate-500)" }}>
+                        Cần ít nhất 1 giấy tờ thuế hoặc thư xác nhận của tổ chức để kiểm định viên
+                        đối chiếu trước khi duyệt.
+                      </p>
+                      <SelectField
+                        label="Loại tài liệu"
+                        value={orgDocForm.documentType}
+                        onChange={(e) => setOrgDocForm({ documentType: e.target.value })}
+                        options={ORG_DOCUMENT_TYPE_OPTIONS}
+                      />
+                      <FileField
+                        label="Tệp tài liệu"
+                        required
+                        accept="application/pdf,image/jpeg,image/png"
+                        hint="PDF, JPG hoặc PNG, tối đa 20 MB."
+                        maxSizeBytes={MAX_DOCUMENT_SIZE_BYTES}
+                        allowedMimeTypes={ALLOWED_DOCUMENT_MIME_TYPES}
+                        onChange={setOrgDocFile}
+                        onValidationError={setOrgDocError}
+                      />
+                      {orgDocError && (
+                        <p className="uikit-alert-error" role="alert">
+                          {orgDocError}
+                        </p>
+                      )}
+                      <PrimaryButton type="submit" disabled={orgDocStatus === "loading"}>
+                        {orgDocStatus === "loading" ? "Đang nộp…" : "Nộp tài liệu"}
+                      </PrimaryButton>
+                    </form>
                   )}
                 </div>
               )}
@@ -351,6 +545,61 @@ export default function ProfilePage() {
                 </form>
               </div>
             </Card>
+
+            {pendingMembers !== null && (
+              <Card>
+                <SectionHeader title="Yêu cầu tham gia đang chờ duyệt" />
+                {memberActionError && (
+                  <p className="uikit-alert-error" role="alert" style={{ marginBottom: "var(--space-3)" }}>
+                    {memberActionError}
+                  </p>
+                )}
+                {pendingMembers.length === 0 ? (
+                  <p className="uikit-empty">Không có yêu cầu nào đang chờ duyệt.</p>
+                ) : (
+                  <div className="uikit-stack">
+                    {pendingMembers.map((member) => {
+                      const isBusy = memberActionBusy === member.id;
+                      return (
+                        <div
+                          key={member.id}
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            gap: "var(--space-3)",
+                            border: "1px solid var(--uikit-slate-200)",
+                            borderRadius: "var(--radius-sm)",
+                            padding: "var(--space-3)",
+                          }}
+                        >
+                          <div>
+                            <p style={{ fontWeight: 600, fontSize: 13 }}>{member.displayName || member.email}</p>
+                            <p style={{ marginTop: 2, fontSize: 12, color: "var(--uikit-slate-500)" }}>{member.email}</p>
+                          </div>
+                          <div style={{ display: "flex", gap: "var(--space-2)" }}>
+                            <PrimaryButton
+                              disabled={isBusy}
+                              onClick={() => onDecideJoinRequest(primaryOrg.id, member.id, "ACTIVE")}
+                            >
+                              {isBusy ? "Đang xử lý…" : "Duyệt"}
+                            </PrimaryButton>
+                            <GhostButton
+                              tone="red"
+                              disabled={isBusy}
+                              onClick={() => onDecideJoinRequest(primaryOrg.id, member.id, "LEFT")}
+                            >
+                              Từ chối
+                            </GhostButton>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </Card>
+            )}
+            </>
           );
         })()}
 

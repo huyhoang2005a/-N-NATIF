@@ -10,18 +10,21 @@ const verifiedAuthorInOrg: ActorContext = {
   platformRole: "USER",
   memberships: [{ organizationId: "org-1", role: "MEMBER", status: "ACTIVE" }],
   authorVerificationStatus: "VERIFIED",
+  isEmailVerified: true,
 };
 const unverifiedUser: ActorContext = {
   userId: "user-1",
   platformRole: "USER",
   memberships: [{ organizationId: "org-1", role: "MEMBER", status: "ACTIVE" }],
   authorVerificationStatus: "UNVERIFIED",
+  isEmailVerified: true,
 };
 const orgAdmin: ActorContext = {
   userId: "admin-1",
   platformRole: "USER",
   memberships: [{ organizationId: "org-1", role: "ORG_ADMIN", status: "ACTIVE" }],
   authorVerificationStatus: "UNVERIFIED",
+  isEmailVerified: true,
 };
 
 function buildService() {

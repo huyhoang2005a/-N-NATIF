@@ -1,4 +1,4 @@
-import type { LoginRequest, MeResponse, RefreshRequest, TokenResponse } from "@r2m/contracts";
+import type { LoginRequest, MeResponse, PendingMembershipResponse, RefreshRequest, TokenResponse } from "@r2m/contracts";
 import { LoginRequestSchema, RefreshRequestSchema } from "@r2m/contracts";
 import type { Database } from "@r2m/database";
 import { schema } from "@r2m/database";
@@ -9,12 +9,14 @@ import { CurrentActor } from "../../../common/decorators/current-actor.decorator
 import { Public } from "../../../common/decorators/public.decorator";
 import { ZodValidationPipe } from "../../../common/pipes/zod-validation.pipe";
 import type { ActorContext } from "@r2m/authz";
+import { OrganizationsService } from "../organizations/organizations.service";
 import { AuthService } from "./auth.service";
 
 @Controller()
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
+    private readonly organizationsService: OrganizationsService,
     @Inject(DATABASE) private readonly db: Database,
   ) {}
 
@@ -58,6 +60,12 @@ export class AuthController {
       primaryEmail: user?.primaryEmail ?? "",
       platformRole: actor.platformRole,
       displayName: profile?.displayName ?? "",
+      emailVerified: user?.emailVerifiedAt !== null && user?.emailVerifiedAt !== undefined,
     };
+  }
+
+  @Get("me/pending-memberships")
+  listPendingMemberships(@CurrentActor() actor: ActorContext): Promise<PendingMembershipResponse[]> {
+    return this.organizationsService.listPendingMemberships(actor);
   }
 }

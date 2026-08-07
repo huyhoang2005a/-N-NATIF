@@ -9,6 +9,7 @@ export { PrimaryButton, PrimaryButtonLink } from "./PrimaryButton";
 export { GhostButton } from "./GhostButton";
 export { TextField } from "./TextField";
 export { SelectField } from "./SelectField";
+export { FileField } from "./FileField";
 export { Tabs } from "./Tabs";
 export { BackLink } from "./BackLink";
 export { Shell } from "./Shell";

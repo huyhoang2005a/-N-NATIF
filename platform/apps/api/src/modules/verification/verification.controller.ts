@@ -1,9 +1,30 @@
-import type { OrganizationVerificationDecisionRequest, OrganizationVerificationRequestResponse } from "@r2m/contracts";
-import { OrganizationVerificationDecisionRequestSchema } from "@r2m/contracts";
+import type {
+  OrganizationVerificationDecisionRequest,
+  OrganizationVerificationDocumentResponse,
+  OrganizationVerificationRequestResponse,
+  SubmitOrganizationVerificationDocumentRequest,
+} from "@r2m/contracts";
+import {
+  MAX_DOCUMENT_SIZE_BYTES,
+  OrganizationVerificationDecisionRequestSchema,
+  SubmitOrganizationVerificationDocumentSchema,
+} from "@r2m/contracts";
 import type { ActorContext } from "@r2m/authz";
-import { Body, Controller, Get, Param, Post, Req, UsePipes } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Req,
+  UploadedFile,
+  UseInterceptors,
+  UsePipes,
+} from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
 import type { Request } from "express";
 import { CurrentActor } from "../../common/decorators/current-actor.decorator";
+import { toDocumentUpload } from "../../common/multipart/document-upload.util";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
 import { VerificationService } from "./verification.service";
 
@@ -18,6 +39,14 @@ export class PlatformOrganizationVerificationController {
   @Get()
   listPending(@CurrentActor() actor: ActorContext): Promise<OrganizationVerificationRequestResponse[]> {
     return this.verificationService.listPending(actor);
+  }
+
+  @Get(":id/documents")
+  listDocuments(
+    @CurrentActor() actor: ActorContext,
+    @Param("id") id: string,
+  ): Promise<OrganizationVerificationDocumentResponse[]> {
+    return this.verificationService.listDocuments(actor, id);
   }
 
   @Post(":id/claim")
@@ -44,11 +73,33 @@ export class PlatformOrganizationVerificationController {
 export class OrganizationVerificationRequestController {
   constructor(private readonly verificationService: VerificationService) {}
 
+  /** Multipart on purpose (create request + upload the minimum-required document in one
+   * call, no separate presign step) — see mục 1 of the "vá lỗ hổng xác minh" plan. */
   @Post(":id/verification-requests")
+  @UseInterceptors(FileInterceptor("file", { limits: { fileSize: MAX_DOCUMENT_SIZE_BYTES } }))
+  @UsePipes(new ZodValidationPipe(SubmitOrganizationVerificationDocumentSchema))
   resubmit(
     @CurrentActor() actor: ActorContext,
     @Param("id") id: string,
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @Body() body: SubmitOrganizationVerificationDocumentRequest,
+    @Req() req: Request,
   ): Promise<OrganizationVerificationRequestResponse> {
-    return this.verificationService.resubmit(actor, id);
+    return this.verificationService.resubmit(actor, id, toDocumentUpload(file, body.documentType), requestId(req));
+  }
+
+  /** Attaches a document to the org's currently open request — needed because the first
+   * request is created implicitly by org registration with zero documents (see plan). */
+  @Post(":id/verification-requests/documents")
+  @UseInterceptors(FileInterceptor("file", { limits: { fileSize: MAX_DOCUMENT_SIZE_BYTES } }))
+  @UsePipes(new ZodValidationPipe(SubmitOrganizationVerificationDocumentSchema))
+  attachDocument(
+    @CurrentActor() actor: ActorContext,
+    @Param("id") id: string,
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @Body() body: SubmitOrganizationVerificationDocumentRequest,
+    @Req() req: Request,
+  ): Promise<OrganizationVerificationRequestResponse> {
+    return this.verificationService.attachDocument(actor, id, toDocumentUpload(file, body.documentType), requestId(req));
   }
 }

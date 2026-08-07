@@ -2,14 +2,21 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ExternalLink, FileCheck2 } from "lucide-react";
 import type {
   MeResponse,
   OrganizationResponse,
+  OrganizationVerificationDocumentResponse,
   OrganizationVerificationRequestResponse,
 } from "@r2m/contracts";
 import { ApiError, authFetch, SessionExpiredError } from "../../../lib/api-client";
 import { describeErrorCode } from "../../../lib/error-messages";
-import { ORG_TYPE_LABELS, PLATFORM_ROLE_LABELS, VERIFICATION_REQUEST_STATUS_LABELS } from "../../../lib/labels";
+import {
+  ORG_TYPE_LABELS,
+  ORG_VERIFICATION_DOCUMENT_TYPE_LABELS,
+  PLATFORM_ROLE_LABELS,
+  VERIFICATION_REQUEST_STATUS_LABELS,
+} from "../../../lib/labels";
 import { navForPersona } from "../../../lib/nav";
 import { getAccessToken } from "../../../lib/session";
 import { toneOf, VERIFICATION_REQUEST_STATUS_TONE } from "../../../lib/tone";
@@ -18,6 +25,9 @@ import { Card, GhostButton, PrimaryButton, Shell, StatusPill, TextField } from "
 interface Row {
   request: OrganizationVerificationRequestResponse;
   organization: OrganizationResponse;
+  /** `null` = failed to load (per-row, doesn't sink the whole list) — distinct from `[]`,
+   * which means "loaded fine, genuinely no documents attached yet". */
+  documents: OrganizationVerificationDocumentResponse[] | null;
 }
 
 export default function OrganizationVerificationsPage() {
@@ -36,7 +46,43 @@ export default function OrganizationVerificationsPage() {
     const organizations = await Promise.all(
       requests.map((request) => authFetch<OrganizationResponse>(`/organizations/${request.organizationId}`)),
     );
-    setRows(requests.map((request, index) => ({ request, organization: organizations[index]! })));
+    const documentResults = await Promise.allSettled(
+      requests.map((request) =>
+        authFetch<OrganizationVerificationDocumentResponse[]>(
+          `/platform/organization-verifications/${request.id}/documents`,
+        ),
+      ),
+    );
+    setRows(
+      requests.map((request, index) => {
+        const documentResult = documentResults[index]!;
+        return {
+          request,
+          organization: organizations[index]!,
+          documents: documentResult.status === "fulfilled" ? documentResult.value : null,
+        };
+      }),
+    );
+  }
+
+  async function onViewDocument(requestId: string, documentId: string) {
+    try {
+      // Re-fetch instead of using the cached URL — signed URLs expire, and the row may
+      // have been sitting on screen for a while before the reviewer clicks "Xem".
+      const documents = await authFetch<OrganizationVerificationDocumentResponse[]>(
+        `/platform/organization-verifications/${requestId}/documents`,
+      );
+      const fresh = documents.find((doc) => doc.id === documentId);
+      if (fresh) {
+        window.open(fresh.downloadUrl, "_blank", "noopener,noreferrer");
+      }
+    } catch (err) {
+      if (err instanceof SessionExpiredError) {
+        router.push("/login");
+        return;
+      }
+      setError(err instanceof ApiError ? describeErrorCode(err.code) : "Không mở được tài liệu.");
+    }
   }
 
   useEffect(() => {
@@ -130,7 +176,7 @@ export default function OrganizationVerificationsPage() {
             <p className="uikit-empty">Không có hồ sơ tổ chức nào đang chờ xử lý.</p>
           ) : (
             <div className="uikit-stack">
-              {rows.map(({ request, organization }) => {
+              {rows.map(({ request, organization, documents }) => {
                 const isBusy = busyId === request.id;
                 const claimedByMe = request.reviewerUserId === me.userId;
 
@@ -150,6 +196,37 @@ export default function OrganizationVerificationsPage() {
                       <StatusPill tone={toneOf(VERIFICATION_REQUEST_STATUS_TONE, request.status)}>
                         {VERIFICATION_REQUEST_STATUS_LABELS[request.status] ?? request.status}
                       </StatusPill>
+                    </div>
+
+                    <div style={{ marginTop: "var(--space-4)" }}>
+                      <p style={{ fontSize: 12, fontWeight: 600, color: "var(--uikit-slate-500)", marginBottom: "var(--space-2)" }}>
+                        Tài liệu đính kèm
+                      </p>
+                      {documents === null ? (
+                        <p style={{ fontSize: 13, color: "var(--uikit-slate-400)" }}>
+                          Không tải được tài liệu — thử tải lại trang.
+                        </p>
+                      ) : documents.length === 0 ? (
+                        <p style={{ fontSize: 13, color: "var(--uikit-amber-700)" }}>Chưa có tài liệu đính kèm.</p>
+                      ) : (
+                        <div className="uikit-stack" style={{ gap: "var(--space-2)" }}>
+                          {documents.map((doc) => (
+                            <div
+                              key={doc.id}
+                              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--space-3)" }}
+                            >
+                              <span style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", fontSize: 13 }}>
+                                <FileCheck2 size={16} />
+                                {ORG_VERIFICATION_DOCUMENT_TYPE_LABELS[doc.documentType] ?? doc.documentType} ·{" "}
+                                {doc.originalFilename}
+                              </span>
+                              <GhostButton icon={ExternalLink} onClick={() => onViewDocument(request.id, doc.id)}>
+                                Xem
+                              </GhostButton>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     <div style={{ display: "flex", gap: "var(--space-3)", marginTop: "var(--space-4)", flexWrap: "wrap" }}>

@@ -10,6 +10,7 @@ const actor: ActorContext = {
   platformRole: "USER",
   memberships: [],
   authorVerificationStatus: "UNVERIFIED",
+  isEmailVerified: true,
 };
 
 describe("UsersService.updateMyProfile", () => {

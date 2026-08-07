@@ -23,6 +23,17 @@ export class OrganizationsRepository {
     return this.db.query.organization.findFirst({ where: eq(schema.organization.id, id) });
   }
 
+  /** Domain is globally unique (see `organization_domain` schema note) — used both to block
+   * duplicate registrations with a clear `ORG_DOMAIN_ALREADY_REGISTERED` error and to power
+   * the self-service "join this organization instead" flow. */
+  async findOrganizationByDomain(domain: string) {
+    const row = await this.db.query.organizationDomain.findFirst({
+      where: eq(schema.organizationDomain.domain, domain),
+      with: { organization: true },
+    });
+    return row?.organization;
+  }
+
   async findUserByEmail(email: string, tx?: Database) {
     const client = tx ?? this.db;
     return client.query.userAccount.findFirst({ where: eq(schema.userAccount.primaryEmail, email) });
@@ -70,6 +81,35 @@ export class OrganizationsRepository {
     return firstOrThrow(rows, "createVerificationRequest: insert returned no row");
   }
 
+  /** Mirrors `VerificationRepository.createDocument` — duplicated (not imported) to avoid
+   * a circular module dependency: `VerificationModule` already imports `OrganizationsModule`. */
+  async createVerificationDocument(
+    input: {
+      organizationVerificationRequestId: string;
+      documentType: string;
+      storageObjectKey: string;
+      originalFilename: string;
+      mimeType: string;
+      sizeBytes: number;
+      checksumSha256: string;
+    },
+    tx: Database,
+  ) {
+    const rows = await tx
+      .insert(schema.verificationDocument)
+      .values({
+        organizationVerificationRequestId: input.organizationVerificationRequestId,
+        documentType: input.documentType as never,
+        storageObjectKey: input.storageObjectKey,
+        originalFilename: input.originalFilename,
+        mimeType: input.mimeType,
+        sizeBytes: input.sizeBytes,
+        checksumSha256: input.checksumSha256,
+      })
+      .returning();
+    return firstOrThrow(rows, "createVerificationDocument: insert returned no row");
+  }
+
   async findMemberById(organizationId: string, memberId: string) {
     return this.db.query.organizationMember.findFirst({
       where: and(
@@ -85,6 +125,33 @@ export class OrganizationsRepository {
         eq(schema.organizationMember.organizationId, organizationId),
         eq(schema.organizationMember.userId, userId),
       ),
+    });
+  }
+
+  async findMemberWithUserById(organizationId: string, memberId: string) {
+    return this.db.query.organizationMember.findFirst({
+      where: and(
+        eq(schema.organizationMember.id, memberId),
+        eq(schema.organizationMember.organizationId, organizationId),
+      ),
+      with: { user: { with: { profile: true } } },
+    });
+  }
+
+  async listMembers(organizationId: string) {
+    return this.db.query.organizationMember.findMany({
+      where: eq(schema.organizationMember.organizationId, organizationId),
+      with: { user: { with: { profile: true } } },
+    });
+  }
+
+  async listPendingMembershipsForUser(userId: string) {
+    return this.db.query.organizationMember.findMany({
+      where: and(
+        eq(schema.organizationMember.userId, userId),
+        eq(schema.organizationMember.status, "PENDING_APPROVAL"),
+      ),
+      with: { organization: true },
     });
   }
 

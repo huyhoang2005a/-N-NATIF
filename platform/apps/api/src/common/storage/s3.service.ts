@@ -58,6 +58,15 @@ export class S3Service {
     this.ensuredBuckets.add(bucket);
   }
 
+  /** Server-side upload for multipart intake (no presign round-trip) — the API process
+   * already holds the bytes, so it PUTs them directly instead of handing the client a URL. */
+  async putObject(bucket: string, key: string, body: Buffer, contentType: string): Promise<void> {
+    await this.ensureBucket(bucket);
+    await this.client.send(
+      new PutObjectCommand({ Bucket: bucket, Key: key, Body: body, ContentType: contentType }),
+    );
+  }
+
   async createPresignedUploadUrl(
     bucket: string,
     key: string,
@@ -91,6 +100,10 @@ export class S3Service {
   // Bucket-aware convenience wrappers — callers never need to read S3_*_BUCKET / call
   // loadEnv() themselves, which also keeps them trivially mockable in unit tests (no env
   // vars required just to construct a service that depends on S3Service).
+
+  uploadVerificationDocument(key: string, body: Buffer, contentType: string): Promise<void> {
+    return this.putObject(this.verificationBucket, key, body, contentType);
+  }
 
   createVerificationUploadUrl(key: string, contentType: string): Promise<PresignedUrlResult> {
     return this.createPresignedUploadUrl(this.verificationBucket, key, contentType);

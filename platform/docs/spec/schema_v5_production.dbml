@@ -387,6 +387,22 @@ Table user_account {
   }
 }
 
+// Additive (2026-08-07): backs real email verification for user_account.email_verified_at,
+// which existed in the schema from the start but had no writer until this table was added.
+Table email_verification_token {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > user_account.id]
+  token_hash varchar(64) [not null]
+  purpose varchar(50) [not null, default: 'EMAIL_VERIFICATION']
+  expires_at timestamptz [not null]
+  used_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (user_id, purpose)
+  }
+}
+
 Table user_identity {
   id uuid [pk, default: `gen_random_uuid()`]
   user_id uuid [not null, ref: > user_account.id]

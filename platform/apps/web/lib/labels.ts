@@ -35,6 +35,11 @@ export const VERIFICATION_REQUEST_STATUS_LABELS: Record<string, string> = {
   CANCELLED: "Đã huỷ",
 };
 
+export const ORG_VERIFICATION_DOCUMENT_TYPE_LABELS: Record<string, string> = {
+  TAX_DOCUMENT: "Giấy tờ thuế",
+  ORGANIZATION_LETTER: "Thư xác nhận của tổ chức",
+};
+
 // ---------- Phase 2: Resource ----------
 
 export const RESOURCE_TYPE_LABELS: Record<string, string> = {

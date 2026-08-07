@@ -37,6 +37,22 @@ export const userIdentity = pgTable(
   ],
 );
 
+export const emailVerificationToken = pgTable(
+  "email_verification_token",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => userAccount.id),
+    tokenHash: varchar("token_hash", { length: 64 }).notNull(),
+    purpose: varchar("purpose", { length: 50 }).notNull().default("EMAIL_VERIFICATION"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("idx_email_verification_token_user_purpose").on(table.userId, table.purpose)],
+);
+
 export const userProfile = pgTable("user_profile", {
   userId: uuid("user_id")
     .primaryKey()

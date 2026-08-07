@@ -69,6 +69,7 @@ export class JwtAuthGuard implements CanActivate {
         status: membership.status,
       })),
       authorVerificationStatus: authorProfile?.verificationStatus ?? "UNVERIFIED",
+      isEmailVerified: user.emailVerifiedAt !== null,
     };
 
     return true;

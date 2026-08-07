@@ -29,6 +29,20 @@
       "when": 1785984419094,
       "tag": "0003_flowery_sprite",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1786079277553,
+      "tag": "0004_tense_bloodstrike",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1786099910138,
+      "tag": "0005_nervous_arclight",
+      "breakpoints": true
     }
   ]
 }

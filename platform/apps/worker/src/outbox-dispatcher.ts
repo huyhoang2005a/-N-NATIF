@@ -1,8 +1,22 @@
 import type { DomainEvent } from "@r2m/contracts";
 import type { Database } from "@r2m/database";
 import { schema } from "@r2m/database";
+import type { EmailSender } from "@r2m/domain";
 import { and, eq, inArray, lte } from "drizzle-orm";
-import { findActiveOrgOwnerUserId, listActivePlatformReviewerIds, notify } from "./notify";
+import {
+  authorApprovedTemplate,
+  authorRejectedTemplate,
+  organizationApprovedTemplate,
+  organizationRejectedTemplate,
+  verifyEmailTemplate,
+} from "./email/templates";
+import {
+  findActiveOrgOwnerUserId,
+  findUserEmail,
+  listActiveOrgOwnersAndAdmins,
+  listActivePlatformReviewerIds,
+  notify,
+} from "./notify";
 
 const DEFAULT_BATCH_SIZE = 20;
 const DEFAULT_MAX_ATTEMPTS = 5;
@@ -12,8 +26,13 @@ const DEFAULT_MAX_ATTEMPTS = 5;
  * (OrganizationRegistered, UserProfileUpdated) are acknowledged without producing one —
  * "no notification" is a valid, deliberate outcome, not a missing case.
  */
-async function handleEvent(db: Database, event: DomainEvent): Promise<void> {
+async function handleEvent(db: Database, event: DomainEvent, emailSender: EmailSender): Promise<void> {
   switch (event.type) {
+    case "EmailVerificationRequested": {
+      const { subject, html } = verifyEmailTemplate(event.token, event.expiresAt);
+      await emailSender.send({ to: event.email, subject, html });
+      return;
+    }
     case "OrganizationVerificationRequested": {
       const reviewerIds = await listActivePlatformReviewerIds(db);
       await Promise.all(
@@ -40,6 +59,11 @@ async function handleEvent(db: Database, event: DomainEvent): Promise<void> {
           message: "Your organization is now ACTIVE.",
           dedupeKey: `org-verification-decided:${event.verificationRequestId}`,
         });
+        const email = await findUserEmail(db, ownerId);
+        if (email) {
+          const { subject, html } = organizationApprovedTemplate();
+          await emailSender.send({ to: email, subject, html });
+        }
       }
       return;
     }
@@ -54,7 +78,42 @@ async function handleEvent(db: Database, event: DomainEvent): Promise<void> {
           message: event.reason,
           dedupeKey: `org-verification-decided:${event.verificationRequestId}`,
         });
+        const email = await findUserEmail(db, ownerId);
+        if (email) {
+          const { subject, html } = organizationRejectedTemplate(event.reason);
+          await emailSender.send({ to: email, subject, html });
+        }
       }
+      return;
+    }
+    case "OrganizationJoinRequested": {
+      const recipientIds = await listActiveOrgOwnersAndAdmins(db, event.organizationId);
+      await Promise.all(
+        recipientIds.map((recipientUserId) =>
+          notify(db, {
+            recipientUserId,
+            scopeOrganizationId: event.organizationId,
+            type: "organization_join_request.requested",
+            title: "New request to join your organization",
+            message: `A new user requested to join your organization.`,
+            dedupeKey: `org-join-requested:${event.memberId}`,
+          }),
+        ),
+      );
+      return;
+    }
+    case "OrganizationJoinRequestDecided": {
+      await notify(db, {
+        recipientUserId: event.userId,
+        scopeOrganizationId: event.organizationId,
+        type: event.decision === "APPROVED" ? "organization_join_request.approved" : "organization_join_request.rejected",
+        title: event.decision === "APPROVED" ? "Your join request was approved" : "Your join request was rejected",
+        message:
+          event.decision === "APPROVED"
+            ? "You are now an active member of the organization."
+            : "The organization did not approve your join request.",
+        dedupeKey: `org-join-decided:${event.memberId}`,
+      });
       return;
     }
     case "OrganizationMemberInvited": {
@@ -106,6 +165,11 @@ async function handleEvent(db: Database, event: DomainEvent): Promise<void> {
         message: "Your author verification request was approved.",
         dedupeKey: `author-verification-decided:${event.verificationRequestId}`,
       });
+      const email = await findUserEmail(db, event.authorUserId);
+      if (email) {
+        const { subject, html } = authorApprovedTemplate();
+        await emailSender.send({ to: email, subject, html });
+      }
       return;
     }
     case "AuthorVerificationRejected": {
@@ -116,6 +180,11 @@ async function handleEvent(db: Database, event: DomainEvent): Promise<void> {
         message: event.reason,
         dedupeKey: `author-verification-decided:${event.verificationRequestId}`,
       });
+      const email = await findUserEmail(db, event.authorUserId);
+      if (email) {
+        const { subject, html } = authorRejectedTemplate(event.reason);
+        await emailSender.send({ to: email, subject, html });
+      }
       return;
     }
     case "OrganizationRegistered":
@@ -159,6 +228,7 @@ export interface DispatchResult {
 /** Polls `outbox_event` and delivers PENDING/FAILED rows whose available_at has passed. */
 export async function dispatchPendingEvents(
   db: Database,
+  emailSender: EmailSender,
   options: { batchSize?: number; maxAttempts?: number } = {},
 ): Promise<DispatchResult> {
   const batchSize = options.batchSize ?? DEFAULT_BATCH_SIZE;
@@ -182,7 +252,7 @@ export async function dispatchPendingEvents(
       .where(eq(schema.outboxEvent.id, row.id));
 
     try {
-      await handleEvent(db, row.payload as DomainEvent);
+      await handleEvent(db, row.payload as DomainEvent, emailSender);
       await db
         .update(schema.outboxEvent)
         .set({ status: "PUBLISHED", publishedAt: new Date() })

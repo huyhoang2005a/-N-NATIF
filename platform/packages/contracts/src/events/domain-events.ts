@@ -34,6 +34,21 @@ export interface OrganizationVerificationRejectedEvent {
   reason: string;
 }
 
+export interface OrganizationJoinRequestedEvent {
+  type: "OrganizationJoinRequested";
+  organizationId: string;
+  memberId: string;
+  requestingUserId: string;
+}
+
+export interface OrganizationJoinRequestDecidedEvent {
+  type: "OrganizationJoinRequestDecided";
+  organizationId: string;
+  memberId: string;
+  userId: string;
+  decision: "APPROVED" | "REJECTED";
+}
+
 export interface OrganizationMemberInvitedEvent {
   type: "OrganizationMemberInvited";
   organizationId: string;
@@ -56,6 +71,16 @@ export interface UserProfileUpdatedEvent {
   type: "UserProfileUpdated";
   userId: string;
   changedFields: string[];
+}
+
+export interface EmailVerificationRequestedEvent {
+  type: "EmailVerificationRequested";
+  userId: string;
+  email: string;
+  /** Raw token — only ever persisted here (outbox_event.payload) and in the email itself,
+   * never in audit_log or application logs. */
+  token: string;
+  expiresAt: string;
 }
 
 export interface AuthorVerificationSubmittedEvent {
@@ -190,9 +215,12 @@ export type DomainEvent =
   | OrganizationVerificationRequestedEvent
   | OrganizationActivatedEvent
   | OrganizationVerificationRejectedEvent
+  | OrganizationJoinRequestedEvent
+  | OrganizationJoinRequestDecidedEvent
   | OrganizationMemberInvitedEvent
   | OrganizationMemberRoleChangedEvent
   | UserProfileUpdatedEvent
+  | EmailVerificationRequestedEvent
   | AuthorVerificationSubmittedEvent
   | AuthorVerifiedEvent
   | AuthorVerificationRejectedEvent

@@ -13,7 +13,9 @@
     "@r2m/env": "workspace:*",
     "@r2m/contracts": "workspace:*",
     "@r2m/database": "workspace:*",
-    "drizzle-orm": "^0.38.3"
+    "@r2m/domain": "workspace:*",
+    "drizzle-orm": "^0.38.3",
+    "resend": "^4.0.1"
   },
   "devDependencies": {
     "tsx": "^4.19.2",

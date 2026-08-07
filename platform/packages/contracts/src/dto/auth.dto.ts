@@ -23,4 +23,14 @@ export interface MeResponse {
   primaryEmail: string;
   platformRole: string;
   displayName: string;
+  emailVerified: boolean;
+}
+
+export const ConfirmEmailVerificationRequestSchema = z.object({
+  token: z.string().min(1),
+});
+export type ConfirmEmailVerificationRequest = z.infer<typeof ConfirmEmailVerificationRequestSchema>;
+
+export interface EmailVerificationStatusResponse {
+  emailVerified: boolean;
 }

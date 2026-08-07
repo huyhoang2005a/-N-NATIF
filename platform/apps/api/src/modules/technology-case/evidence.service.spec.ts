@@ -14,12 +14,14 @@ const owner: ActorContext = {
   platformRole: "USER",
   memberships: [{ organizationId: "org-1", role: "MEMBER", status: "ACTIVE" }],
   authorVerificationStatus: "VERIFIED",
+  isEmailVerified: true,
 };
 const outsider: ActorContext = {
   userId: "outsider-1",
   platformRole: "USER",
   memberships: [],
   authorVerificationStatus: "UNVERIFIED",
+  isEmailVerified: true,
 };
 
 const draftCase = {

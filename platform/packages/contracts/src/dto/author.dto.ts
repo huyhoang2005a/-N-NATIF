@@ -9,8 +9,8 @@ const verificationDocumentTypeValues = Object.values(VerificationDocumentType) a
 /** UC-VER-01 only allows PDF/JPG/PNG. 20 MB is an operational cap (not spec-mandated —
  * no size limit is given in the spec), matching the general "kiểm tra MIME/size cơ bản"
  * scope decided for Phase 2 (see plan B.0). */
-const ALLOWED_DOCUMENT_MIME_TYPES = ["application/pdf", "image/jpeg", "image/png"] as const;
-const MAX_DOCUMENT_SIZE_BYTES = 20 * 1024 * 1024;
+export const ALLOWED_DOCUMENT_MIME_TYPES = ["application/pdf", "image/jpeg", "image/png"] as const;
+export const MAX_DOCUMENT_SIZE_BYTES = 20 * 1024 * 1024;
 
 /** UC-VER-01 step 1 — request a presigned upload URL before creating the request itself. */
 export const RequestAuthorVerificationUploadSchema = z.object({

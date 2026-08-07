@@ -1,5 +1,8 @@
+import type { EmailSender } from "@r2m/domain";
 import { describe, expect, it, vi } from "vitest";
 import { dispatchPendingEvents } from "./outbox-dispatcher";
+
+const fakeEmailSender: EmailSender = { send: vi.fn().mockResolvedValue(undefined) };
 
 function buildFakeDb(rows: unknown[], overrides: Partial<Record<string, unknown>> = {}) {
   const updateCalls: unknown[] = [];
@@ -20,9 +23,11 @@ function buildFakeDb(rows: unknown[], overrides: Partial<Record<string, unknown>
       })),
     })),
     insert: vi.fn(() => ({
-      values: vi.fn(async (values: unknown) => {
-        insertCalls.push(values);
-      }),
+      values: vi.fn((values: unknown) => ({
+        onConflictDoNothing: vi.fn(async () => {
+          insertCalls.push(values);
+        }),
+      })),
     })),
   };
 
@@ -40,7 +45,7 @@ describe("dispatchPendingEvents", () => {
       },
     ]);
 
-    const result = await dispatchPendingEvents(db as never, { maxAttempts: 5 });
+    const result = await dispatchPendingEvents(db as never, fakeEmailSender, { maxAttempts: 5 });
 
     expect(result.failed).toBe(1);
     expect(updateCalls).toContainEqual(expect.objectContaining({ status: "PROCESSING" }));
@@ -57,7 +62,7 @@ describe("dispatchPendingEvents", () => {
       },
     ]);
 
-    await dispatchPendingEvents(db as never, { maxAttempts: 5 });
+    await dispatchPendingEvents(db as never, fakeEmailSender, { maxAttempts: 5 });
 
     expect(updateCalls).toContainEqual(
       expect.objectContaining({ status: "DEAD_LETTER", attemptCount: 5 }),
@@ -81,7 +86,7 @@ describe("dispatchPendingEvents", () => {
       },
     ]);
 
-    const result = await dispatchPendingEvents(db as never);
+    const result = await dispatchPendingEvents(db as never, fakeEmailSender);
 
     expect(result.processed).toBe(1);
     expect(insertCalls).toContainEqual(expect.objectContaining({ recipientUserId: "user-2" }));
@@ -104,7 +109,7 @@ describe("dispatchPendingEvents", () => {
       },
     ]);
 
-    const result = await dispatchPendingEvents(db as never);
+    const result = await dispatchPendingEvents(db as never, fakeEmailSender);
 
     expect(result.processed).toBe(1);
     expect(insertCalls).toHaveLength(0);

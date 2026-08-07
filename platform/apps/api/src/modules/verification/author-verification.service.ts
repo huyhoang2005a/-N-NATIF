@@ -77,6 +77,12 @@ export class AuthorVerificationService {
     input: SubmitAuthorVerificationRequest,
     requestIdHeader: string | null,
   ): Promise<AuthorVerificationRequestResponse> {
+    if (!actor.isEmailVerified) {
+      throw new ForbiddenError(
+        ErrorCode.AUTH_EMAIL_NOT_VERIFIED,
+        "Verify your email address before submitting an author verification request.",
+      );
+    }
     const existingProfile = await this.authorVerificationRepository.findAuthorProfile(actor.userId);
     if (existingProfile?.verificationStatus === AuthorVerificationStatus.VERIFIED) {
       throw new ConflictError(ErrorCode.AUTHOR_ALREADY_VERIFIED, "Author is already verified.");

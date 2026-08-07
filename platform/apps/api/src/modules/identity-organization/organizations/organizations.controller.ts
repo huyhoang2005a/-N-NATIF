@@ -1,19 +1,35 @@
 import type {
   InviteMemberRequest,
+  JoinOrganizationRequest,
   OrganizationMemberResponse,
   OrganizationResponse,
-  RegisterOrganizationRequest,
+  RegisterOrganizationWithDocumentRequest,
   UpdateMemberRequest,
 } from "@r2m/contracts";
 import {
   InviteMemberRequestSchema,
-  RegisterOrganizationRequestSchema,
+  JoinOrganizationRequestSchema,
+  MAX_DOCUMENT_SIZE_BYTES,
+  RegisterOrganizationWithDocumentSchema,
   UpdateMemberRequestSchema,
 } from "@r2m/contracts";
 import type { ActorContext } from "@r2m/authz";
-import { Body, Controller, Get, Param, Patch, Post, Req, UsePipes } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Req,
+  UploadedFile,
+  UseInterceptors,
+  UsePipes,
+} from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
 import type { Request } from "express";
 import { CurrentActor } from "../../../common/decorators/current-actor.decorator";
+import { toDocumentUpload } from "../../../common/multipart/document-upload.util";
 import { Public } from "../../../common/decorators/public.decorator";
 import { ZodValidationPipe } from "../../../common/pipes/zod-validation.pipe";
 import { OrganizationsService } from "./organizations.service";
@@ -26,14 +42,31 @@ function requestId(req: Request): string | null {
 export class OrganizationsController {
   constructor(private readonly organizationsService: OrganizationsService) {}
 
+  /** Multipart on purpose — the mandatory minimum verification document is submitted in
+   * the same call as registration, not a separate post-registration step. */
   @Public()
   @Post("register")
-  @UsePipes(new ZodValidationPipe(RegisterOrganizationRequestSchema))
+  @UseInterceptors(FileInterceptor("file", { limits: { fileSize: MAX_DOCUMENT_SIZE_BYTES } }))
+  @UsePipes(new ZodValidationPipe(RegisterOrganizationWithDocumentSchema))
   register(
-    @Body() body: RegisterOrganizationRequest,
+    @Body() body: RegisterOrganizationWithDocumentRequest,
+    @UploadedFile() file: Express.Multer.File | undefined,
     @Req() req: Request,
   ): Promise<OrganizationResponse> {
-    return this.organizationsService.register(body, requestId(req));
+    return this.organizationsService.register(body, toDocumentUpload(file, body.documentType), requestId(req));
+  }
+
+  /** Self-service join request for an organization already registered under the
+   * requester's email domain — no invite token, membership starts PENDING_APPROVAL. */
+  @Public()
+  @Post(":id/join-requests")
+  @UsePipes(new ZodValidationPipe(JoinOrganizationRequestSchema))
+  joinRequest(
+    @Param("id") id: string,
+    @Body() body: JoinOrganizationRequest,
+    @Req() req: Request,
+  ): Promise<OrganizationMemberResponse> {
+    return this.organizationsService.joinRequest(id, body, requestId(req));
   }
 
   @Get()
@@ -47,6 +80,14 @@ export class OrganizationsController {
     @Param("id") id: string,
   ): Promise<OrganizationResponse> {
     return this.organizationsService.getById(actor, id);
+  }
+
+  @Get(":id/members")
+  listMembers(
+    @CurrentActor() actor: ActorContext,
+    @Param("id") id: string,
+  ): Promise<OrganizationMemberResponse[]> {
+    return this.organizationsService.listMembers(actor, id);
   }
 
   @Post(":id/members/invitations")
