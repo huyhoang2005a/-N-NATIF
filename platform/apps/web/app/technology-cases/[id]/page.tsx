@@ -3,10 +3,12 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import { Plus, UserPlus } from "lucide-react";
 import type {
   AssessmentCriterionResponse,
   AssessmentScoreResponse,
   CaseMemberResponse,
+  CaseOrganizationResponse,
   EvidenceResponse,
   GapResponse,
   MeResponse,
@@ -20,6 +22,8 @@ import { ApiError, authFetch, SessionExpiredError } from "../../../lib/api-clien
 import { describeErrorCode } from "../../../lib/error-messages";
 import {
   ASSESSMENT_STATUS_LABELS,
+  CASE_MEMBER_ROLE_LABELS,
+  CASE_ORGANIZATION_ROLE_LABELS,
   GAP_SEVERITY_LABELS,
   MILESTONE_STATUS_LABELS,
   PLATFORM_ROLE_LABELS,
@@ -34,9 +38,12 @@ import {
   MILESTONE_STATUS_TONE,
   TECHNOLOGY_CASE_STATUS_TONE,
 } from "../../../lib/tone";
-import { BackLink, Card, PrimaryButton, Shell, StatusDot, StatusPill, Tabs, TextField } from "../../../components/ui";
+import { BackLink, Card, GhostButton, PrimaryButton, SelectField, Shell, StatusDot, StatusPill, Tabs, TextField } from "../../../components/ui";
 
 const TABS = ["Tổng quan", "Bằng chứng", "Đánh giá", "Gap", "Lộ trình"] as const;
+const CASE_MEMBER_ROLES = Object.keys(CASE_MEMBER_ROLE_LABELS);
+const CASE_ORGANIZATION_ROLES = Object.keys(CASE_ORGANIZATION_ROLE_LABELS).filter((role) => role !== "OWNING_ORGANIZATION");
+const TECHNOLOGY_CASE_STATUSES = Object.keys(TECHNOLOGY_CASE_STATUS_LABELS);
 
 export default function TechnologyCaseDetailPage() {
   const router = useRouter();
@@ -48,6 +55,7 @@ export default function TechnologyCaseDetailPage() {
   const [technologyCase, setTechnologyCase] = useState<TechnologyCaseResponse | null>(null);
   const [owningOrg, setOwningOrg] = useState<OrganizationResponse | null>(null);
   const [members, setMembers] = useState<CaseMemberResponse[] | null>(null);
+  const [caseOrganizations, setCaseOrganizations] = useState<CaseOrganizationResponse[] | null>(null);
   const [evidence, setEvidence] = useState<EvidenceResponse[] | null>(null);
   const [assessments, setAssessments] = useState<ReadinessAssessmentResponse[] | null>(null);
   const [criteria, setCriteria] = useState<AssessmentCriterionResponse[]>([]);
@@ -75,9 +83,10 @@ export default function TechnologyCaseDetailPage() {
       authFetch<OrganizationResponse[]>("/organizations"),
     ]);
     const tc = await authFetch<TechnologyCaseResponse>(`/technology-cases/${caseId}`);
-    const [org, memberRows, evidenceRows, assessmentRows, gapRows, roadmapRows] = await Promise.all([
+    const [org, memberRows, caseOrgRows, evidenceRows, assessmentRows, gapRows, roadmapRows] = await Promise.all([
       authFetch<OrganizationResponse>(`/organizations/${tc.owningOrganizationId}`),
       authFetch<CaseMemberResponse[]>(`/technology-cases/${caseId}/members`),
+      authFetch<CaseOrganizationResponse[]>(`/technology-cases/${caseId}/organizations`),
       authFetch<EvidenceResponse[]>(`/technology-cases/${caseId}/evidence`),
       authFetch<ReadinessAssessmentResponse[]>(`/technology-cases/${caseId}/assessments`),
       authFetch<GapResponse[]>(`/technology-cases/${caseId}/gaps`),
@@ -100,6 +109,7 @@ export default function TechnologyCaseDetailPage() {
     setTechnologyCase(tc);
     setOwningOrg(org);
     setMembers(memberRows);
+    setCaseOrganizations(caseOrgRows);
     setEvidence(evidenceRows);
     setAssessments(assessmentRows);
     setCriteria(criterionRows);
@@ -169,6 +179,40 @@ export default function TechnologyCaseDetailPage() {
     });
   }
 
+  // ---------- quản trị case (nâng cao) ----------
+  const [memberForm, setMemberForm] = useState({ userId: "", organizationId: "", role: CASE_MEMBER_ROLES[0] ?? "" });
+
+  function onAddMember() {
+    return runAction("add-member", async () => {
+      await authFetch(`/technology-cases/${caseId}/members`, { method: "POST", body: JSON.stringify(memberForm) });
+      setMemberForm({ userId: "", organizationId: "", role: CASE_MEMBER_ROLES[0] ?? "" });
+      await load();
+    });
+  }
+
+  const [orgForm, setOrgForm] = useState({ organizationId: "", role: CASE_ORGANIZATION_ROLES[0] ?? "" });
+
+  function onAddOrganization() {
+    return runAction("add-org", async () => {
+      await authFetch(`/technology-cases/${caseId}/organizations`, { method: "POST", body: JSON.stringify(orgForm) });
+      setOrgForm({ organizationId: "", role: CASE_ORGANIZATION_ROLES[0] ?? "" });
+      await load();
+    });
+  }
+
+  const [transitionStatus, setTransitionStatus] = useState(TECHNOLOGY_CASE_STATUSES[1] ?? "");
+  const [transitionReason, setTransitionReason] = useState("");
+
+  function onTransition() {
+    return runAction("transition", async () => {
+      await authFetch(`/technology-cases/${caseId}/transitions`, {
+        method: "POST",
+        body: JSON.stringify({ toStatus: transitionStatus, reason: transitionReason || undefined }),
+      });
+      await load();
+    });
+  }
+
   if (!me || !myOrganizations) {
     if (loadError) {
       return (
@@ -195,7 +239,7 @@ export default function TechnologyCaseDetailPage() {
     );
   }
 
-  if (!technologyCase || !owningOrg || !members || !evidence || !assessments || !gaps || !roadmaps) {
+  if (!technologyCase || !owningOrg || !members || !caseOrganizations || !evidence || !assessments || !gaps || !roadmaps) {
     return (
       <Shell brandLabel="R2M" me={me} roleLabel={roleLabel} nav={nav}>
         {null}
@@ -445,6 +489,111 @@ export default function TechnologyCaseDetailPage() {
             )}
           </Card>
         )}
+
+        <details className="uikit-disclosure">
+          <summary>Quản trị case (nâng cao)</summary>
+          <div className="uikit-disclosure__body uikit-stack">
+            <Card>
+              <h2 style={{ fontSize: 14, fontWeight: 600, marginBottom: "var(--space-3)" }}>Thành viên ({members.length})</h2>
+              {members.length === 0 ? (
+                <p className="uikit-empty">Chưa có thành viên nào.</p>
+              ) : (
+                <div className="uikit-row-list">
+                  {members.map((m) => (
+                    <div key={m.id} className="uikit-row">
+                      <span style={{ fontFamily: "var(--font-mono)", fontSize: 13 }}>{m.userId.slice(0, 8)}</span>
+                      <span style={{ fontSize: 13, color: "var(--uikit-slate-500)" }}>{CASE_MEMBER_ROLE_LABELS[m.role] ?? m.role}</span>
+                      <StatusPill tone={m.status === "ACTIVE" ? "green" : "gray"}>{m.status}</StatusPill>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="uikit-stack" style={{ marginTop: "var(--space-4)" }}>
+                <TextField label="User ID" hint="UUID người dùng" value={memberForm.userId} onChange={(e) => setMemberForm({ ...memberForm, userId: e.target.value })} />
+                <TextField
+                  label="Organization ID"
+                  hint="UUID tổ chức của người này"
+                  value={memberForm.organizationId}
+                  onChange={(e) => setMemberForm({ ...memberForm, organizationId: e.target.value })}
+                />
+                <SelectField
+                  label="Vai trò"
+                  value={memberForm.role}
+                  onChange={(e) => setMemberForm({ ...memberForm, role: e.target.value })}
+                  options={CASE_MEMBER_ROLES.map((r) => ({ value: r, label: CASE_MEMBER_ROLE_LABELS[r] ?? r }))}
+                />
+              </div>
+              <GhostButton
+                icon={UserPlus}
+                disabled={busyKey === "add-member" || !memberForm.userId || !memberForm.organizationId}
+                onClick={onAddMember}
+                className="uikit-mt-4"
+              >
+                {busyKey === "add-member" ? "Đang thêm…" : "Thêm thành viên"}
+              </GhostButton>
+            </Card>
+
+            <Card>
+              <h2 style={{ fontSize: 14, fontWeight: 600, marginBottom: "var(--space-3)" }}>
+                Tổ chức liên kết ({caseOrganizations.length})
+              </h2>
+              {caseOrganizations.length === 0 ? (
+                <p className="uikit-empty">Chưa có tổ chức liên kết nào ngoài tổ chức chủ trì.</p>
+              ) : (
+                <div className="uikit-row-list">
+                  {caseOrganizations.map((o) => (
+                    <div key={o.id} className="uikit-row">
+                      <span style={{ fontFamily: "var(--font-mono)", fontSize: 13 }}>{o.organizationId.slice(0, 8)}</span>
+                      <span style={{ fontSize: 13, color: "var(--uikit-slate-500)" }}>{CASE_ORGANIZATION_ROLE_LABELS[o.role] ?? o.role}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="uikit-stack" style={{ marginTop: "var(--space-4)" }}>
+                <TextField
+                  label="Organization ID"
+                  hint="UUID tổ chức"
+                  value={orgForm.organizationId}
+                  onChange={(e) => setOrgForm({ ...orgForm, organizationId: e.target.value })}
+                />
+                <SelectField
+                  label="Vai trò"
+                  value={orgForm.role}
+                  onChange={(e) => setOrgForm({ ...orgForm, role: e.target.value })}
+                  options={CASE_ORGANIZATION_ROLES.map((r) => ({ value: r, label: CASE_ORGANIZATION_ROLE_LABELS[r] ?? r }))}
+                />
+              </div>
+              <GhostButton
+                icon={Plus}
+                disabled={busyKey === "add-org" || !orgForm.organizationId}
+                onClick={onAddOrganization}
+                className="uikit-mt-4"
+              >
+                {busyKey === "add-org" ? "Đang liên kết…" : "Liên kết tổ chức"}
+              </GhostButton>
+            </Card>
+
+            <Card>
+              <h2 style={{ fontSize: 14, fontWeight: 600, marginBottom: "var(--space-2)" }}>Chuyển trạng thái thủ công</h2>
+              <p style={{ fontSize: 13, color: "var(--uikit-slate-500)" }}>
+                Hầu hết trạng thái case tự chuyển khi có evidence/đánh giá/gap/roadmap mới. Chỉ
+                dùng mục này khi thật sự cần can thiệp thủ công.
+              </p>
+              <div className="uikit-stack" style={{ marginTop: "var(--space-4)" }}>
+                <SelectField
+                  label="Trạng thái đích"
+                  value={transitionStatus}
+                  onChange={(e) => setTransitionStatus(e.target.value)}
+                  options={TECHNOLOGY_CASE_STATUSES.map((s) => ({ value: s, label: TECHNOLOGY_CASE_STATUS_LABELS[s] ?? s }))}
+                />
+                <TextField label="Lý do" optional value={transitionReason} onChange={(e) => setTransitionReason(e.target.value)} />
+              </div>
+              <GhostButton disabled={busyKey === "transition"} onClick={onTransition} className="uikit-mt-4">
+                {busyKey === "transition" ? "Đang chuyển…" : "Chuyển trạng thái"}
+              </GhostButton>
+            </Card>
+          </div>
+        </details>
       </div>
     </Shell>
   );

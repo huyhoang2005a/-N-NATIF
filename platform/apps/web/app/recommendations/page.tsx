@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Sparkles } from "lucide-react";
 import type { MeResponse, OrganizationResponse } from "@r2m/contracts";
 import { authFetch, SessionExpiredError } from "../../lib/api-client";
 import { PLATFORM_ROLE_LABELS } from "../../lib/labels";
@@ -37,6 +38,7 @@ export default function RecommendationsPage() {
     <SoonPage
       title="Gợi ý công nghệ"
       description="Gợi ý công nghệ tự động theo nhu cầu nghiên cứu, dựa trên đối sánh ngữ nghĩa, đang được phát triển (Phase 5)."
+      icon={Sparkles}
       me={me}
       roleLabel={PLATFORM_ROLE_LABELS[me.platformRole] ?? me.platformRole}
       nav={navForPersona(persona, me.platformRole === "PLATFORM_ADMIN")}

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Users } from "lucide-react";
 import type { MeResponse } from "@r2m/contracts";
 import { authFetch, SessionExpiredError } from "../../../lib/api-client";
 import { PLATFORM_ROLE_LABELS } from "../../../lib/labels";
@@ -37,6 +38,7 @@ export default function AdminUsersPage() {
     <SoonPage
       title="Người dùng"
       description="Danh mục toàn bộ người dùng trên nền tảng đang được phát triển — hiện chưa có endpoint tra cứu người dùng khác ngoài chính bạn."
+      icon={Users}
       me={me}
       roleLabel={PLATFORM_ROLE_LABELS[me.platformRole] ?? me.platformRole}
       nav={navForPersona("platform-ops", true)}

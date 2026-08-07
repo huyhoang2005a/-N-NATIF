@@ -1,3 +1,19 @@
+import {
+  Bell,
+  Building2,
+  ClipboardCheck,
+  Database,
+  FolderOpen,
+  Flag,
+  LayoutDashboard,
+  Send,
+  ShieldCheck,
+  Sparkles,
+  Target,
+  User,
+  UserCheck,
+  Users,
+} from "lucide-react";
 import type { MeResponse, OrganizationResponse } from "@r2m/contracts";
 import type { ShellNavItem } from "../components/ui";
 
@@ -20,35 +36,35 @@ export function personaOf(me: MeResponse, organizations: OrganizationResponse[])
 }
 
 export const AUTHOR_NAV: ShellNavItem[] = [
-  { label: "Tổng quan", href: "/dashboard" },
-  { label: "Tài nguyên", href: "/resources" },
-  { label: "Case của tôi", href: "/technology-cases" },
-  { label: "Đề xuất", href: "/proposals" },
-  { label: "Thông báo", href: "/notifications" },
-  { label: "Hồ sơ", href: "/profile" },
+  { label: "Tổng quan", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Tài nguyên", href: "/resources", icon: Database },
+  { label: "Case của tôi", href: "/technology-cases", icon: FolderOpen },
+  { label: "Đề xuất", href: "/proposals", icon: Send },
+  { label: "Thông báo", href: "/notifications", icon: Bell },
+  { label: "Hồ sơ", href: "/profile", icon: User },
 ];
 
 export const COMPANY_NAV: ShellNavItem[] = [
-  { label: "Tổng quan", href: "/dashboard" },
-  { label: "Nhu cầu nghiên cứu", href: "/needs" },
-  { label: "Gợi ý công nghệ", href: "/recommendations" },
-  { label: "Đề xuất nhận được", href: "/proposals-received" },
-  { label: "Case của tôi", href: "/technology-cases" },
-  { label: "Hồ sơ", href: "/profile" },
+  { label: "Tổng quan", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Nhu cầu nghiên cứu", href: "/needs", icon: Target },
+  { label: "Gợi ý công nghệ", href: "/recommendations", icon: Sparkles },
+  { label: "Đề xuất nhận được", href: "/proposals-received", icon: Send },
+  { label: "Case của tôi", href: "/technology-cases", icon: FolderOpen },
+  { label: "Hồ sơ", href: "/profile", icon: User },
 ];
 
 const PLATFORM_OPS_NAV_BASE: ShellNavItem[] = [
-  { label: "Tổng quan", href: "/dashboard" },
-  { label: "Xác minh tổ chức", href: "/platform/organization-verifications" },
-  { label: "Xác minh tác giả", href: "/platform/author-verifications" },
-  { label: "Duyệt đánh giá & lộ trình", href: "/platform/reviews" },
-  { label: "Kiểm duyệt", href: "/platform/flags" },
-  { label: "Hồ sơ", href: "/profile" },
+  { label: "Tổng quan", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Xác minh tổ chức", href: "/platform/organization-verifications", icon: ShieldCheck },
+  { label: "Xác minh tác giả", href: "/platform/author-verifications", icon: UserCheck },
+  { label: "Duyệt đánh giá & lộ trình", href: "/platform/reviews", icon: ClipboardCheck },
+  { label: "Kiểm duyệt", href: "/platform/flags", icon: Flag },
+  { label: "Hồ sơ", href: "/profile", icon: User },
 ];
 
 const PLATFORM_ADMIN_EXTRA_NAV: ShellNavItem[] = [
-  { label: "Tổ chức", href: "/platform/organizations" },
-  { label: "Người dùng", href: "/platform/users" },
+  { label: "Tổ chức", href: "/platform/organizations", icon: Building2 },
+  { label: "Người dùng", href: "/platform/users", icon: Users },
 ];
 
 /** Admin có thêm 2 mục quản trị tổ chức/người dùng so với reviewer — cả 2 mục

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Flag } from "lucide-react";
 import type { MeResponse } from "@r2m/contracts";
 import { authFetch, SessionExpiredError } from "../../../lib/api-client";
 import { PLATFORM_ROLE_LABELS } from "../../../lib/labels";
@@ -37,6 +38,7 @@ export default function FlagsPage() {
     <SoonPage
       title="Kiểm duyệt nội dung"
       description="Tính năng gắn cờ và xử lý nội dung vi phạm đang được phát triển."
+      icon={Flag}
       me={me}
       roleLabel={PLATFORM_ROLE_LABELS[me.platformRole] ?? me.platformRole}
       nav={navForPersona("platform-ops", me.platformRole === "PLATFORM_ADMIN")}

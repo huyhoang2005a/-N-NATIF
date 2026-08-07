@@ -3,6 +3,18 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import {
+  Building2,
+  ClipboardCheck,
+  Database,
+  Flag,
+  FolderOpen,
+  Send,
+  ShieldCheck,
+  Sparkles,
+  Target,
+  type LucideIcon,
+} from "lucide-react";
 import type {
   AuthorVerificationRequestResponse,
   MeResponse,
@@ -106,9 +118,9 @@ function AuthorDashboardBody({ me, organizations }: { me: MeResponse; organizati
       </div>
 
       <div className="uikit-card-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
-        <StatCard label="Case đang theo dõi" value={cases.length} tone="indigo" />
-        <StatCard label="Tài nguyên đã đăng" value={resources.length} tone="slate" />
-        <SoonStatTile label="Đề xuất chờ phản hồi" />
+        <StatCard label="Case đang theo dõi" value={cases.length} icon={FolderOpen} tone="indigo" />
+        <StatCard label="Tài nguyên đã đăng" value={resources.length} icon={Database} tone="slate" />
+        <SoonStatTile label="Đề xuất chờ phản hồi" icon={Send} />
       </div>
 
       <Card>
@@ -186,9 +198,9 @@ function CompanyDashboardBody({ me, organizations }: { me: MeResponse; organizat
       </div>
 
       <div className="uikit-card-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
-        <SoonStatTile label="Nhu cầu đang mở" />
-        <SoonStatTile label="Gợi ý công nghệ mới" />
-        <StatCard label="Case đang hợp tác" value={cases.length} tone="slate" />
+        <SoonStatTile label="Nhu cầu đang mở" icon={Target} />
+        <SoonStatTile label="Gợi ý công nghệ mới" icon={Sparkles} />
+        <StatCard label="Case đang hợp tác" value={cases.length} icon={FolderOpen} tone="slate" />
       </div>
 
       <Card>
@@ -285,11 +297,11 @@ function PlatformOpsDashboardBody({ isAdmin }: { isAdmin: boolean }) {
       </div>
 
       <div className="uikit-card-grid" style={{ gridTemplateColumns: `repeat(${isAdmin ? 4 : 3}, 1fr)` }}>
-        {isAdmin && <SoonStatTile label="Tổ chức hoạt động" />}
-        {isAdmin && <SoonStatTile label="Case đang xử lý" />}
-        <StatCard label="Chờ xác minh" value={pendingOrg.length + pendingAuthor.length} tone="amber" />
-        <StatCard label="Đánh giá & lộ trình chờ duyệt" value={reviewQueue.length} tone="indigo" />
-        <SoonStatTile label="Nội dung bị gắn cờ" />
+        {isAdmin && <SoonStatTile label="Tổ chức hoạt động" icon={Building2} />}
+        {isAdmin && <SoonStatTile label="Case đang xử lý" icon={FolderOpen} />}
+        <StatCard label="Chờ xác minh" value={pendingOrg.length + pendingAuthor.length} icon={ShieldCheck} tone="amber" />
+        <StatCard label="Đánh giá & lộ trình chờ duyệt" value={reviewQueue.length} icon={ClipboardCheck} tone="indigo" />
+        <SoonStatTile label="Nội dung bị gắn cờ" icon={Flag} />
       </div>
 
       <Card>
@@ -334,10 +346,12 @@ function PlatformOpsDashboardBody({ isAdmin }: { isAdmin: boolean }) {
   );
 }
 
-function SoonStatTile({ label }: { label: string }) {
+function SoonStatTile({ label, icon: Icon }: { label: string; icon: LucideIcon }) {
   return (
     <div className="uikit-card uikit-statcard" style={{ opacity: 0.6 }}>
-      <div className="uikit-statcard__icon uikit-statcard__icon--amber" aria-hidden="true" />
+      <div className="uikit-statcard__icon uikit-statcard__icon--amber">
+        <Icon aria-hidden="true" />
+      </div>
       <div>
         <p className="uikit-statcard__value">—</p>
         <p className="uikit-statcard__label">{label}</p>

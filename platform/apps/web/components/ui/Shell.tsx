@@ -1,8 +1,10 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { Bell, LogOut, Search } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import type { MeResponse } from "@r2m/contracts";
 import { apiFetch } from "../../lib/api-client";
 import { clearTokens } from "../../lib/session";
@@ -11,6 +13,7 @@ import { BrandMark } from "./BrandMark";
 export interface ShellNavItem {
   label: string;
   href: string;
+  icon: LucideIcon;
 }
 
 /** Khung ứng dụng nội bộ (sidebar + top bar) dùng ở mọi trang đã đăng nhập.
@@ -32,6 +35,7 @@ export function Shell({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [searchTerm, setSearchTerm] = useState("");
 
   async function onLogout() {
     try {
@@ -43,6 +47,20 @@ export function Shell({
     router.push("/login");
   }
 
+  function onSearchSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    const term = searchTerm.trim();
+    router.push(term ? `/resources?q=${encodeURIComponent(term)}` : "/resources");
+  }
+
+  const initials = me.displayName
+    .split(" ")
+    .filter(Boolean)
+    .slice(-2)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase();
+
   return (
     <div className="uikit-shell">
       <aside className="uikit-sidebar">
@@ -53,12 +71,14 @@ export function Shell({
         <nav className="uikit-sidebar__nav">
           {nav.map((item) => {
             const active = pathname === item.href || pathname?.startsWith(`${item.href}/`);
+            const Icon = item.icon;
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 className={`uikit-sidebar__link ${active ? "uikit-sidebar__link--active" : ""}`}
               >
+                <Icon className="uikit-sidebar__icon" aria-hidden="true" />
                 {item.label}
               </Link>
             );
@@ -67,11 +87,28 @@ export function Shell({
       </aside>
       <div className="uikit-shell__main">
         <div className="uikit-topbar">
-          <span className="uikit-topbar__role">{roleLabel}</span>
-          <span className="uikit-topbar__user">{me.displayName}</span>
-          <button type="button" className="uikit-topbar__logout" onClick={onLogout}>
-            Đăng xuất
-          </button>
+          <form onSubmit={onSearchSubmit} className="uikit-search">
+            <Search className="uikit-search__icon" aria-hidden="true" />
+            <input
+              type="search"
+              placeholder="Tìm tài nguyên..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </form>
+          <div className="uikit-topbar__right">
+            <span className="uikit-topbar__role">{roleLabel}</span>
+            <Link href="/notifications" className="uikit-topbar__icon-btn" aria-label="Thông báo" title="Thông báo">
+              <Bell aria-hidden="true" />
+            </Link>
+            <span className="uikit-topbar__user">{me.displayName}</span>
+            <div className="uikit-avatar" aria-hidden="true">
+              {initials || "?"}
+            </div>
+            <button type="button" className="uikit-topbar__logout" onClick={onLogout} title="Đăng xuất">
+              <LogOut aria-hidden="true" />
+            </button>
+          </div>
         </div>
         <main className="uikit-main">{children}</main>
       </div>

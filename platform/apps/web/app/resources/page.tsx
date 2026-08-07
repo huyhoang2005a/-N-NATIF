@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Plus } from "lucide-react";
 import type { MeResponse, OrganizationResponse, ResourceResponse } from "@r2m/contracts";
 import { authFetch, SessionExpiredError } from "../../lib/api-client";
 import { PLATFORM_ROLE_LABELS, RESOURCE_ACCESS_LEVEL_LABELS, RESOURCE_TYPE_LABELS } from "../../lib/labels";
@@ -10,7 +12,17 @@ import { getAccessToken } from "../../lib/session";
 import { Card, PrimaryButtonLink, Shell } from "../../components/ui";
 
 export default function ResourcesPage() {
+  return (
+    <Suspense fallback={null}>
+      <ResourcesPageInner />
+    </Suspense>
+  );
+}
+
+function ResourcesPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const q = searchParams.get("q") ?? "";
   const [me, setMe] = useState<MeResponse | null>(null);
   const [organizations, setOrganizations] = useState<OrganizationResponse[] | null>(null);
   const [resources, setResources] = useState<ResourceResponse[] | null>(null);
@@ -21,15 +33,16 @@ export default function ResourcesPage() {
       router.push("/login");
       return;
     }
+    const resourcePath = q ? `/resources?q=${encodeURIComponent(q)}` : "/resources";
     Promise.all([
       authFetch<MeResponse>("/me"),
       authFetch<OrganizationResponse[]>("/organizations"),
-      authFetch<ResourceResponse[]>("/resources"),
+      authFetch<ResourceResponse[]>(resourcePath),
     ])
       .then(([meResponse, orgs, rows]) => {
         setMe(meResponse);
         setOrganizations(orgs);
-        setResources(rows.filter((r) => r.createdByUserId === meResponse.userId));
+        setResources(q ? rows : rows.filter((r) => r.createdByUserId === meResponse.userId));
       })
       .catch((err) => {
         if (err instanceof SessionExpiredError) {
@@ -38,7 +51,7 @@ export default function ResourcesPage() {
         }
         setError("Không tải được danh sách tài nguyên.");
       });
-  }, [router]);
+  }, [router, q]);
 
   if (error) {
     return (
@@ -58,15 +71,18 @@ export default function ResourcesPage() {
     <Shell brandLabel="R2M" me={me} roleLabel={PLATFORM_ROLE_LABELS[me.platformRole] ?? me.platformRole} nav={nav}>
       <div className="uikit-stack">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <h1 style={{ fontSize: 22 }}>Tài nguyên của tôi</h1>
-          <PrimaryButtonLink href="/resources/new">+ Đăng tài nguyên mới</PrimaryButtonLink>
+          <h1 style={{ fontSize: 22 }}>{q ? `Kết quả tìm kiếm: "${q}"` : "Tài nguyên của tôi"}</h1>
+          <PrimaryButtonLink href="/resources/new" icon={Plus}>
+            Đăng tài nguyên mới
+          </PrimaryButtonLink>
         </div>
 
         <Card>
           {resources.length === 0 ? (
             <p className="uikit-empty">
-              Chưa có tài nguyên nào. Đăng bài báo, bộ dữ liệu, mô hình hay kết quả thực
-              nghiệm đầu tiên để làm bằng chứng cho các technology case sau này.
+              {q
+                ? `Không tìm thấy tài nguyên nào khớp với "${q}".`
+                : "Chưa có tài nguyên nào. Đăng bài báo, bộ dữ liệu, mô hình hay kết quả thực nghiệm đầu tiên để làm bằng chứng cho các technology case sau này."}
             </p>
           ) : (
             <table className="uikit-table">
@@ -80,7 +96,11 @@ export default function ResourcesPage() {
               <tbody>
                 {resources.map((r) => (
                   <tr key={r.id}>
-                    <td style={{ color: "var(--uikit-slate-900)" }}>{r.title}</td>
+                    <td>
+                      <Link href={`/resources/${r.id}`} style={{ color: "var(--uikit-indigo-700)", fontWeight: 500, textDecoration: "none" }}>
+                        {r.title}
+                      </Link>
+                    </td>
                     <td style={{ color: "var(--uikit-slate-500)" }}>{RESOURCE_TYPE_LABELS[r.type] ?? r.type}</td>
                     <td style={{ color: "var(--uikit-slate-500)" }}>
                       {RESOURCE_ACCESS_LEVEL_LABELS[r.accessLevel] ?? r.accessLevel}

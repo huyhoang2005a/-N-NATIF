@@ -2,9 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { ChevronDown, ChevronRight, Link2, Plus, Send } from "lucide-react";
 import type {
   GapResponse,
+  MeResponse,
   MilestoneDependencyResponse,
+  OrganizationResponse,
   RoadmapMilestoneResponse,
   RoadmapResponse,
   RoadmapReviewResponse,
@@ -16,18 +19,22 @@ import {
   DEPENDENCY_TYPE_LABELS,
   GAP_SEVERITY_LABELS,
   MILESTONE_STATUS_LABELS,
+  PLATFORM_ROLE_LABELS,
   PRIORITY_LEVEL_LABELS,
   ROADMAP_REVIEW_DECISION_LABELS,
   ROADMAP_STATUS_LABELS,
   TASK_STATUS_LABELS,
-  gapSeverityBadgeClass,
-  milestoneStatusBadgeClass,
-  roadmapStatusBadgeClass,
-  taskStatusBadgeClass,
 } from "../../../lib/labels";
+import { navForPersona, personaOf } from "../../../lib/nav";
 import { getAccessToken } from "../../../lib/session";
-import { FormField } from "../../_components/FormField";
-import { SiteHeader } from "../../_components/SiteHeader";
+import {
+  toneOf,
+  GAP_SEVERITY_TONE,
+  MILESTONE_STATUS_TONE,
+  ROADMAP_STATUS_TONE,
+  TASK_STATUS_TONE,
+} from "../../../lib/tone";
+import { Card, GhostButton, PrimaryButton, SelectField, Shell, StatusPill, TextField } from "../../../components/ui";
 
 const PRIORITY_LEVELS = Object.keys(PRIORITY_LEVEL_LABELS);
 const DEPENDENCY_TYPES = Object.keys(DEPENDENCY_TYPE_LABELS);
@@ -38,6 +45,8 @@ export default function RoadmapDetailPage() {
   const params = useParams<{ id: string }>();
   const roadmapId = params.id;
 
+  const [me, setMe] = useState<MeResponse | null>(null);
+  const [organizations, setOrganizations] = useState<OrganizationResponse[] | null>(null);
   const [roadmap, setRoadmap] = useState<RoadmapResponse | null>(null);
   const [milestones, setMilestones] = useState<RoadmapMilestoneResponse[] | null>(null);
   const [dependencies, setDependencies] = useState<MilestoneDependencyResponse[] | null>(null);
@@ -53,13 +62,19 @@ export default function RoadmapDetailPage() {
   const [milestoneGaps, setMilestoneGaps] = useState<Record<string, GapResponse[]>>({});
 
   async function load() {
-    const r = await authFetch<RoadmapResponse>(`/roadmaps/${roadmapId}`);
+    const [meResponse, myOrgs, r] = await Promise.all([
+      authFetch<MeResponse>("/me"),
+      authFetch<OrganizationResponse[]>("/organizations"),
+      authFetch<RoadmapResponse>(`/roadmaps/${roadmapId}`),
+    ]);
     const [milestoneRows, dependencyRows, reviewRows, gapRows] = await Promise.all([
       authFetch<RoadmapMilestoneResponse[]>(`/roadmaps/${roadmapId}/milestones`),
       authFetch<MilestoneDependencyResponse[]>(`/roadmaps/${roadmapId}/dependencies`),
       authFetch<RoadmapReviewResponse[]>(`/roadmaps/${roadmapId}/reviews`),
       authFetch<GapResponse[]>(`/technology-cases/${r.technologyCaseId}/gaps`),
     ]);
+    setMe(meResponse);
+    setOrganizations(myOrgs);
     setRoadmap(r);
     setMilestones(milestoneRows);
     setDependencies(dependencyRows);
@@ -235,196 +250,207 @@ export default function RoadmapDetailPage() {
     return milestones?.find((m) => m.id === id)?.title ?? id.slice(0, 8);
   }
 
-  if (loadError) {
-    return (
-      <div className="shell">
-        <SiteHeader />
-        <div className="container" style={{ padding: "var(--space-6) var(--space-5) var(--space-9)" }}>
-          <p className="alert alert-error" role="alert">
+  if (!me || !organizations) {
+    if (loadError) {
+      return (
+        <div className="uikit-main" style={{ maxWidth: 860, margin: "0 auto" }}>
+          <p className="uikit-alert-error" role="alert">
             {loadError}
           </p>
         </div>
-      </div>
+      );
+    }
+    return null;
+  }
+
+  const roleLabel = PLATFORM_ROLE_LABELS[me.platformRole] ?? me.platformRole;
+  const nav = navForPersona(personaOf(me, organizations), me.platformRole === "PLATFORM_ADMIN");
+
+  if (loadError) {
+    return (
+      <Shell brandLabel="R2M" me={me} roleLabel={roleLabel} nav={nav}>
+        <p className="uikit-alert-error" role="alert">
+          {loadError}
+        </p>
+      </Shell>
     );
   }
 
   if (!roadmap || !milestones || !dependencies || !reviews || !caseGaps) {
     return (
-      <div className="shell">
-        <SiteHeader />
-      </div>
+      <Shell brandLabel="R2M" me={me} roleLabel={roleLabel} nav={nav}>
+        {null}
+      </Shell>
     );
   }
 
   return (
-    <div className="shell">
-      <SiteHeader />
-      <div className="container" style={{ padding: "var(--space-6) var(--space-5) var(--space-9)", maxWidth: 860 }}>
-        <span className="eyebrow">Phase 4 · Roadmap</span>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-4)", marginTop: "var(--space-4)" }}>
-          <h1 style={{ fontSize: 30 }}>
+    <Shell brandLabel="R2M" me={me} roleLabel={roleLabel} nav={nav}>
+      <div className="uikit-stack" style={{ maxWidth: 800 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-4)" }}>
+          <h1 style={{ fontSize: 22 }}>
             {roadmap.title} · v{roadmap.versionNo}
           </h1>
-          <span className={roadmapStatusBadgeClass(roadmap.status)}>{ROADMAP_STATUS_LABELS[roadmap.status] ?? roadmap.status}</span>
+          <StatusPill tone={toneOf(ROADMAP_STATUS_TONE, roadmap.status)}>
+            {ROADMAP_STATUS_LABELS[roadmap.status] ?? roadmap.status}
+          </StatusPill>
         </div>
-        {roadmap.objective && <p style={{ marginTop: "var(--space-3)", fontSize: 14, color: "var(--ink-700)" }}>{roadmap.objective}</p>}
+        {roadmap.objective && <p style={{ fontSize: 14, color: "var(--uikit-slate-700)" }}>{roadmap.objective}</p>}
 
         {actionError && (
-          <p className="alert alert-error" role="alert" style={{ marginTop: "var(--space-5)" }}>
+          <p className="uikit-alert-error" role="alert">
             {actionError}
           </p>
         )}
 
         {roadmap.status === "DRAFT" && (
-          <div className="card" style={{ marginTop: "var(--space-6)" }}>
-            <span className="eyebrow">Nộp roadmap</span>
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={busyKey === "submit"}
-              onClick={onSubmitRoadmap}
-              style={{ marginTop: "var(--space-4)" }}
-            >
+          <Card>
+            <h2 style={{ fontSize: 14, fontWeight: 600, marginBottom: "var(--space-4)" }}>Nộp roadmap</h2>
+            <PrimaryButton icon={Send} disabled={busyKey === "submit"} onClick={onSubmitRoadmap}>
               {busyKey === "submit" ? "Đang nộp…" : "Nộp roadmap để duyệt"}
-            </button>
-          </div>
+            </PrimaryButton>
+          </Card>
         )}
 
         {roadmap.status === "IN_REVIEW" && (
-          <div className="card">
-            <span className="eyebrow">Review (chỉ CASE_REVIEWER)</span>
-            <div className="field-row" style={{ marginTop: "var(--space-4)" }}>
-              <FormField label="Quyết định">
-                <select value={reviewDecision} onChange={(e) => setReviewDecision(e.target.value)}>
-                  {REVIEW_DECISIONS.map((d) => (
-                    <option key={d} value={d}>
-                      {ROADMAP_REVIEW_DECISION_LABELS[d]}
-                    </option>
-                  ))}
-                </select>
-              </FormField>
+          <Card>
+            <h2 style={{ fontSize: 14, fontWeight: 600, marginBottom: "var(--space-4)" }}>Review (chỉ kiểm định viên của case)</h2>
+            <div className="uikit-stack">
+              <SelectField
+                label="Quyết định"
+                value={reviewDecision}
+                onChange={(e) => setReviewDecision(e.target.value)}
+                options={REVIEW_DECISIONS.map((d) => ({ value: d, label: ROADMAP_REVIEW_DECISION_LABELS[d] ?? d }))}
+              />
+              <TextField label="Ghi chú" as="textarea" optional value={reviewComment} onChange={(e) => setReviewComment(e.target.value)} />
             </div>
-            <FormField label="Ghi chú" optional>
-              <textarea rows={2} value={reviewComment} onChange={(e) => setReviewComment(e.target.value)} />
-            </FormField>
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={busyKey === "review"}
-              onClick={onReview}
-              style={{ marginTop: "var(--space-4)" }}
-            >
+            <PrimaryButton disabled={busyKey === "review"} onClick={onReview} style={{ marginTop: "var(--space-4)" }}>
               {busyKey === "review" ? "Đang gửi…" : "Gửi quyết định"}
-            </button>
-          </div>
+            </PrimaryButton>
+          </Card>
         )}
 
         {reviews.length > 0 && (
-          <div className="card">
-            <span className="eyebrow">Lịch sử review ({reviews.length})</span>
-            <div className="row-list" style={{ marginTop: "var(--space-4)" }}>
+          <Card>
+            <h2 style={{ fontSize: 14, fontWeight: 600, marginBottom: "var(--space-4)" }}>Lịch sử review ({reviews.length})</h2>
+            <div className="uikit-row-list">
               {reviews.map((rv) => (
-                <div key={rv.id} className="row-card">
+                <div key={rv.id} className="uikit-row">
                   <div>
-                    <strong>{ROADMAP_REVIEW_DECISION_LABELS[rv.decision] ?? rv.decision}</strong>
-                    {rv.comment && <p style={{ marginTop: "var(--space-1)", fontSize: 13, color: "var(--ink-400)" }}>{rv.comment}</p>}
+                    <p style={{ fontWeight: 500, fontSize: 14 }}>{ROADMAP_REVIEW_DECISION_LABELS[rv.decision] ?? rv.decision}</p>
+                    {rv.comment && <p style={{ marginTop: 2, fontSize: 13, color: "var(--uikit-slate-500)" }}>{rv.comment}</p>}
                   </div>
-                  <span style={{ fontSize: 12, color: "var(--ink-400)" }}>{new Date(rv.createdAt).toLocaleString("vi-VN")}</span>
+                  <span style={{ fontSize: 12, color: "var(--uikit-slate-400)" }}>{new Date(rv.createdAt).toLocaleString("vi-VN")}</span>
                 </div>
               ))}
             </div>
-          </div>
+          </Card>
         )}
 
         {/* ---------- milestones ---------- */}
-        <div className="card">
-          <span className="eyebrow">Milestone ({milestones.length})</span>
+        <Card>
+          <h2 style={{ fontSize: 14, fontWeight: 600, marginBottom: "var(--space-4)" }}>Milestone ({milestones.length})</h2>
           {milestones.length === 0 ? (
-            <p className="empty-state" style={{ marginTop: "var(--space-4)" }}>
-              Chưa có milestone nào.
-            </p>
+            <p className="uikit-empty">Chưa có milestone nào.</p>
           ) : (
-            <div className="row-list" style={{ marginTop: "var(--space-4)" }}>
+            <div className="uikit-stack">
               {milestones.map((m) => {
                 const expanded = expandedMilestoneId === m.id;
                 return (
-                  <div key={m.id} className="row-card" style={{ flexDirection: "column", alignItems: "stretch" }}>
-                    <div
-                      style={{ display: "flex", justifyContent: "space-between", gap: "var(--space-4)", cursor: "pointer" }}
+                  <div key={m.id} style={{ border: "1px solid var(--uikit-slate-200)", borderRadius: "var(--radius-sm)", padding: "var(--space-4)" }}>
+                    <button
+                      type="button"
                       onClick={() => toggleMilestone(m.id)}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: "var(--space-4)",
+                        width: "100%",
+                        background: "none",
+                        border: "none",
+                        padding: 0,
+                        cursor: "pointer",
+                        textAlign: "left",
+                        font: "inherit",
+                        color: "inherit",
+                      }}
                     >
-                      <div>
-                        <strong>{m.title}</strong>
-                        <p style={{ marginTop: "var(--space-1)", fontSize: 13, color: "var(--ink-400)" }}>
-                          {PRIORITY_LEVEL_LABELS[m.priority] ?? m.priority}
-                        </p>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        {expanded ? <ChevronDown style={{ width: 16, height: 16, color: "var(--uikit-slate-400)" }} /> : <ChevronRight style={{ width: 16, height: 16, color: "var(--uikit-slate-400)" }} />}
+                        <div>
+                          <p style={{ fontWeight: 600, fontSize: 14 }}>{m.title}</p>
+                          <p style={{ marginTop: 2, fontSize: 13, color: "var(--uikit-slate-500)" }}>
+                            {PRIORITY_LEVEL_LABELS[m.priority] ?? m.priority}
+                          </p>
+                        </div>
                       </div>
-                      <span className={milestoneStatusBadgeClass(m.status)}>{MILESTONE_STATUS_LABELS[m.status] ?? m.status}</span>
-                    </div>
+                      <StatusPill tone={toneOf(MILESTONE_STATUS_TONE, m.status)}>
+                        {MILESTONE_STATUS_LABELS[m.status] ?? m.status}
+                      </StatusPill>
+                    </button>
 
                     {expanded && (
-                      <div style={{ marginTop: "var(--space-4)", paddingTop: "var(--space-4)", borderTop: "1px solid var(--ink-200)" }}>
-                        <span className="eyebrow">Task ({milestoneTasks[m.id]?.length ?? 0})</span>
-                        <div className="row-list" style={{ marginTop: "var(--space-3)" }}>
+                      <div style={{ marginTop: "var(--space-4)", paddingTop: "var(--space-4)", borderTop: "1px solid var(--uikit-slate-100)" }}>
+                        <p style={{ fontSize: 12, fontWeight: 600, color: "var(--uikit-slate-500)" }}>
+                          Task ({milestoneTasks[m.id]?.length ?? 0})
+                        </p>
+                        <div className="uikit-row-list" style={{ marginTop: "var(--space-2)" }}>
                           {(milestoneTasks[m.id] ?? []).map((t) => (
-                            <div key={t.id} className="row-card">
-                              <strong>{t.title}</strong>
-                              <span className={taskStatusBadgeClass(t.status)}>{TASK_STATUS_LABELS[t.status] ?? t.status}</span>
+                            <div key={t.id} className="uikit-row">
+                              <span style={{ fontSize: 14 }}>{t.title}</span>
+                              <StatusPill tone={toneOf(TASK_STATUS_TONE, t.status)}>
+                                {TASK_STATUS_LABELS[t.status] ?? t.status}
+                              </StatusPill>
                             </div>
                           ))}
                         </div>
-                        <div className="field-row" style={{ marginTop: "var(--space-3)" }}>
-                          <FormField label="Task mới">
-                            <input
-                              value={taskForm(m.id).title}
-                              onChange={(e) => setTaskForms({ ...taskForms, [m.id]: { ...taskForm(m.id), title: e.target.value } })}
-                            />
-                          </FormField>
+                        <div style={{ marginTop: "var(--space-3)" }}>
+                          <TextField
+                            label="Task mới"
+                            value={taskForm(m.id).title}
+                            onChange={(e) => setTaskForms({ ...taskForms, [m.id]: { ...taskForm(m.id), title: e.target.value } })}
+                          />
                         </div>
-                        <button
-                          type="button"
-                          className="btn btn-ghost"
+                        <GhostButton
+                          icon={Plus}
                           disabled={busyKey === `create-task-${m.id}` || !taskForm(m.id).title}
                           onClick={() => onCreateTask(m.id)}
-                          style={{ marginTop: "var(--space-3)" }}
+                          className="uikit-mt-4"
                         >
-                          {busyKey === `create-task-${m.id}` ? "Đang thêm…" : "+ Thêm task"}
-                        </button>
+                          {busyKey === `create-task-${m.id}` ? "Đang thêm…" : "Thêm task"}
+                        </GhostButton>
 
                         <div style={{ marginTop: "var(--space-5)" }}>
-                          <span className="eyebrow">Gap liên kết ({milestoneGaps[m.id]?.length ?? 0})</span>
-                          <div className="row-list" style={{ marginTop: "var(--space-3)" }}>
+                          <p style={{ fontSize: 12, fontWeight: 600, color: "var(--uikit-slate-500)" }}>
+                            Gap liên kết ({milestoneGaps[m.id]?.length ?? 0})
+                          </p>
+                          <div className="uikit-row-list" style={{ marginTop: "var(--space-2)" }}>
                             {(milestoneGaps[m.id] ?? []).map((g) => (
-                              <div key={g.id} className="row-card">
-                                <strong>{g.title}</strong>
-                                <span className={gapSeverityBadgeClass(g.severity)}>{GAP_SEVERITY_LABELS[g.severity] ?? g.severity}</span>
+                              <div key={g.id} className="uikit-row">
+                                <span style={{ fontSize: 14 }}>{g.title}</span>
+                                <StatusPill tone={toneOf(GAP_SEVERITY_TONE, g.severity)}>
+                                  {GAP_SEVERITY_LABELS[g.severity] ?? g.severity}
+                                </StatusPill>
                               </div>
                             ))}
                           </div>
-                          <div className="field-row" style={{ marginTop: "var(--space-3)" }}>
-                            <FormField label="Liên kết gap của case">
-                              <select
-                                value={linkGapId[m.id] ?? ""}
-                                onChange={(e) => setLinkGapId({ ...linkGapId, [m.id]: e.target.value })}
-                              >
-                                <option value="">— Chọn gap —</option>
-                                {caseGaps.map((g) => (
-                                  <option key={g.id} value={g.id}>
-                                    {g.title}
-                                  </option>
-                                ))}
-                              </select>
-                            </FormField>
+                          <div style={{ marginTop: "var(--space-3)" }}>
+                            <SelectField
+                              label="Liên kết gap của case"
+                              value={linkGapId[m.id] ?? ""}
+                              onChange={(e) => setLinkGapId({ ...linkGapId, [m.id]: e.target.value })}
+                              options={[{ value: "", label: "— Chọn gap —" }, ...caseGaps.map((g) => ({ value: g.id, label: g.title }))]}
+                            />
                           </div>
-                          <button
-                            type="button"
-                            className="btn btn-ghost"
+                          <GhostButton
+                            icon={Link2}
                             disabled={busyKey === `link-gap-${m.id}` || !linkGapId[m.id]}
                             onClick={() => onLinkGap(m.id)}
-                            style={{ marginTop: "var(--space-3)" }}
+                            className="uikit-mt-4"
                           >
-                            {busyKey === `link-gap-${m.id}` ? "Đang liên kết…" : "+ Liên kết gap"}
-                          </button>
+                            {busyKey === `link-gap-${m.id}` ? "Đang liên kết…" : "Liên kết gap"}
+                          </GhostButton>
                         </div>
                       </div>
                     )}
@@ -434,100 +460,90 @@ export default function RoadmapDetailPage() {
             </div>
           )}
 
-          <div className="form-stack" style={{ marginTop: "var(--space-5)" }}>
-            <FormField label="Tiêu đề milestone mới">
-              <input value={milestoneForm.title} onChange={(e) => setMilestoneForm({ ...milestoneForm, title: e.target.value })} />
-            </FormField>
-            <div className="field-row">
-              <FormField label="Độ ưu tiên">
-                <select value={milestoneForm.priority} onChange={(e) => setMilestoneForm({ ...milestoneForm, priority: e.target.value })}>
-                  {PRIORITY_LEVELS.map((p) => (
-                    <option key={p} value={p}>
-                      {PRIORITY_LEVEL_LABELS[p]}
-                    </option>
-                  ))}
-                </select>
-              </FormField>
-              <FormField label="Ngày bắt đầu" optional>
-                <input type="date" value={milestoneForm.startDate} onChange={(e) => setMilestoneForm({ ...milestoneForm, startDate: e.target.value })} />
-              </FormField>
-              <FormField label="Hạn hoàn thành" optional>
-                <input type="date" value={milestoneForm.dueDate} onChange={(e) => setMilestoneForm({ ...milestoneForm, dueDate: e.target.value })} />
-              </FormField>
-            </div>
+          <div className="uikit-stack" style={{ marginTop: "var(--space-5)" }}>
+            <TextField
+              label="Tiêu đề milestone mới"
+              value={milestoneForm.title}
+              onChange={(e) => setMilestoneForm({ ...milestoneForm, title: e.target.value })}
+            />
+            <SelectField
+              label="Độ ưu tiên"
+              value={milestoneForm.priority}
+              onChange={(e) => setMilestoneForm({ ...milestoneForm, priority: e.target.value })}
+              options={PRIORITY_LEVELS.map((p) => ({ value: p, label: PRIORITY_LEVEL_LABELS[p] ?? p }))}
+            />
+            <TextField
+              label="Ngày bắt đầu"
+              optional
+              type="date"
+              value={milestoneForm.startDate}
+              onChange={(e) => setMilestoneForm({ ...milestoneForm, startDate: e.target.value })}
+            />
+            <TextField
+              label="Hạn hoàn thành"
+              optional
+              type="date"
+              value={milestoneForm.dueDate}
+              onChange={(e) => setMilestoneForm({ ...milestoneForm, dueDate: e.target.value })}
+            />
           </div>
-          <button
-            type="button"
-            className="btn btn-ghost"
+          <GhostButton
+            icon={Plus}
             disabled={busyKey === "create-milestone" || !milestoneForm.title}
             onClick={onCreateMilestone}
-            style={{ marginTop: "var(--space-4)" }}
+            className="uikit-mt-4"
           >
-            {busyKey === "create-milestone" ? "Đang tạo…" : "+ Thêm milestone"}
-          </button>
-        </div>
+            {busyKey === "create-milestone" ? "Đang tạo…" : "Thêm milestone"}
+          </GhostButton>
+        </Card>
 
         {/* ---------- dependencies ---------- */}
-        <div className="card">
-          <span className="eyebrow">Phụ thuộc milestone ({dependencies.length})</span>
+        <Card>
+          <h2 style={{ fontSize: 14, fontWeight: 600, marginBottom: "var(--space-4)" }}>Phụ thuộc milestone ({dependencies.length})</h2>
           {dependencies.length === 0 ? (
-            <p className="empty-state" style={{ marginTop: "var(--space-4)" }}>
-              Chưa có phụ thuộc nào.
-            </p>
+            <p className="uikit-empty">Chưa có phụ thuộc nào.</p>
           ) : (
-            <div className="row-list" style={{ marginTop: "var(--space-4)" }}>
+            <div className="uikit-row-list">
               {dependencies.map((d) => (
-                <div key={d.id} className="row-card">
-                  <span>
+                <div key={d.id} className="uikit-row">
+                  <span style={{ fontSize: 14 }}>
                     {milestoneTitle(d.predecessorMilestoneId)} → {milestoneTitle(d.successorMilestoneId)}
                   </span>
-                  <span className="badge">{DEPENDENCY_TYPE_LABELS[d.dependencyType] ?? d.dependencyType}</span>
+                  <StatusPill tone="gray">{DEPENDENCY_TYPE_LABELS[d.dependencyType] ?? d.dependencyType}</StatusPill>
                 </div>
               ))}
             </div>
           )}
-          <div className="field-row" style={{ marginTop: "var(--space-5)" }}>
-            <FormField label="Trước">
-              <select value={depForm.predecessorMilestoneId} onChange={(e) => setDepForm({ ...depForm, predecessorMilestoneId: e.target.value })}>
-                <option value="">— Chọn milestone —</option>
-                {milestones.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.title}
-                  </option>
-                ))}
-              </select>
-            </FormField>
-            <FormField label="Sau">
-              <select value={depForm.successorMilestoneId} onChange={(e) => setDepForm({ ...depForm, successorMilestoneId: e.target.value })}>
-                <option value="">— Chọn milestone —</option>
-                {milestones.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.title}
-                  </option>
-                ))}
-              </select>
-            </FormField>
-            <FormField label="Loại phụ thuộc">
-              <select value={depForm.dependencyType} onChange={(e) => setDepForm({ ...depForm, dependencyType: e.target.value })}>
-                {DEPENDENCY_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {DEPENDENCY_TYPE_LABELS[t]}
-                  </option>
-                ))}
-              </select>
-            </FormField>
+          <div className="uikit-stack" style={{ marginTop: "var(--space-5)" }}>
+            <SelectField
+              label="Trước"
+              value={depForm.predecessorMilestoneId}
+              onChange={(e) => setDepForm({ ...depForm, predecessorMilestoneId: e.target.value })}
+              options={[{ value: "", label: "— Chọn milestone —" }, ...milestones.map((m) => ({ value: m.id, label: m.title }))]}
+            />
+            <SelectField
+              label="Sau"
+              value={depForm.successorMilestoneId}
+              onChange={(e) => setDepForm({ ...depForm, successorMilestoneId: e.target.value })}
+              options={[{ value: "", label: "— Chọn milestone —" }, ...milestones.map((m) => ({ value: m.id, label: m.title }))]}
+            />
+            <SelectField
+              label="Loại phụ thuộc"
+              value={depForm.dependencyType}
+              onChange={(e) => setDepForm({ ...depForm, dependencyType: e.target.value })}
+              options={DEPENDENCY_TYPES.map((t) => ({ value: t, label: DEPENDENCY_TYPE_LABELS[t] ?? t }))}
+            />
           </div>
-          <button
-            type="button"
-            className="btn btn-ghost"
+          <GhostButton
+            icon={Plus}
             disabled={busyKey === "create-dependency" || !depForm.predecessorMilestoneId || !depForm.successorMilestoneId}
             onClick={onCreateDependency}
-            style={{ marginTop: "var(--space-4)" }}
+            className="uikit-mt-4"
           >
-            {busyKey === "create-dependency" ? "Đang thêm…" : "+ Thêm phụ thuộc"}
-          </button>
-        </div>
+            {busyKey === "create-dependency" ? "Đang thêm…" : "Thêm phụ thuộc"}
+          </GhostButton>
+        </Card>
       </div>
-    </div>
+    </Shell>
   );
 }

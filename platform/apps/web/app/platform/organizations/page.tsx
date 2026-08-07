@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Building2 } from "lucide-react";
 import type { MeResponse } from "@r2m/contracts";
 import { authFetch, SessionExpiredError } from "../../../lib/api-client";
 import { PLATFORM_ROLE_LABELS } from "../../../lib/labels";
@@ -37,6 +38,7 @@ export default function AdminOrganizationsPage() {
     <SoonPage
       title="Tổ chức"
       description="Danh mục toàn bộ tổ chức trên nền tảng đang được phát triển — API hiện chỉ trả về tổ chức bạn là thành viên, chưa có endpoint liệt kê tất cả."
+      icon={Building2}
       me={me}
       roleLabel={PLATFORM_ROLE_LABELS[me.platformRole] ?? me.platformRole}
       nav={navForPersona("platform-ops", true)}

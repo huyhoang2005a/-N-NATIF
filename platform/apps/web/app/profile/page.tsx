@@ -2,20 +2,22 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { RefreshCw, UserPlus } from "lucide-react";
 import type {
   AuthorVerificationRequestResponse,
   AuthorVerificationUploadResponse,
   MeResponse,
+  OrganizationMemberResponse,
   OrganizationResponse,
   UpdateProfileRequest,
   UserProfileResponse,
 } from "@r2m/contracts";
 import { ApiError, authFetch, SessionExpiredError } from "../../lib/api-client";
 import { describeErrorCode } from "../../lib/error-messages";
-import { PLATFORM_ROLE_LABELS, VERIFICATION_REQUEST_STATUS_LABELS } from "../../lib/labels";
+import { ORG_STATUS_LABELS, ORG_TYPE_LABELS, PLATFORM_ROLE_LABELS, VERIFICATION_REQUEST_STATUS_LABELS } from "../../lib/labels";
 import { navForPersona, personaOf } from "../../lib/nav";
 import { getAccessToken } from "../../lib/session";
-import { toneOf, VERIFICATION_REQUEST_STATUS_TONE } from "../../lib/tone";
+import { toneOf, ORGANIZATION_STATUS_TONE, VERIFICATION_REQUEST_STATUS_TONE } from "../../lib/tone";
 import { Card, GhostButton, PrimaryButton, SectionHeader, SelectField, Shell, StatusPill, TextField } from "../../components/ui";
 
 const DOCUMENT_TYPE_OPTIONS = [
@@ -24,6 +26,11 @@ const DOCUMENT_TYPE_OPTIONS = [
   { value: "ORGANIZATION_LETTER", label: "Thư xác nhận của tổ chức" },
   { value: "TAX_DOCUMENT", label: "Giấy tờ thuế" },
   { value: "OTHER", label: "Khác" },
+];
+
+const INVITE_ROLE_OPTIONS = [
+  { value: "MEMBER", label: "Thành viên" },
+  { value: "ORG_ADMIN", label: "Quản trị viên tổ chức" },
 ];
 
 export default function ProfilePage() {
@@ -148,6 +155,49 @@ export default function ProfilePage() {
     }
   }
 
+  const [orgActionBusy, setOrgActionBusy] = useState<string | null>(null);
+  const [orgActionError, setOrgActionError] = useState<string | null>(null);
+  const [resubmitted, setResubmitted] = useState(false);
+  const [inviteForm, setInviteForm] = useState({ email: "", role: "MEMBER" });
+  const [inviteResult, setInviteResult] = useState<OrganizationMemberResponse | null>(null);
+
+  function onResubmitVerification(organizationId: string) {
+    setOrgActionBusy("resubmit");
+    setOrgActionError(null);
+    authFetch(`/organizations/${organizationId}/verification-requests`, { method: "POST" })
+      .then(() => setResubmitted(true))
+      .catch((err) => {
+        if (err instanceof SessionExpiredError) {
+          router.push("/login");
+          return;
+        }
+        setOrgActionError(err instanceof ApiError ? describeErrorCode(err.code) : "Nộp lại hồ sơ thất bại.");
+      })
+      .finally(() => setOrgActionBusy(null));
+  }
+
+  function onInviteMember(organizationId: string, event: React.FormEvent) {
+    event.preventDefault();
+    setOrgActionBusy("invite");
+    setOrgActionError(null);
+    authFetch<OrganizationMemberResponse>(`/organizations/${organizationId}/members/invitations`, {
+      method: "POST",
+      body: JSON.stringify(inviteForm),
+    })
+      .then((member) => {
+        setInviteResult(member);
+        setInviteForm({ email: "", role: "MEMBER" });
+      })
+      .catch((err) => {
+        if (err instanceof SessionExpiredError) {
+          router.push("/login");
+          return;
+        }
+        setOrgActionError(err instanceof ApiError ? describeErrorCode(err.code) : "Mời thành viên thất bại.");
+      })
+      .finally(() => setOrgActionBusy(null));
+  }
+
   if (!me) {
     if (loadError) {
       return (
@@ -238,6 +288,71 @@ export default function ProfilePage() {
             </form>
           )}
         </Card>
+
+        {organizations.length > 0 && (() => {
+          const primaryOrg = organizations[0]!;
+          return (
+            <Card>
+              <SectionHeader title="Tổ chức của tôi" />
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <p style={{ fontWeight: 600, fontSize: 14 }}>{primaryOrg.name}</p>
+                  <p style={{ marginTop: 2, fontSize: 13, color: "var(--uikit-slate-500)" }}>{ORG_TYPE_LABELS[primaryOrg.type]}</p>
+                </div>
+                <StatusPill tone={toneOf(ORGANIZATION_STATUS_TONE, primaryOrg.status)}>
+                  {ORG_STATUS_LABELS[primaryOrg.status] ?? primaryOrg.status}
+                </StatusPill>
+              </div>
+
+              {orgActionError && (
+                <p className="uikit-alert-error" role="alert" style={{ marginTop: "var(--space-3)" }}>
+                  {orgActionError}
+                </p>
+              )}
+
+              {primaryOrg.status === "REJECTED" && (
+                <div style={{ marginTop: "var(--space-4)" }}>
+                  {resubmitted ? (
+                    <StatusPill tone="amber">Đã nộp lại — chờ kiểm định viên duyệt</StatusPill>
+                  ) : (
+                    <GhostButton icon={RefreshCw} disabled={orgActionBusy === "resubmit"} onClick={() => onResubmitVerification(primaryOrg.id)}>
+                      {orgActionBusy === "resubmit" ? "Đang nộp…" : "Nộp lại hồ sơ xác minh"}
+                    </GhostButton>
+                  )}
+                </div>
+              )}
+
+              <div style={{ marginTop: "var(--space-5)", paddingTop: "var(--space-4)", borderTop: "1px solid var(--uikit-slate-100)" }}>
+                <p style={{ fontSize: 12, fontWeight: 600, color: "var(--uikit-slate-500)", marginBottom: "var(--space-3)" }}>
+                  Mời thành viên
+                </p>
+                {inviteResult && (
+                  <p style={{ fontSize: 13, color: "var(--uikit-emerald-700)", marginBottom: "var(--space-3)" }}>
+                    Đã mời thành công — thành viên ở trạng thái {inviteResult.status}.
+                  </p>
+                )}
+                <form onSubmit={(e) => onInviteMember(primaryOrg.id, e)} className="uikit-stack">
+                  <TextField
+                    label="Email"
+                    type="email"
+                    required
+                    value={inviteForm.email}
+                    onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })}
+                  />
+                  <SelectField
+                    label="Vai trò"
+                    value={inviteForm.role}
+                    onChange={(e) => setInviteForm({ ...inviteForm, role: e.target.value })}
+                    options={INVITE_ROLE_OPTIONS}
+                  />
+                  <PrimaryButton icon={UserPlus} type="submit" disabled={orgActionBusy === "invite" || !inviteForm.email}>
+                    {orgActionBusy === "invite" ? "Đang mời…" : "Mời thành viên"}
+                  </PrimaryButton>
+                </form>
+              </div>
+            </Card>
+          );
+        })()}
 
         {showAuthorVerification && (
         <Card>

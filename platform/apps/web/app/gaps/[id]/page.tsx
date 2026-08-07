@@ -2,13 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import type { GapResponse } from "@r2m/contracts";
+import { Save, ArrowRightCircle } from "lucide-react";
+import type { GapResponse, MeResponse, OrganizationResponse } from "@r2m/contracts";
 import { ApiError, authFetch, SessionExpiredError } from "../../../lib/api-client";
 import { describeErrorCode } from "../../../lib/error-messages";
-import { GAP_SEVERITY_LABELS, GAP_STATUS_LABELS, gapSeverityBadgeClass, gapStatusBadgeClass } from "../../../lib/labels";
+import { GAP_SEVERITY_LABELS, GAP_STATUS_LABELS, PLATFORM_ROLE_LABELS } from "../../../lib/labels";
+import { navForPersona, personaOf } from "../../../lib/nav";
 import { getAccessToken } from "../../../lib/session";
-import { FormField } from "../../_components/FormField";
-import { SiteHeader } from "../../_components/SiteHeader";
+import { toneOf, GAP_SEVERITY_TONE, GAP_STATUS_TONE } from "../../../lib/tone";
+import { BackLink, Card, PrimaryButton, SelectField, Shell, StatusPill, TextField } from "../../../components/ui";
 
 const GAP_STATUSES = Object.keys(GAP_STATUS_LABELS);
 const RESOLUTION_STATUSES = ["RESOLVED", "ACCEPTED_RISK", "CLOSED"];
@@ -18,6 +20,8 @@ export default function GapDetailPage() {
   const params = useParams<{ id: string }>();
   const gapId = params.id;
 
+  const [me, setMe] = useState<MeResponse | null>(null);
+  const [organizations, setOrganizations] = useState<OrganizationResponse[] | null>(null);
   const [gap, setGap] = useState<GapResponse | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
@@ -28,7 +32,13 @@ export default function GapDetailPage() {
   const [resolutionNote, setResolutionNote] = useState("");
 
   async function load() {
-    const g = await authFetch<GapResponse>(`/gaps/${gapId}`);
+    const [meResponse, myOrgs, g] = await Promise.all([
+      authFetch<MeResponse>("/me"),
+      authFetch<OrganizationResponse[]>("/organizations"),
+      authFetch<GapResponse>(`/gaps/${gapId}`),
+    ]);
+    setMe(meResponse);
+    setOrganizations(myOrgs);
     setGap(g);
     setEditForm({
       title: g.title,
@@ -37,7 +47,7 @@ export default function GapDetailPage() {
       ownerUserId: g.ownerUserId ?? "",
       dueDate: g.dueDate ?? "",
     });
-    if (!targetStatus) setTargetStatus(g.status);
+    setTargetStatus((current) => current || g.status);
   }
 
   useEffect(() => {
@@ -101,115 +111,127 @@ export default function GapDetailPage() {
     });
   }
 
-  if (loadError) {
-    return (
-      <div className="shell">
-        <SiteHeader />
-        <div className="container" style={{ padding: "var(--space-6) var(--space-5) var(--space-9)" }}>
-          <p className="alert alert-error" role="alert">
+  if (!me || !organizations) {
+    if (loadError) {
+      return (
+        <div className="uikit-main" style={{ maxWidth: 680, margin: "0 auto" }}>
+          <p className="uikit-alert-error" role="alert">
             {loadError}
           </p>
         </div>
-      </div>
+      );
+    }
+    return null;
+  }
+
+  const roleLabel = PLATFORM_ROLE_LABELS[me.platformRole] ?? me.platformRole;
+  const nav = navForPersona(personaOf(me, organizations), me.platformRole === "PLATFORM_ADMIN");
+
+  if (loadError) {
+    return (
+      <Shell brandLabel="R2M" me={me} roleLabel={roleLabel} nav={nav}>
+        <p className="uikit-alert-error" role="alert">
+          {loadError}
+        </p>
+      </Shell>
     );
   }
 
   if (!gap) {
     return (
-      <div className="shell">
-        <SiteHeader />
-      </div>
+      <Shell brandLabel="R2M" me={me} roleLabel={roleLabel} nav={nav}>
+        {null}
+      </Shell>
     );
   }
 
   return (
-    <div className="shell">
-      <SiteHeader />
-      <div className="container" style={{ padding: "var(--space-6) var(--space-5) var(--space-9)", maxWidth: 680 }}>
-        <span className="eyebrow">Phase 4 · Gap</span>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-4)", marginTop: "var(--space-4)" }}>
-          <h1 style={{ fontSize: 30 }}>{gap.title}</h1>
-          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)", alignItems: "flex-end" }}>
-            <span className={gapSeverityBadgeClass(gap.severity)}>{GAP_SEVERITY_LABELS[gap.severity] ?? gap.severity}</span>
-            <span className={gapStatusBadgeClass(gap.status)}>{GAP_STATUS_LABELS[gap.status] ?? gap.status}</span>
+    <Shell brandLabel="R2M" me={me} roleLabel={roleLabel} nav={nav}>
+      <div className="uikit-stack" style={{ maxWidth: 640 }}>
+        <BackLink href="/technology-cases">Quay lại danh sách case</BackLink>
+
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-4)" }}>
+          <h1 style={{ fontSize: 22 }}>{gap.title}</h1>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
+            <StatusPill tone={toneOf(GAP_SEVERITY_TONE, gap.severity)}>
+              {GAP_SEVERITY_LABELS[gap.severity] ?? gap.severity}
+            </StatusPill>
+            <StatusPill tone={toneOf(GAP_STATUS_TONE, gap.status)}>
+              {GAP_STATUS_LABELS[gap.status] ?? gap.status}
+            </StatusPill>
           </div>
         </div>
-        <p style={{ marginTop: "var(--space-3)", fontSize: 14, color: "var(--ink-700)" }}>{gap.description}</p>
+        <p style={{ fontSize: 14, color: "var(--uikit-slate-700)" }}>{gap.description}</p>
         {gap.resolutionNote && (
-          <p style={{ marginTop: "var(--space-3)", fontSize: 13, color: "var(--ink-400)" }}>
-            Ghi chú xử lý: {gap.resolutionNote}
-          </p>
+          <p style={{ fontSize: 13, color: "var(--uikit-slate-500)" }}>Ghi chú xử lý: {gap.resolutionNote}</p>
         )}
 
         {actionError && (
-          <p className="alert alert-error" role="alert" style={{ marginTop: "var(--space-5)" }}>
+          <p className="uikit-alert-error" role="alert">
             {actionError}
           </p>
         )}
 
-        <div className="card" style={{ marginTop: "var(--space-6)" }}>
-          <span className="eyebrow">Chỉnh sửa</span>
-          <div className="form-stack" style={{ marginTop: "var(--space-4)" }}>
-            <FormField label="Tiêu đề">
-              <input value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} />
-            </FormField>
-            <FormField label="Mô tả">
-              <textarea rows={2} value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} />
-            </FormField>
-            <div className="field-row">
-              <FormField label="Danh mục" optional>
-                <input value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })} />
-              </FormField>
-              <FormField label="Người phụ trách" optional hint="UUID user">
-                <input value={editForm.ownerUserId} onChange={(e) => setEditForm({ ...editForm, ownerUserId: e.target.value })} />
-              </FormField>
-              <FormField label="Hạn xử lý" optional>
-                <input type="date" value={editForm.dueDate} onChange={(e) => setEditForm({ ...editForm, dueDate: e.target.value })} />
-              </FormField>
-            </div>
+        <Card>
+          <h2 style={{ fontSize: 14, fontWeight: 600, marginBottom: "var(--space-4)" }}>Chỉnh sửa</h2>
+          <div className="uikit-stack">
+            <TextField label="Tiêu đề" value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} />
+            <TextField
+              label="Mô tả"
+              as="textarea"
+              value={editForm.description}
+              onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+            />
+            <TextField label="Danh mục" optional value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })} />
+            <TextField
+              label="Người phụ trách"
+              optional
+              hint="UUID user"
+              value={editForm.ownerUserId}
+              onChange={(e) => setEditForm({ ...editForm, ownerUserId: e.target.value })}
+            />
+            <TextField label="Hạn xử lý" optional type="date" value={editForm.dueDate} onChange={(e) => setEditForm({ ...editForm, dueDate: e.target.value })} />
           </div>
-          <button
-            type="button"
-            className="btn btn-ghost"
+          <PrimaryButton
+            icon={Save}
             disabled={busyKey === "edit" || !editForm.title || !editForm.description}
             onClick={onSaveEdit}
             style={{ marginTop: "var(--space-4)" }}
           >
             {busyKey === "edit" ? "Đang lưu…" : "Lưu thay đổi"}
-          </button>
-        </div>
+          </PrimaryButton>
+        </Card>
 
-        <div className="card">
-          <span className="eyebrow">Chuyển trạng thái</span>
-          <div className="field-row" style={{ marginTop: "var(--space-4)" }}>
-            <FormField label="Trạng thái đích">
-              <select value={targetStatus} onChange={(e) => setTargetStatus(e.target.value)}>
-                {GAP_STATUSES.map((s) => (
-                  <option key={s} value={s}>
-                    {GAP_STATUS_LABELS[s]}
-                  </option>
-                ))}
-              </select>
-            </FormField>
-          </div>
+        <Card>
+          <h2 style={{ fontSize: 14, fontWeight: 600, marginBottom: "var(--space-4)" }}>Chuyển trạng thái</h2>
+          <SelectField
+            label="Trạng thái đích"
+            value={targetStatus}
+            onChange={(e) => setTargetStatus(e.target.value)}
+            options={GAP_STATUSES.map((s) => ({ value: s, label: GAP_STATUS_LABELS[s] ?? s }))}
+          />
           {RESOLUTION_STATUSES.includes(targetStatus) && (
-            <FormField label="Ghi chú xử lý (bắt buộc)" hint="Bắt buộc khi chuyển sang RESOLVED/ACCEPTED_RISK/CLOSED">
-              <textarea rows={2} value={resolutionNote} onChange={(e) => setResolutionNote(e.target.value)} />
-            </FormField>
+            <div style={{ marginTop: "var(--space-4)" }}>
+              <TextField
+                label="Ghi chú xử lý"
+                required
+                as="textarea"
+                hint="Bắt buộc khi chuyển sang Đã giải quyết/Chấp nhận rủi ro/Đã đóng"
+                value={resolutionNote}
+                onChange={(e) => setResolutionNote(e.target.value)}
+              />
+            </div>
           )}
-          <button
-            type="button"
-            className="btn btn-primary"
-            disabled={
-              busyKey === "transition" || (RESOLUTION_STATUSES.includes(targetStatus) && !resolutionNote.trim())
-            }
+          <PrimaryButton
+            icon={ArrowRightCircle}
+            disabled={busyKey === "transition" || (RESOLUTION_STATUSES.includes(targetStatus) && !resolutionNote.trim())}
             onClick={onTransition}
             style={{ marginTop: "var(--space-4)" }}
           >
             {busyKey === "transition" ? "Đang chuyển…" : "Chuyển trạng thái"}
-          </button>
-        </div>
+          </PrimaryButton>
+        </Card>
       </div>
-    </div>
+    </Shell>
   );
 }

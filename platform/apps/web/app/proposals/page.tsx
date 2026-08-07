@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Send } from "lucide-react";
 import type { MeResponse, OrganizationResponse } from "@r2m/contracts";
 import { authFetch, SessionExpiredError } from "../../lib/api-client";
 import { PLATFORM_ROLE_LABELS } from "../../lib/labels";
@@ -35,6 +36,7 @@ export default function ProposalsPage() {
     <SoonPage
       title="Đề xuất của tôi"
       description="Tính năng gửi đề xuất công nghệ theo nhu cầu doanh nghiệp đang được phát triển (Phase 5)."
+      icon={Send}
       me={me}
       roleLabel={PLATFORM_ROLE_LABELS[me.platformRole] ?? me.platformRole}
       nav={navForPersona(personaOf(me, organizations), me.platformRole === "PLATFORM_ADMIN")}

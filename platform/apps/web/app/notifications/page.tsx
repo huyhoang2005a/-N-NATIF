@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Bell } from "lucide-react";
 import type { MeResponse, OrganizationResponse } from "@r2m/contracts";
 import { authFetch, SessionExpiredError } from "../../lib/api-client";
 import { PLATFORM_ROLE_LABELS } from "../../lib/labels";
@@ -35,6 +36,7 @@ export default function NotificationsPage() {
     <SoonPage
       title="Thông báo"
       description="Trung tâm thông báo hoạt động (đánh giá được duyệt, đề xuất mới...) đang được phát triển."
+      icon={Bell}
       me={me}
       roleLabel={PLATFORM_ROLE_LABELS[me.platformRole] ?? me.platformRole}
       nav={navForPersona(personaOf(me, organizations), me.platformRole === "PLATFORM_ADMIN")}

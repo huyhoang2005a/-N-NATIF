@@ -96,6 +96,14 @@ export const ROADMAP_REVIEW_DECISION_TONE: Record<string, Tone> = {
   CHANGES_REQUESTED: "amber",
 };
 
+export const TASK_STATUS_TONE: Record<string, Tone> = {
+  TODO: "gray",
+  IN_PROGRESS: "blue",
+  BLOCKED: "red",
+  DONE: "green",
+  CANCELLED: "gray",
+};
+
 export function toneOf(map: Record<string, Tone>, value: string): Tone {
   return map[value] ?? "gray";
 }

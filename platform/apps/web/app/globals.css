@@ -946,6 +946,11 @@ select {
   font-family: var(--font-mono);
   font-size: 12px;
 }
+.uikit-chip svg {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
 .uikit-chip__locator {
   color: var(--uikit-amber-600);
 }
@@ -983,21 +988,33 @@ select {
   height: 40px;
   flex-shrink: 0;
   border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.uikit-statcard__icon svg {
+  width: 19px;
+  height: 19px;
 }
 .uikit-statcard__icon--slate {
   background: var(--uikit-slate-100);
+  color: var(--uikit-slate-500);
 }
 .uikit-statcard__icon--indigo {
   background: var(--uikit-indigo-50);
+  color: var(--uikit-indigo-700);
 }
 .uikit-statcard__icon--amber {
   background: var(--uikit-amber-50);
+  color: var(--uikit-amber-700);
 }
 .uikit-statcard__icon--rose {
   background: var(--uikit-rose-50);
+  color: var(--uikit-rose-700);
 }
 .uikit-statcard__icon--green {
   background: var(--uikit-emerald-50);
+  color: var(--uikit-emerald-700);
 }
 .uikit-statcard__value {
   font-family: var(--font-mono);
@@ -1102,6 +1119,11 @@ select {
 }
 .uikit-btn--ghost-red:hover:not(:disabled) {
   background: var(--uikit-rose-50);
+}
+.uikit-btn__icon {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
 }
 
 /* ---------- form fields ---------- */
@@ -1225,7 +1247,9 @@ select {
   gap: 2px;
 }
 .uikit-sidebar__link {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   border-radius: var(--radius-sm);
   padding: 9px 10px;
   font-size: 14px;
@@ -1240,6 +1264,15 @@ select {
   color: var(--uikit-indigo-700);
   font-weight: 500;
 }
+.uikit-sidebar__icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: var(--uikit-slate-400);
+}
+.uikit-sidebar__link--active .uikit-sidebar__icon {
+  color: var(--uikit-indigo-700);
+}
 
 .uikit-shell__main {
   flex: 1;
@@ -1249,11 +1282,47 @@ select {
 .uikit-topbar {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: var(--space-4);
   border-bottom: 1px solid var(--uikit-slate-200);
   background: #fff;
   padding: var(--space-3) var(--space-6);
+}
+.uikit-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 320px;
+  max-width: 40vw;
+  border: 1px solid var(--uikit-slate-200);
+  border-radius: var(--radius-sm);
+  padding: 7px 12px;
+  color: var(--uikit-slate-400);
+}
+.uikit-search:focus-within {
+  border-color: var(--uikit-indigo-700);
+}
+.uikit-search__icon {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+.uikit-search input {
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 14px;
+  width: 100%;
+  color: var(--uikit-slate-900);
+}
+.uikit-search input::placeholder {
+  color: var(--uikit-slate-400);
+}
+.uikit-topbar__right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-shrink: 0;
 }
 .uikit-topbar__role {
   font-size: 12px;
@@ -1263,24 +1332,100 @@ select {
   font-size: 14px;
   color: var(--uikit-slate-700);
 }
+.uikit-topbar__icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  color: var(--uikit-slate-400);
+  text-decoration: none;
+}
+.uikit-topbar__icon-btn:hover {
+  background: var(--uikit-slate-50);
+  color: var(--uikit-slate-700);
+}
+.uikit-topbar__icon-btn svg {
+  width: 18px;
+  height: 18px;
+}
+.uikit-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--uikit-indigo-50);
+  color: var(--uikit-indigo-700);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
 .uikit-topbar__logout {
   appearance: none;
   border: none;
   background: transparent;
-  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--uikit-slate-500);
+  color: var(--uikit-slate-400);
 }
 .uikit-topbar__logout:hover {
+  background: var(--uikit-rose-50);
   color: var(--uikit-rose-700);
+}
+.uikit-topbar__logout svg {
+  width: 18px;
+  height: 18px;
 }
 
 .uikit-main {
   padding: var(--space-6);
   max-width: 1040px;
+}
+
+.uikit-mt-4 {
+  margin-top: var(--space-4);
+}
+
+.uikit-page-container {
+  width: 100%;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 var(--space-5);
+}
+
+/* ---------- disclosure (form phụ ẩn/hiện, tránh chiếm chỗ mặc định) ---------- */
+
+.uikit-disclosure summary {
+  cursor: pointer;
+  list-style: none;
+  color: var(--uikit-indigo-700);
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.uikit-disclosure summary::-webkit-details-marker {
+  display: none;
+}
+.uikit-disclosure summary::before {
+  content: "▸";
+  font-size: 11px;
+  transition: transform 0.15s ease;
+}
+.uikit-disclosure[open] summary::before {
+  transform: rotate(90deg);
+}
+.uikit-disclosure__body {
+  margin-top: var(--space-4);
 }
 
 /* ---------- misc layout helpers ---------- */
@@ -1366,6 +1511,21 @@ select {
   padding: var(--space-8) var(--space-5);
   text-align: center;
   color: var(--uikit-slate-500);
+}
+.uikit-soon__icon {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto var(--space-4);
+  border-radius: 50%;
+  background: var(--uikit-indigo-50);
+  color: var(--uikit-indigo-700);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.uikit-soon__icon svg {
+  width: 22px;
+  height: 22px;
 }
 .uikit-soon__title {
   font-size: 16px;
