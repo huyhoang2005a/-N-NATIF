@@ -2,15 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { OrganizationResponse, RegisterTechnologyCaseRequest, TechnologyCaseResponse } from "@r2m/contracts";
+import type { MeResponse, OrganizationResponse, RegisterTechnologyCaseRequest, TechnologyCaseResponse } from "@r2m/contracts";
 import { ApiError, authFetch, SessionExpiredError } from "../../../lib/api-client";
 import { describeErrorCode } from "../../../lib/error-messages";
+import { PLATFORM_ROLE_LABELS } from "../../../lib/labels";
+import { navForPersona, personaOf } from "../../../lib/nav";
 import { getAccessToken } from "../../../lib/session";
-import { FormField } from "../../_components/FormField";
-import { SiteHeader } from "../../_components/SiteHeader";
+import { BackLink, PrimaryButton, SelectField, Shell, TextField } from "../../../components/ui";
 
 export default function NewTechnologyCasePage() {
   const router = useRouter();
+  const [me, setMe] = useState<MeResponse | null>(null);
   const [organizations, setOrganizations] = useState<OrganizationResponse[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [form, setForm] = useState({
@@ -27,12 +29,11 @@ export default function NewTechnologyCasePage() {
       router.push("/login");
       return;
     }
-    authFetch<OrganizationResponse[]>("/organizations")
-      .then((orgs) => {
+    Promise.all([authFetch<MeResponse>("/me"), authFetch<OrganizationResponse[]>("/organizations")])
+      .then(([meResponse, orgs]) => {
+        setMe(meResponse);
         setOrganizations(orgs);
-        if (orgs.length > 0) {
-          setForm((f) => ({ ...f, owningOrganizationId: orgs[0]?.id ?? "" }));
-        }
+        if (orgs.length > 0) setForm((f) => ({ ...f, owningOrganizationId: orgs[0]?.id ?? "" }));
       })
       .catch((err) => {
         if (err instanceof SessionExpiredError) {
@@ -69,81 +70,64 @@ export default function NewTechnologyCasePage() {
     }
   }
 
+  if (!me || !organizations) return null;
+
+  const nav = navForPersona(personaOf(me, organizations), me.platformRole === "PLATFORM_ADMIN");
+
   if (loadError) {
     return (
-      <div className="shell">
-        <SiteHeader />
-        <div className="container" style={{ padding: "var(--space-6) var(--space-5) var(--space-9)" }}>
-          <p className="alert alert-error" role="alert">
-            {loadError}
-          </p>
-        </div>
-      </div>
+      <Shell brandLabel="R2M" me={me} roleLabel={PLATFORM_ROLE_LABELS[me.platformRole] ?? me.platformRole} nav={nav}>
+        <p className="uikit-alert-error" role="alert">
+          {loadError}
+        </p>
+      </Shell>
     );
   }
 
   return (
-    <div className="shell">
-      <SiteHeader />
-      <div className="container" style={{ padding: "var(--space-6) var(--space-5) var(--space-9)", maxWidth: 640 }}>
-        <span className="eyebrow">Phase 3</span>
-        <h1 style={{ fontSize: 30, marginTop: "var(--space-4)" }}>Tạo Technology Case</h1>
+    <Shell brandLabel="R2M" me={me} roleLabel={PLATFORM_ROLE_LABELS[me.platformRole] ?? me.platformRole} nav={nav}>
+      <div style={{ maxWidth: 480 }}>
+        <BackLink href="/technology-cases">Quay lại danh sách case</BackLink>
+        <h1 style={{ fontSize: 22, marginBottom: "var(--space-5)" }}>Tạo Technology Case</h1>
 
-        {organizations === null ? null : organizations.length === 0 ? (
-          <p className="empty-state" style={{ marginTop: "var(--space-6)" }}>
-            Bạn cần là thành viên của ít nhất 1 tổ chức trước khi tạo case.
-          </p>
+        {organizations.length === 0 ? (
+          <p className="uikit-empty">Bạn cần là thành viên của ít nhất 1 tổ chức trước khi tạo case.</p>
         ) : (
-          <form onSubmit={onSubmit} className="card" style={{ marginTop: "var(--space-6)" }}>
-            <div className="form-stack">
-              <FormField label="Tổ chức chủ trì">
-                <select
-                  value={form.owningOrganizationId}
-                  onChange={(e) => setForm({ ...form, owningOrganizationId: e.target.value })}
-                >
-                  {organizations.map((org) => (
-                    <option key={org.id} value={org.id}>
-                      {org.name}
-                    </option>
-                  ))}
-                </select>
-              </FormField>
-              <FormField label="Tiêu đề">
-                <input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
-              </FormField>
-              <FormField label="Mô tả" optional>
-                <textarea
-                  rows={3}
-                  value={form.description}
-                  onChange={(e) => setForm({ ...form, description: e.target.value })}
-                />
-              </FormField>
-              <FormField label="Tóm tắt công nghệ" optional>
-                <textarea
-                  rows={3}
-                  value={form.summary}
-                  onChange={(e) => setForm({ ...form, summary: e.target.value })}
-                />
-              </FormField>
-            </div>
+          <form onSubmit={onSubmit} className="uikit-card uikit-stack">
+            <SelectField
+              label="Tổ chức chủ trì"
+              value={form.owningOrganizationId}
+              onChange={(e) => setForm({ ...form, owningOrganizationId: e.target.value })}
+              options={organizations.map((org) => ({ value: org.id, label: org.name }))}
+            />
+            <TextField label="Tiêu đề" required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+            <TextField
+              label="Mô tả"
+              as="textarea"
+              optional
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+            />
+            <TextField
+              label="Tóm tắt công nghệ"
+              as="textarea"
+              optional
+              value={form.summary}
+              onChange={(e) => setForm({ ...form, summary: e.target.value })}
+            />
 
             {status === "error" && errorMessage && (
-              <p className="alert alert-error" role="alert" style={{ marginTop: "var(--space-5)" }}>
+              <p className="uikit-alert-error" role="alert">
                 {errorMessage}
               </p>
             )}
 
-            <button
-              type="submit"
-              className="btn btn-primary btn-block"
-              disabled={status === "loading"}
-              style={{ marginTop: "var(--space-6)" }}
-            >
+            <PrimaryButton type="submit" full disabled={status === "loading"}>
               {status === "loading" ? "Đang tạo…" : "Tạo case"}
-            </button>
+            </PrimaryButton>
           </form>
         )}
       </div>
-    </div>
+    </Shell>
   );
 }

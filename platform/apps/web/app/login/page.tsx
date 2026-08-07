@@ -7,8 +7,7 @@ import type { LoginRequest, TokenResponse } from "@r2m/contracts";
 import { ApiError, apiFetch } from "../../lib/api-client";
 import { describeErrorCode } from "../../lib/error-messages";
 import { saveTokens } from "../../lib/session";
-import { FormField } from "../_components/FormField";
-import { SiteHeader } from "../_components/SiteHeader";
+import { BrandMark, PrimaryButton, TextField } from "../../components/ui";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -34,61 +33,53 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="shell">
-      <SiteHeader />
-
-      <div className="shell__center">
-        <div className="dossier" style={{ width: "100%", maxWidth: 420 }}>
-          <div className="dossier__stub">
-            <span>Truy cập sổ đăng ký</span>
-            <span>Bảo mật</span>
-          </div>
-          <div className="dossier__perforation" />
-          <div className="dossier__body">
-            <h1 style={{ fontSize: 26 }}>Đăng nhập</h1>
-            <p style={{ marginTop: "var(--space-2)", color: "var(--ink-700)", fontSize: 14 }}>
-              Dùng tài khoản đã được xác minh để truy cập hồ sơ tổ chức của bạn.
-            </p>
-
-            <form onSubmit={onSubmit} className="form-stack" style={{ marginTop: "var(--space-5)" }}>
-              <FormField label="Email">
-                <input
-                  type="email"
-                  required
-                  autoComplete="email"
-                  value={form.email}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
-                />
-              </FormField>
-              <FormField label="Mật khẩu">
-                <input
-                  type="password"
-                  required
-                  autoComplete="current-password"
-                  value={form.password}
-                  onChange={(e) => setForm({ ...form, password: e.target.value })}
-                />
-              </FormField>
-
-              {status === "error" && errorMessage && (
-                <p className="alert alert-error" role="alert">
-                  {errorMessage}
-                </p>
-              )}
-
-              <button type="submit" className="btn btn-primary btn-block" disabled={status === "loading"}>
-                {status === "loading" ? "Đang đăng nhập…" : "Đăng nhập"}
-              </button>
-            </form>
-
-            <p style={{ marginTop: "var(--space-5)", fontSize: 13, color: "var(--ink-400)" }}>
-              Chưa có tổ chức?{" "}
-              <Link href="/register-organization" className="nav-link" style={{ display: "inline" }}>
-                Đăng ký tổ chức
-              </Link>
-            </p>
-          </div>
+    <div className="uikit-shell" style={{ alignItems: "center", justifyContent: "center" }}>
+      <div style={{ width: "100%", maxWidth: 400, padding: "var(--space-6) var(--space-5)" }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: "var(--space-6)" }}>
+          <BrandMark size="lg" />
+          <h1 style={{ fontSize: 22, marginTop: "var(--space-4)" }}>Đăng nhập R2M</h1>
+          <p style={{ marginTop: "var(--space-2)", fontSize: 14, color: "var(--uikit-slate-500)", textAlign: "center" }}>
+            Dùng tài khoản đã đăng ký để truy cập không gian làm việc của bạn.
+          </p>
         </div>
+
+        <div className="uikit-card">
+          <form onSubmit={onSubmit} className="uikit-stack">
+            <TextField
+              label="Email"
+              type="email"
+              required
+              autoComplete="email"
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+            />
+            <TextField
+              label="Mật khẩu"
+              type="password"
+              required
+              autoComplete="current-password"
+              value={form.password}
+              onChange={(e) => setForm({ ...form, password: e.target.value })}
+            />
+
+            {status === "error" && errorMessage && (
+              <p className="uikit-alert-error" role="alert">
+                {errorMessage}
+              </p>
+            )}
+
+            <PrimaryButton type="submit" full disabled={status === "loading"}>
+              {status === "loading" ? "Đang đăng nhập…" : "Đăng nhập"}
+            </PrimaryButton>
+          </form>
+        </div>
+
+        <p style={{ marginTop: "var(--space-5)", fontSize: 13, color: "var(--uikit-slate-500)", textAlign: "center" }}>
+          Chưa có tổ chức?{" "}
+          <Link href="/register-organization" style={{ color: "var(--uikit-indigo-700)", fontWeight: 500 }}>
+            Đăng ký tổ chức
+          </Link>
+        </p>
       </div>
     </div>
   );

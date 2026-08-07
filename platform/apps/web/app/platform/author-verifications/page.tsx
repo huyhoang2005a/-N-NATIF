@@ -2,41 +2,36 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import type {
-  MeResponse,
-  OrganizationResponse,
-  OrganizationVerificationRequestResponse,
-} from "@r2m/contracts";
+import type { AuthorVerificationRequestResponse, MeResponse, OrganizationResponse } from "@r2m/contracts";
 import { ApiError, authFetch, SessionExpiredError } from "../../../lib/api-client";
 import { describeErrorCode } from "../../../lib/error-messages";
-import { ORG_TYPE_LABELS, PLATFORM_ROLE_LABELS, VERIFICATION_REQUEST_STATUS_LABELS } from "../../../lib/labels";
+import { PLATFORM_ROLE_LABELS, VERIFICATION_REQUEST_STATUS_LABELS } from "../../../lib/labels";
 import { navForPersona } from "../../../lib/nav";
 import { getAccessToken } from "../../../lib/session";
 import { toneOf, VERIFICATION_REQUEST_STATUS_TONE } from "../../../lib/tone";
 import { Card, GhostButton, PrimaryButton, Shell, StatusPill, TextField } from "../../../components/ui";
 
-interface Row {
-  request: OrganizationVerificationRequestResponse;
-  organization: OrganizationResponse;
+interface PresignedUrlResponse {
+  url: string;
+  expiresIn: number;
 }
 
-export default function OrganizationVerificationsPage() {
+export default function AuthorVerificationsPage() {
   const router = useRouter();
   const [me, setMe] = useState<MeResponse | null>(null);
-  const [rows, setRows] = useState<Row[] | null>(null);
+  const [requests, setRequests] = useState<AuthorVerificationRequestResponse[] | null>(null);
+  const [orgNames, setOrgNames] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectNote, setRejectNote] = useState("");
 
   async function load() {
-    const requests = await authFetch<OrganizationVerificationRequestResponse[]>(
-      "/platform/organization-verifications",
-    );
-    const organizations = await Promise.all(
-      requests.map((request) => authFetch<OrganizationResponse>(`/organizations/${request.organizationId}`)),
-    );
-    setRows(requests.map((request, index) => ({ request, organization: organizations[index]! })));
+    const rows = await authFetch<AuthorVerificationRequestResponse[]>("/platform/author-verifications");
+    setRequests(rows);
+    const uniqueOrgIds = Array.from(new Set(rows.map((r) => r.affiliationOrgId)));
+    const orgs = await Promise.all(uniqueOrgIds.map((id) => authFetch<OrganizationResponse>(`/organizations/${id}`)));
+    setOrgNames(Object.fromEntries(orgs.map((o) => [o.id, o.name])));
   }
 
   useEffect(() => {
@@ -58,7 +53,7 @@ export default function OrganizationVerificationsPage() {
           router.push("/login");
           return;
         }
-        setError("Không tải được danh sách hồ sơ chờ duyệt.");
+        setError("Không tải được danh sách yêu cầu xác minh tác giả.");
       });
     // Intentionally runs once on mount — `load` closes over state that would otherwise
     // cause a dependency-array footgun; router/getAccessToken don't change across renders.
@@ -78,14 +73,14 @@ export default function OrganizationVerificationsPage() {
 
   function onClaim(requestId: string) {
     return withBusy(requestId, async () => {
-      await authFetch(`/platform/organization-verifications/${requestId}/claim`, { method: "POST" });
+      await authFetch(`/platform/author-verifications/${requestId}/claim`, { method: "POST" });
       await load();
     });
   }
 
   function onApprove(requestId: string) {
     return withBusy(requestId, async () => {
-      await authFetch(`/platform/organization-verifications/${requestId}/decision`, {
+      await authFetch(`/platform/author-verifications/${requestId}/decision`, {
         method: "POST",
         body: JSON.stringify({ decision: "APPROVE" }),
       });
@@ -96,7 +91,7 @@ export default function OrganizationVerificationsPage() {
   function onReject(requestId: string) {
     if (!rejectNote.trim()) return Promise.resolve();
     return withBusy(requestId, async () => {
-      await authFetch(`/platform/organization-verifications/${requestId}/decision`, {
+      await authFetch(`/platform/author-verifications/${requestId}/decision`, {
         method: "POST",
         body: JSON.stringify({ decision: "REJECT", reviewerNote: rejectNote.trim() }),
       });
@@ -106,6 +101,11 @@ export default function OrganizationVerificationsPage() {
     });
   }
 
+  async function onViewDocument(requestId: string) {
+    const { url } = await authFetch<PresignedUrlResponse>(`/platform/author-verifications/${requestId}/document-url`);
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+
   if (!me) return null;
 
   const nav = navForPersona("platform-ops", me.platformRole === "PLATFORM_ADMIN");
@@ -113,10 +113,9 @@ export default function OrganizationVerificationsPage() {
   return (
     <Shell brandLabel="R2M" me={me} roleLabel={PLATFORM_ROLE_LABELS[me.platformRole] ?? me.platformRole} nav={nav}>
       <div style={{ maxWidth: 720 }}>
-        <h1 style={{ fontSize: 22 }}>Yêu cầu xác minh tổ chức</h1>
+        <h1 style={{ fontSize: 22 }}>Yêu cầu xác minh tác giả</h1>
         <p style={{ marginTop: "var(--space-2)", fontSize: 14, color: "var(--uikit-slate-500)", marginBottom: "var(--space-5)" }}>
-          Hồ sơ tổ chức đang chờ hoặc đang được thẩm định. Nhận xử lý một hồ sơ trước khi có thể
-          duyệt hoặc từ chối.
+          Yêu cầu xác minh danh tính tác giả đang chờ hoặc đang được thẩm định.
         </p>
 
         {error && (
@@ -126,11 +125,11 @@ export default function OrganizationVerificationsPage() {
         )}
 
         <Card>
-          {rows === null ? null : rows.length === 0 ? (
-            <p className="uikit-empty">Không có hồ sơ tổ chức nào đang chờ xử lý.</p>
+          {requests === null ? null : requests.length === 0 ? (
+            <p className="uikit-empty">Không có yêu cầu xác minh tác giả nào đang chờ xử lý.</p>
           ) : (
             <div className="uikit-stack">
-              {rows.map(({ request, organization }) => {
+              {requests.map((request) => {
                 const isBusy = busyId === request.id;
                 const claimedByMe = request.reviewerUserId === me.userId;
 
@@ -141,11 +140,16 @@ export default function OrganizationVerificationsPage() {
                   >
                     <div style={{ display: "flex", justifyContent: "space-between", gap: "var(--space-4)", flexWrap: "wrap" }}>
                       <div>
-                        <p style={{ fontWeight: 600, fontSize: 14 }}>{organization.name}</p>
+                        <p style={{ fontWeight: 600, fontSize: 14, fontFamily: "var(--font-mono)" }}>
+                          Tác giả {request.authorUserId.slice(0, 8)}
+                        </p>
                         <p style={{ marginTop: 4, fontSize: 13, color: "var(--uikit-slate-500)" }}>
-                          {ORG_TYPE_LABELS[organization.type]} · Nộp lúc{" "}
+                          {orgNames[request.affiliationOrgId] ?? "—"} · Nộp lúc{" "}
                           {new Date(request.submittedAt).toLocaleString("vi-VN")}
                         </p>
+                        {request.submittedNote && (
+                          <p style={{ marginTop: 4, fontSize: 13, color: "var(--uikit-slate-500)" }}>{request.submittedNote}</p>
+                        )}
                       </div>
                       <StatusPill tone={toneOf(VERIFICATION_REQUEST_STATUS_TONE, request.status)}>
                         {VERIFICATION_REQUEST_STATUS_LABELS[request.status] ?? request.status}
@@ -153,6 +157,8 @@ export default function OrganizationVerificationsPage() {
                     </div>
 
                     <div style={{ display: "flex", gap: "var(--space-3)", marginTop: "var(--space-4)", flexWrap: "wrap" }}>
+                      <GhostButton onClick={() => onViewDocument(request.id)}>Xem tài liệu</GhostButton>
+
                       {request.status === "PENDING" && (
                         <PrimaryButton disabled={isBusy} onClick={() => onClaim(request.id)}>
                           {isBusy ? "Đang xử lý…" : "Nhận xử lý"}
@@ -162,7 +168,7 @@ export default function OrganizationVerificationsPage() {
                       {request.status === "IN_REVIEW" && claimedByMe && rejectingId !== request.id && (
                         <>
                           <PrimaryButton disabled={isBusy} onClick={() => onApprove(request.id)}>
-                            {isBusy ? "Đang xử lý…" : "Duyệt · Kích hoạt tổ chức"}
+                            {isBusy ? "Đang xử lý…" : "Duyệt xác minh"}
                           </PrimaryButton>
                           <GhostButton
                             tone="red"

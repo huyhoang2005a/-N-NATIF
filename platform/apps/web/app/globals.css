@@ -1,4 +1,4 @@
-:root {
+﻿:root {
   --ink-900: #12213b;
   --ink-700: #2c4770;
   --ink-400: #667082;
@@ -804,403 +804,572 @@ select {
 }
 
 /* ============================================================
-   Design system v2 — token bổ sung + component nền tảng dùng
-   chung, bắt đầu từ trang Technology Case Detail (đã duyệt
-   token system 2026-08-06). Không đổi token/class cũ ở trên để
-   không phá các trang chưa redesign (login/register/dashboard/
-   organization-verifications) — 2 hệ song song cho tới khi lan
-   dần sang các trang khác.
+   uikit-* — hệ thiết kế trích từ docs/design/*.jsx (duyệt
+   2026-08-06): accent indigo-700, 5-tone status (gray/blue/green/
+   amber/red). Đây là hệ thiết kế duy nhất hiện dùng cho các trang
+   đã đăng nhập (dashboard/resources/technology-cases/profile...).
+   `.btn`/`.card`/`.badge` gốc phía trên vẫn còn dùng ở `/`,
+   `/platform/organization-verifications`, `/assessments/[id]`,
+   `/gaps/[id]`, `/roadmaps/[id]` — sẽ chuyển nốt sang uikit-* khi
+   tới lượt xây các route đó.
    ============================================================ */
 
 :root {
-  --surface-0: #ffffff;
-  --surface-50: #f3f6f8;
-  --surface-200: #e1e7eb;
+  --uikit-indigo-50: #eef2ff;
+  --uikit-indigo-700: #4338ca;
+  --uikit-indigo-800: #3730a3;
 
-  --brand-50: #e7f1f3;
-  --brand-600: #0f6472;
-  --brand-700: #0a4a54;
+  --uikit-slate-50: #f8fafc;
+  --uikit-slate-100: #f1f5f9;
+  --uikit-slate-200: #e2e8f0;
+  --uikit-slate-400: #94a3b8;
+  --uikit-slate-500: #64748b;
+  --uikit-slate-700: #334155;
+  --uikit-slate-900: #0f172a;
 
-  --status-ok: #1a7a5e;
-  --status-ok-bg: #e6f4ee;
-  --status-pending: #a6740f;
-  --status-pending-bg: #fbf0dc;
-  --status-danger: #b3261e;
-  --status-danger-bg: #fbe9e7;
-  --status-neutral: #5b6b76;
-  --status-neutral-bg: #eef1f3;
+  --uikit-blue-50: #eff6ff;
+  --uikit-blue-500: #3b82f6;
+  --uikit-blue-800: #1e40af;
 
-  --ink-600: #4c5f6b;
-  --ink-300: #8496a1;
+  --uikit-emerald-50: #ecfdf5;
+  --uikit-emerald-500: #10b981;
+  --uikit-emerald-700: #047857;
+  --uikit-emerald-800: #065f46;
+
+  --uikit-amber-50: #fffbeb;
+  --uikit-amber-200: #fde68a;
+  --uikit-amber-500: #f59e0b;
+  --uikit-amber-600: #d97706;
+  --uikit-amber-700: #b45309;
+  --uikit-amber-800: #92400e;
+
+  --uikit-rose-50: #fff1f2;
+  --uikit-rose-500: #f43f5e;
+  --uikit-rose-700: #be123c;
+  --uikit-rose-800: #9f1239;
 }
 
-/* ---------- buttons (v2) — .ui-btn không bao giờ gạch chân;
-   .ui-link là biến thể DUY NHẤT có underline, dùng cho link chữ
-   trong câu, không phải cho hành động. ---------- */
+.uikit-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  background: var(--uikit-indigo-700);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+.uikit-brand--md {
+  width: 28px;
+  height: 28px;
+  font-size: 12px;
+}
+.uikit-brand--lg {
+  width: 40px;
+  height: 40px;
+  font-size: 15px;
+}
 
-.ui-btn {
+/* ---------- tone (dot/pill) ---------- */
+
+.uikit-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.uikit-dot--gray {
+  background: var(--uikit-slate-400);
+}
+.uikit-dot--blue {
+  background: var(--uikit-blue-500);
+}
+.uikit-dot--green {
+  background: var(--uikit-emerald-500);
+}
+.uikit-dot--amber {
+  background: var(--uikit-amber-500);
+}
+.uikit-dot--red {
+  background: var(--uikit-rose-500);
+}
+
+.uikit-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.uikit-pill--gray {
+  background: var(--uikit-slate-100);
+  color: var(--uikit-slate-700);
+}
+.uikit-pill--blue {
+  background: var(--uikit-blue-50);
+  color: var(--uikit-blue-800);
+}
+.uikit-pill--green {
+  background: var(--uikit-emerald-50);
+  color: var(--uikit-emerald-800);
+}
+.uikit-pill--amber {
+  background: var(--uikit-amber-50);
+  color: var(--uikit-amber-800);
+}
+.uikit-pill--red {
+  background: var(--uikit-rose-50);
+  color: var(--uikit-rose-800);
+}
+
+.uikit-statusdot {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--uikit-slate-700);
+}
+
+/* ---------- citation chip ---------- */
+
+.uikit-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--uikit-amber-200);
+  background: var(--uikit-amber-50);
+  color: var(--uikit-amber-800);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.uikit-chip__locator {
+  color: var(--uikit-amber-600);
+}
+
+/* ---------- card ---------- */
+
+.uikit-card {
+  background: #ffffff;
+  border: 1px solid var(--uikit-slate-200);
+  border-radius: var(--radius-md);
+  padding: var(--space-5);
+}
+.uikit-card + .uikit-card {
+  margin-top: var(--space-5);
+}
+
+.uikit-card-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-5);
+}
+@media (max-width: 760px) {
+  .uikit-card-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.uikit-statcard {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+.uikit-statcard__icon {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+}
+.uikit-statcard__icon--slate {
+  background: var(--uikit-slate-100);
+}
+.uikit-statcard__icon--indigo {
+  background: var(--uikit-indigo-50);
+}
+.uikit-statcard__icon--amber {
+  background: var(--uikit-amber-50);
+}
+.uikit-statcard__icon--rose {
+  background: var(--uikit-rose-50);
+}
+.uikit-statcard__icon--green {
+  background: var(--uikit-emerald-50);
+}
+.uikit-statcard__value {
+  font-family: var(--font-mono);
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--uikit-slate-900);
+  margin: 0;
+}
+.uikit-statcard__label {
+  font-size: 12px;
+  color: var(--uikit-slate-500);
+  margin: 0;
+}
+.uikit-statcard__hint {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: var(--uikit-slate-400);
+}
+
+/* ---------- section header ---------- */
+
+.uikit-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.uikit-section-header__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--uikit-slate-900);
+}
+.uikit-section-header__action {
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--uikit-indigo-700);
+  text-decoration: none;
+}
+.uikit-section-header__action:hover {
+  color: var(--uikit-indigo-800);
+}
+
+/* ---------- buttons ---------- */
+
+.uikit-btn {
   appearance: none;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
-  padding: 9px 16px;
+  padding: 9px 14px;
   font-family: var(--font-body);
   font-size: 14px;
-  font-weight: 600;
-  line-height: 1.2;
+  font-weight: 500;
   text-decoration: none;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-2);
+  gap: 6px;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
-
-.ui-btn:disabled {
+.uikit-btn:disabled {
   cursor: not-allowed;
-  opacity: 0.55;
+  opacity: 0.6;
 }
-
-.ui-btn--primary {
-  background: var(--brand-600);
-  color: #ffffff;
+.uikit-btn--full {
+  width: 100%;
 }
-.ui-btn--primary:hover:not(:disabled) {
-  background: var(--brand-700);
+.uikit-btn--primary {
+  background: var(--uikit-indigo-700);
+  color: #fff;
 }
-
-.ui-btn--secondary {
-  background: var(--surface-0);
-  border-color: var(--surface-200);
-  color: var(--ink-900);
+.uikit-btn--primary:hover:not(:disabled) {
+  background: var(--uikit-indigo-800);
 }
-.ui-btn--secondary:hover:not(:disabled) {
-  border-color: var(--brand-600);
-  color: var(--brand-700);
-}
-
-.ui-btn--ghost {
+.uikit-btn--ghost-slate {
   background: transparent;
-  color: var(--ink-600);
+  border-color: var(--uikit-slate-200);
+  color: var(--uikit-slate-700);
 }
-.ui-btn--ghost:hover:not(:disabled) {
-  background: var(--surface-50);
-  color: var(--ink-900);
+.uikit-btn--ghost-slate:hover:not(:disabled) {
+  background: var(--uikit-slate-50);
 }
-
-.ui-btn--danger {
-  background: var(--status-danger-bg);
-  color: var(--status-danger);
+.uikit-btn--ghost-green {
+  background: transparent;
+  border-color: var(--uikit-emerald-500);
+  color: var(--uikit-emerald-700);
 }
-.ui-btn--danger:hover:not(:disabled) {
-  background: var(--status-danger);
-  color: #ffffff;
+.uikit-btn--ghost-green:hover:not(:disabled) {
+  background: var(--uikit-emerald-50);
 }
-
-.ui-btn--sm {
-  padding: 6px 12px;
-  font-size: 13px;
+.uikit-btn--ghost-red {
+  background: transparent;
+  border-color: var(--uikit-rose-500);
+  color: var(--uikit-rose-700);
 }
-
-.ui-link {
-  color: var(--brand-600);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  font-weight: 500;
-}
-.ui-link:hover {
-  color: var(--brand-700);
+.uikit-btn--ghost-red:hover:not(:disabled) {
+  background: var(--uikit-rose-50);
 }
 
-/* ---------- status badge (v2) — tone chung cho mọi enum status ---------- */
+/* ---------- form fields ---------- */
 
-.ui-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-family: var(--font-mono);
+.uikit-field {
+  display: block;
+}
+.uikit-field__label {
+  display: block;
+  margin-bottom: 6px;
   font-size: 12px;
   font-weight: 500;
-  letter-spacing: 0.02em;
-  padding: 3px 9px;
-  border-radius: 5px;
-  white-space: nowrap;
+  color: var(--uikit-slate-700);
 }
-
-.ui-badge--ok {
-  background: var(--status-ok-bg);
-  color: var(--status-ok);
+.uikit-field__optional {
+  font-weight: 400;
+  color: var(--uikit-slate-400);
 }
-.ui-badge--pending {
-  background: var(--status-pending-bg);
-  color: var(--status-pending);
+.uikit-field__hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--uikit-slate-400);
 }
-.ui-badge--danger {
-  background: var(--status-danger-bg);
-  color: var(--status-danger);
-  font-weight: 700;
-}
-.ui-badge--neutral {
-  background: var(--status-neutral-bg);
-  color: var(--status-neutral);
-}
-
-/* ---------- card / section (v2) — viền mảnh phẳng, không đổ bóng ---------- */
-
-.ui-card {
-  background: var(--surface-0);
-  border: 1px solid var(--surface-200);
+.uikit-field input,
+.uikit-field select,
+.uikit-field textarea {
+  width: 100%;
+  border: 1px solid var(--uikit-slate-200);
   border-radius: var(--radius-sm);
+  background: #fff;
+  padding: 9px 12px;
+  font-size: 14px;
+  color: var(--uikit-slate-900);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.uikit-field textarea {
+  resize: vertical;
+}
+.uikit-field input:focus-visible,
+.uikit-field select:focus-visible,
+.uikit-field textarea:focus-visible {
+  outline: none;
+  border-color: var(--uikit-indigo-700);
+  box-shadow: 0 0 0 3px var(--uikit-indigo-50);
 }
 
-.ui-card__header {
-  padding: var(--space-4) var(--space-5);
-  border-bottom: 1px solid var(--surface-200);
+/* ---------- tabs ---------- */
+
+.uikit-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--uikit-slate-200);
+  margin-bottom: var(--space-5);
+}
+.uikit-tab {
+  appearance: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  padding: 8px 12px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--uikit-slate-500);
+}
+.uikit-tab:hover {
+  color: var(--uikit-slate-700);
+}
+.uikit-tab--active {
+  border-bottom-color: var(--uikit-indigo-700);
+  color: var(--uikit-indigo-700);
+}
+
+/* ---------- back link ---------- */
+
+.uikit-backlink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--uikit-slate-500);
+  text-decoration: none;
+  margin-bottom: var(--space-3);
+}
+.uikit-backlink:hover {
+  color: var(--uikit-slate-700);
+}
+
+/* ---------- shell (sidebar + top bar) ---------- */
+
+.uikit-shell {
+  min-height: 100dvh;
+  display: flex;
+  background: var(--uikit-slate-50);
+}
+
+.uikit-sidebar {
+  width: 224px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--uikit-slate-200);
+  background: #fff;
+  padding: var(--space-5) var(--space-3);
+}
+.uikit-sidebar__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-2);
+  margin-bottom: var(--space-6);
+  text-decoration: none;
+  color: var(--uikit-slate-900);
+  font-size: 14px;
+  font-weight: 600;
+}
+.uikit-sidebar__nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.uikit-sidebar__link {
+  display: block;
+  border-radius: var(--radius-sm);
+  padding: 9px 10px;
+  font-size: 14px;
+  color: var(--uikit-slate-700);
+  text-decoration: none;
+}
+.uikit-sidebar__link:hover {
+  background: var(--uikit-slate-50);
+}
+.uikit-sidebar__link--active {
+  background: var(--uikit-indigo-50);
+  color: var(--uikit-indigo-700);
+  font-weight: 500;
+}
+
+.uikit-shell__main {
+  flex: 1;
+  min-width: 0;
+}
+
+.uikit-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-4);
+  border-bottom: 1px solid var(--uikit-slate-200);
+  background: #fff;
+  padding: var(--space-3) var(--space-6);
+}
+.uikit-topbar__role {
+  font-size: 12px;
+  color: var(--uikit-slate-400);
+}
+.uikit-topbar__user {
+  font-size: 14px;
+  color: var(--uikit-slate-700);
+}
+.uikit-topbar__logout {
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--uikit-slate-500);
+}
+.uikit-topbar__logout:hover {
+  color: var(--uikit-rose-700);
+}
+
+.uikit-main {
+  padding: var(--space-6);
+  max-width: 1040px;
+}
+
+/* ---------- misc layout helpers ---------- */
+
+.uikit-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.uikit-row-list {
+  display: flex;
+  flex-direction: column;
+}
+.uikit-row-list > * + * {
+  border-top: 1px solid var(--uikit-slate-100);
+}
+.uikit-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-3);
-  flex-wrap: wrap;
+  gap: var(--space-4);
+  padding: var(--space-3) 0;
 }
-
-.ui-card__title {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--ink-600);
+.uikit-row-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  width: 100%;
+  padding: var(--space-3) 0;
+  background: transparent;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  text-decoration: none;
+  font: inherit;
 }
-
-.ui-card__body {
-  padding: var(--space-5);
+.uikit-row-link:hover {
+  background: var(--uikit-slate-50);
 }
-
-.ui-card + .ui-card {
-  margin-top: var(--space-5);
+.uikit-empty {
+  padding: var(--space-5) 0;
+  font-size: 14px;
+  color: var(--uikit-slate-500);
 }
-
-.ui-card-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-5);
-}
-
-@media (max-width: 760px) {
-  .ui-card-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* ---------- table (v2) — dày đặc, quét nhanh, không phải card to ---------- */
-
-.ui-table {
+.uikit-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 14px;
 }
-
-.ui-table th {
+.uikit-table th {
   text-align: left;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--ink-400);
-  padding: var(--space-2) var(--space-3);
-  border-bottom: 1px solid var(--surface-200);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--uikit-slate-400);
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--uikit-slate-100);
 }
-
-.ui-table td {
-  padding: var(--space-3);
-  border-bottom: 1px solid var(--surface-200);
+.uikit-table td {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--uikit-slate-100);
   vertical-align: top;
 }
-
-.ui-table tbody tr:last-child td {
-  border-bottom: none;
+.uikit-table tbody tr:hover td {
+  background: var(--uikit-slate-50);
 }
-
-.ui-table tbody tr:hover td {
-  background: var(--surface-50);
-}
-
-/* ---------- empty state (v2) ---------- */
-
-.ui-empty {
-  padding: var(--space-6) var(--space-4);
-  text-align: center;
-  color: var(--ink-400);
+.uikit-alert-error {
+  border-radius: var(--radius-sm);
+  padding: var(--space-3) var(--space-4);
   font-size: 14px;
+  background: var(--uikit-rose-50);
+  color: var(--uikit-rose-700);
 }
-
-/* ---------- provenance rail (v2) — signature: vệt định vị trích
-   dẫn, ẩn dụ vạch chia caliper. Dùng cho mọi khối nội dung có
-   bằng chứng/evidence đi kèm. ---------- */
-
-.rail {
-  position: relative;
-  padding-left: var(--space-5);
-}
-
-.rail::before {
-  content: "";
-  position: absolute;
-  left: 3px;
-  top: 4px;
-  bottom: 4px;
-  width: 2px;
-  background: var(--brand-600);
-  border-radius: 1px;
-}
-
-.rail-item {
-  position: relative;
-  padding: var(--space-3) 0;
-}
-
-.rail-item + .rail-item {
-  border-top: 1px solid var(--surface-200);
-}
-
-.rail-item::before {
-  content: "";
-  position: absolute;
-  left: calc(-1 * var(--space-5) + 3px);
-  top: 18px;
-  width: 10px;
-  height: 2px;
-  background: var(--brand-600);
-}
-
-.rail-item__claim {
+.uikit-alert-success {
+  border-radius: var(--radius-sm);
+  padding: var(--space-3) var(--space-4);
   font-size: 14px;
-  color: var(--ink-900);
+  background: var(--uikit-emerald-50);
+  color: var(--uikit-emerald-700);
 }
-
-.rail-item__locator {
-  margin-top: var(--space-1);
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--brand-600);
-}
-
-.rail-item__locator::before {
-  content: "⌐";
-}
-
-/* ---------- roadmap mini-timeline (v2) ---------- */
-
-.rm-timeline {
-  display: flex;
-  align-items: flex-start;
-  overflow-x: auto;
-  padding: var(--space-2) 0;
-}
-
-.rm-step {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  min-width: 104px;
-  flex-shrink: 0;
-}
-
-.rm-step__dot {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 2px solid var(--surface-200);
-  background: var(--surface-0);
-  flex-shrink: 0;
-}
-
-.rm-step--done .rm-step__dot {
-  background: var(--status-ok);
-  border-color: var(--status-ok);
-}
-
-.rm-step--current .rm-step__dot {
-  background: var(--brand-600);
-  border-color: var(--brand-600);
-  box-shadow: 0 0 0 3px var(--brand-50);
-}
-
-.rm-step--blocked .rm-step__dot {
-  background: var(--status-danger);
-  border-color: var(--status-danger);
-}
-
-.rm-step__label {
-  margin-top: var(--space-2);
-  font-size: 12px;
-  color: var(--ink-700);
+.uikit-soon {
+  padding: var(--space-8) var(--space-5);
   text-align: center;
-  padding: 0 4px;
+  color: var(--uikit-slate-500);
 }
-
-.rm-connector {
-  flex: 1;
-  height: 2px;
-  background: var(--surface-200);
-  min-width: 24px;
-  margin-top: 6px;
-}
-
-.rm-connector--done {
-  background: var(--status-ok);
-}
-
-/* ---------- meter (composite score bar) ---------- */
-
-.ui-meter {
-  height: 8px;
-  border-radius: 999px;
-  background: var(--surface-200);
-  overflow: hidden;
-}
-
-.ui-meter__fill {
-  height: 100%;
-  background: var(--brand-600);
-  border-radius: 999px;
-}
-
-/* ---------- disclosure (toggle form ẩn/hiện, thay vì form luôn mở) ---------- */
-
-.ui-disclosure summary {
-  cursor: pointer;
-  list-style: none;
-  color: var(--brand-600);
-  font-size: 13px;
+.uikit-soon__title {
+  font-size: 16px;
   font-weight: 600;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.ui-disclosure summary::-webkit-details-marker {
-  display: none;
-}
-
-.ui-disclosure summary::before {
-  content: "▸";
-  font-size: 11px;
-  transition: transform 0.15s ease;
-}
-
-.ui-disclosure[open] summary::before {
-  transform: rotate(90deg);
-}
-
-.ui-disclosure__body {
-  margin-top: var(--space-4);
-}
-
-.ui-mt-4 {
-  margin-top: var(--space-4);
+  color: var(--uikit-slate-700);
+  margin-bottom: var(--space-2);
 }

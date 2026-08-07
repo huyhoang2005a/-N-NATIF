@@ -1,20 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { TechnologyCaseResponse } from "@r2m/contracts";
+import type { MeResponse, OrganizationResponse, TechnologyCaseResponse } from "@r2m/contracts";
 import { authFetch, SessionExpiredError } from "../../lib/api-client";
-import { TECHNOLOGY_CASE_STATUS_LABELS, technologyCaseStatusTone } from "../../lib/labels";
+import { PLATFORM_ROLE_LABELS, TECHNOLOGY_CASE_STATUS_LABELS } from "../../lib/labels";
+import { navForPersona, personaOf } from "../../lib/nav";
 import { getAccessToken } from "../../lib/session";
-import { ButtonLink, TextLink } from "../_components/ui/Button";
-import { Card, CardBody } from "../_components/ui/Card";
-import { EmptyState } from "../_components/ui/EmptyState";
-import { StatusBadge } from "../_components/ui/StatusBadge";
-import { Table } from "../_components/ui/Table";
-import { SiteHeader } from "../_components/SiteHeader";
+import { toneOf, TECHNOLOGY_CASE_STATUS_TONE } from "../../lib/tone";
+import { Card, PrimaryButtonLink, Shell, StatusDot } from "../../components/ui";
 
 export default function TechnologyCasesPage() {
   const router = useRouter();
+  const [me, setMe] = useState<MeResponse | null>(null);
+  const [organizations, setOrganizations] = useState<OrganizationResponse[] | null>(null);
   const [cases, setCases] = useState<TechnologyCaseResponse[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -23,8 +23,16 @@ export default function TechnologyCasesPage() {
       router.push("/login");
       return;
     }
-    authFetch<TechnologyCaseResponse[]>("/technology-cases")
-      .then(setCases)
+    Promise.all([
+      authFetch<MeResponse>("/me"),
+      authFetch<OrganizationResponse[]>("/organizations"),
+      authFetch<TechnologyCaseResponse[]>("/technology-cases"),
+    ])
+      .then(([meResponse, orgs, rows]) => {
+        setMe(meResponse);
+        setOrganizations(orgs);
+        setCases(rows);
+      })
       .catch((err) => {
         if (err instanceof SessionExpiredError) {
           router.push("/login");
@@ -36,56 +44,47 @@ export default function TechnologyCasesPage() {
 
   if (error) {
     return (
-      <div className="shell">
-        <SiteHeader />
-        <div className="container" style={{ padding: "var(--space-6) var(--space-5) var(--space-9)" }}>
-          <p className="alert alert-error" role="alert">
-            {error}
-          </p>
-        </div>
+      <div className="uikit-main" style={{ maxWidth: 720, margin: "0 auto" }}>
+        <p className="uikit-alert-error" role="alert">
+          {error}
+        </p>
       </div>
     );
   }
 
+  if (!me || !organizations || !cases) return null;
+
+  const nav = navForPersona(personaOf(me, organizations), me.platformRole === "PLATFORM_ADMIN");
+
   return (
-    <div className="shell">
-      <SiteHeader />
-      <div className="container" style={{ padding: "var(--space-6) var(--space-5) var(--space-9)", maxWidth: 920 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "var(--space-4)" }}>
-          <div>
-            <span className="eyebrow">Phase 3</span>
-            <h1 style={{ fontSize: 28, marginTop: "var(--space-3)" }}>Technology Case</h1>
-          </div>
-          <ButtonLink href="/technology-cases/new" variant="primary">
-            + Tạo case mới
-          </ButtonLink>
+    <Shell brandLabel="R2M" me={me} roleLabel={PLATFORM_ROLE_LABELS[me.platformRole] ?? me.platformRole} nav={nav}>
+      <div className="uikit-stack">
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h1 style={{ fontSize: 22 }}>Case của tôi</h1>
+          <PrimaryButtonLink href="/technology-cases/new">+ Tạo case mới</PrimaryButtonLink>
         </div>
 
-        <Card style={{ marginTop: "var(--space-6)" }}>
-          <CardBody>
-            {cases === null ? null : cases.length === 0 ? (
-              <EmptyState message="Chưa có technology case nào bạn có quyền xem. Tạo case đầu tiên để bắt đầu theo dõi tiến trình thương mại hoá." />
-            ) : (
-              <Table columns={["Case", "Định danh", "Trạng thái"]}>
-                {cases.map((c) => (
-                  <tr key={c.id}>
-                    <td>
-                      <TextLink href={`/technology-cases/${c.id}`}>{c.title}</TextLink>
-                    </td>
-                    <td style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--ink-400)" }}>{c.slug}</td>
-                    <td>
-                      <StatusBadge
-                        tone={technologyCaseStatusTone(c.lifecycleStatus)}
-                        label={TECHNOLOGY_CASE_STATUS_LABELS[c.lifecycleStatus] ?? c.lifecycleStatus}
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </Table>
-            )}
-          </CardBody>
+        <Card>
+          {cases.length === 0 ? (
+            <p className="uikit-empty">
+              Chưa có case nào. Tạo case đầu tiên để bắt đầu theo dõi quá trình đánh giá, xử
+              lý gap và lập lộ trình thương mại hoá công nghệ của bạn.
+            </p>
+          ) : (
+            <div className="uikit-row-list">
+              {cases.map((c) => (
+                <Link key={c.id} href={`/technology-cases/${c.id}`} className="uikit-row-link">
+                  <span style={{ fontSize: 14, fontWeight: 500 }}>{c.title}</span>
+                  <StatusDot
+                    tone={toneOf(TECHNOLOGY_CASE_STATUS_TONE, c.lifecycleStatus)}
+                    label={TECHNOLOGY_CASE_STATUS_LABELS[c.lifecycleStatus] ?? c.lifecycleStatus}
+                  />
+                </Link>
+              ))}
+            </div>
+          )}
         </Card>
       </div>
-    </div>
+    </Shell>
   );
 }

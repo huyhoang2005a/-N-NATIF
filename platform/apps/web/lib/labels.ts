@@ -1,5 +1,4 @@
 import type { RegisterOrganizationRequest } from "@r2m/contracts";
-import type { StatusTone } from "../app/_components/ui/StatusBadge";
 
 export const ORG_TYPE_LABELS: Record<RegisterOrganizationRequest["organizationType"], string> = {
   RESEARCH_UNIT: "Đơn vị nghiên cứu",
@@ -34,6 +33,32 @@ export const VERIFICATION_REQUEST_STATUS_LABELS: Record<string, string> = {
   APPROVED: "Đã duyệt",
   REJECTED: "Đã từ chối",
   CANCELLED: "Đã huỷ",
+};
+
+// ---------- Phase 2: Resource ----------
+
+export const RESOURCE_TYPE_LABELS: Record<string, string> = {
+  PAPER: "Bài báo",
+  REPORT: "Báo cáo",
+  DATASET: "Bộ dữ liệu",
+  MODEL: "Mô hình",
+  CHECKPOINT: "Checkpoint mô hình",
+  SOURCE_CODE: "Mã nguồn",
+  PATENT: "Bằng sáng chế",
+  LICENSE: "Giấy phép",
+  ARCHITECTURE_DOCUMENT: "Tài liệu kiến trúc",
+  EXPERIMENT_RESULT: "Kết quả thực nghiệm",
+  PILOT_EVIDENCE: "Bằng chứng thí điểm",
+  VIDEO: "Video",
+  OTHER: "Khác",
+};
+
+export const RESOURCE_ACCESS_LEVEL_LABELS: Record<string, string> = {
+  PUBLIC: "Công khai",
+  ORGANIZATION: "Theo tổ chức",
+  CASE_ONLY: "Chỉ trong case",
+  APPROVAL_REQUIRED: "Cần cấp quyền",
+  PRIVATE: "Riêng tư",
 };
 
 // ---------- Phase 3: Technology Case ----------
@@ -197,68 +222,3 @@ export const DEPENDENCY_TYPE_LABELS: Record<string, string> = {
   START_TO_FINISH: "Bắt đầu trước → Kết thúc sau",
 };
 
-// ============================================================
-// Design system v2 (đã duyệt 2026-08-06) — `tone` dùng cho
-// <StatusBadge>, thay cho các hàm `xxxBadgeClass()` cũ ở trên
-// (giữ nguyên hàm cũ cho trang chưa redesign, không xoá).
-// ============================================================
-
-export function orgStatusTone(status: string): StatusTone {
-  if (status === "ACTIVE") return "ok";
-  if (status === "REJECTED" || status === "SUSPENDED") return "danger";
-  return "pending";
-}
-
-export function verificationRequestStatusTone(status: string): StatusTone {
-  if (status === "APPROVED") return "ok";
-  if (status === "REJECTED" || status === "CANCELLED") return "danger";
-  return "pending";
-}
-
-export function technologyCaseStatusTone(status: string): StatusTone {
-  if (["ROADMAP_APPROVED", "PILOT_READY", "TRANSFER_READY", "COMMERCIALIZED"].includes(status)) return "ok";
-  if (status === "ARCHIVED") return "danger";
-  return "pending";
-}
-
-export function evidenceStatusTone(status: string): StatusTone {
-  if (status === "ACTIVE") return "ok";
-  if (status === "REJECTED") return "danger";
-  return "neutral";
-}
-
-export function assessmentStatusTone(status: string): StatusTone {
-  if (status === "APPROVED") return "ok";
-  if (status === "SUPERSEDED") return "danger";
-  return "pending";
-}
-
-export function gapSeverityTone(severity: string): StatusTone {
-  if (severity === "CRITICAL" || severity === "HIGH") return "danger";
-  if (severity === "MEDIUM") return "pending";
-  return "neutral";
-}
-
-export function gapStatusTone(status: string): StatusTone {
-  if (status === "RESOLVED" || status === "CLOSED") return "ok";
-  if (status === "OPEN") return "danger";
-  return "pending";
-}
-
-export function roadmapStatusTone(status: string): StatusTone {
-  if (["APPROVED", "ACTIVE", "COMPLETED"].includes(status)) return "ok";
-  if (status === "REJECTED" || status === "SUPERSEDED") return "danger";
-  return "pending";
-}
-
-export function milestoneStatusTone(status: string): StatusTone {
-  if (status === "COMPLETED") return "ok";
-  if (status === "BLOCKED" || status === "CANCELLED") return "danger";
-  return "pending";
-}
-
-export function taskStatusTone(status: string): StatusTone {
-  if (status === "DONE") return "ok";
-  if (status === "BLOCKED" || status === "CANCELLED") return "danger";
-  return "pending";
-}
