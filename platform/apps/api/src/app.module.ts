@@ -11,6 +11,7 @@ import { ResourceCatalogModule } from "./modules/resource-catalog/resource-catal
 import { TechnologyCaseModule } from "./modules/technology-case/technology-case.module";
 import { AssessmentGapModule } from "./modules/assessment-gap/assessment-gap.module";
 import { RoadmapTransferModule } from "./modules/roadmap-transfer/roadmap-transfer.module";
+import { CompanyDiscoveryModule } from "./modules/company-discovery/company-discovery.module";
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { RoadmapTransferModule } from "./modules/roadmap-transfer/roadmap-transf
     TechnologyCaseModule,
     AssessmentGapModule,
     RoadmapTransferModule,
+    CompanyDiscoveryModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

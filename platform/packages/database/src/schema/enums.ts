@@ -294,3 +294,53 @@ export const dependencyTypeEnum = pgEnum("dependency_type", [
   "FINISH_TO_FINISH",
   "START_TO_FINISH",
 ]);
+
+// Phase 5 (Company & Discovery) — ported 1:1 from schema_v5_production.dbml.
+
+export const researchNeedStatusEnum = pgEnum("research_need_status", [
+  "DRAFT",
+  "OPEN",
+  "PAUSED",
+  "CLOSED",
+  "ARCHIVED",
+]);
+
+export const proposalStatusEnum = pgEnum("proposal_status", [
+  "DRAFT",
+  "SUBMITTED",
+  "UNDER_REVIEW",
+  "ACCEPTED",
+  "REJECTED",
+  "WITHDRAWN",
+]);
+
+export const recommendationRunStatusEnum = pgEnum("recommendation_run_status", [
+  "QUEUED",
+  "RUNNING",
+  "COMPLETED",
+  "FAILED",
+  "CANCELLED",
+]);
+
+export const recommendationItemStatusEnum = pgEnum("recommendation_item_status", [
+  "ACTIVE",
+  "DISMISSED",
+  "SELECTED",
+]);
+
+export const caseInitiationStatusEnum = pgEnum("case_initiation_status", [
+  "PENDING",
+  "ACCEPTED",
+  "DECLINED",
+  "CANCELLED",
+  "EXPIRED",
+]);
+
+/** Additive (Phase 5 Sprint 5.5, "Feed" extension) — not in the original Phase 5 lock,
+ * added so `recommendation_run` can represent a company-profile-driven run with no single
+ * research_need attached. See schema_v5_production.dbml migration note next to
+ * `recommendation_run`. */
+export const recommendationRunTypeEnum = pgEnum("recommendation_run_type", [
+  "FOCUSED",
+  "FEED",
+]);

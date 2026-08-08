@@ -186,6 +186,14 @@ Enum RecommendationRunStatus {
   CANCELLED
 }
 
+// Additive (Phase 5 Sprint 5.5, "Feed" extension) — distinguishes a run tied to one
+// research_need (FOCUSED) from a run driven by company_profile with no single need
+// (FEED). See migration note on recommendation_run below.
+Enum RecommendationRunType {
+  FOCUSED
+  FEED
+}
+
 Enum RecommendationItemStatus {
   ACTIVE
   DISMISSED
@@ -517,6 +525,10 @@ Table organization_member {
 Table author_profile {
   user_id uuid [pk, ref: - user_account.id]
   current_affiliation_org_id uuid [ref: > organization.id]
+  // Additive (Phase 5 Sprint 5.7): auto-generated when verification_status → VERIFIED
+  // (from display name + anti-collision suffix), never user-editable at first release.
+  // Null for unverified authors (no public profile page).
+  public_slug varchar(160) [unique]
   orcid varchar(50) [unique]
   bio text
   expertise_tags text[]
@@ -801,10 +813,18 @@ Table annotation_revision {
 // 5. DISCOVERY & RECOMMENDATION
 // ============================================================
 
+// Additive (Phase 5 Sprint 5.5, "Feed" extension, 2026-08-07): research_need_id /
+// need_statement_version_id nullable + company_organization_id + run_type added so this
+// table can represent a company-profile-driven FEED run with no single research_need.
+// Exactly one of (research_need_id + need_statement_version_id) vs company_organization_id
+// is non-null depending on run_type — enforced in SQL (chk_recommendation_run_context_matches_type),
+// same technique as verification_document's "exactly one request FK" constraint.
 Table recommendation_run {
   id uuid [pk, default: `gen_random_uuid()`]
-  research_need_id uuid [not null, ref: > research_need.id]
-  need_statement_version_id uuid [not null, ref: > need_statement_version.id]
+  research_need_id uuid [ref: > research_need.id]
+  need_statement_version_id uuid [ref: > need_statement_version.id]
+  company_organization_id uuid [ref: > organization.id]
+  run_type RecommendationRunType [not null, default: 'FOCUSED']
   requested_by_user_id uuid [not null, ref: > user_account.id]
   status RecommendationRunStatus [not null, default: 'QUEUED']
   model_provider varchar(100)
@@ -820,7 +840,10 @@ Table recommendation_run {
   indexes {
     (research_need_id, created_at)
     (status, created_at)
+    (company_organization_id, created_at)
   }
+
+  Note: 'Exactly one of (research_need_id + need_statement_version_id) vs company_organization_id must be non-null, matching run_type. Enforced in SQL.'
 }
 
 Table recommendation_item {

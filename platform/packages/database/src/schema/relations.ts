@@ -45,6 +45,16 @@ import {
 } from "./roadmap";
 import type { outboxEvent } from "./platform-ops";
 import { auditLog, idempotencyKey, notification } from "./platform-ops";
+import {
+  caseInitiationRequest,
+  companyProfile,
+  needStatementVersion,
+  recommendationCitation,
+  recommendationItem,
+  recommendationRun,
+  researchNeed,
+  researchProposal,
+} from "./company-discovery";
 
 export const userAccountRelations = relations(userAccount, ({ many, one }) => ({
   identities: many(userIdentity),
@@ -69,10 +79,14 @@ export const userProfileRelations = relations(userProfile, ({ one }) => ({
   }),
 }));
 
-export const organizationRelations = relations(organization, ({ many }) => ({
+export const organizationRelations = relations(organization, ({ many, one }) => ({
   domains: many(organizationDomain),
   members: many(organizationMember),
   verificationRequests: many(organizationVerificationRequest),
+  companyProfile: one(companyProfile, {
+    fields: [organization.id],
+    references: [companyProfile.organizationId],
+  }),
 }));
 
 export const organizationDomainRelations = relations(organizationDomain, ({ one }) => ({
@@ -296,6 +310,18 @@ export const caseOriginRelations = relations(caseOrigin, ({ one }) => ({
   technologyCase: one(technologyCase, {
     fields: [caseOrigin.technologyCaseId],
     references: [technologyCase.id],
+  }),
+  recommendationItem: one(recommendationItem, {
+    fields: [caseOrigin.recommendationItemId],
+    references: [recommendationItem.id],
+  }),
+  researchProposal: one(researchProposal, {
+    fields: [caseOrigin.researchProposalId],
+    references: [researchProposal.id],
+  }),
+  caseInitiationRequest: one(caseInitiationRequest, {
+    fields: [caseOrigin.caseInitiationRequestId],
+    references: [caseInitiationRequest.id],
   }),
 }));
 
@@ -623,4 +649,136 @@ export const idempotencyKeyRelations = relations(idempotencyKey, ({ one }) => ({
 }));
 
 // outboxEvent has no FK relations — it references aggregates polymorphically by type/id.
+
+// ---------- Phase 5: Company & Discovery ----------
+
+export const companyProfileRelations = relations(companyProfile, ({ one, many }) => ({
+  organization: one(organization, {
+    fields: [companyProfile.organizationId],
+    references: [organization.id],
+  }),
+  contactUser: one(userAccount, {
+    fields: [companyProfile.contactUserId],
+    references: [userAccount.id],
+  }),
+  researchNeeds: many(researchNeed),
+}));
+
+export const researchNeedRelations = relations(researchNeed, ({ one, many }) => ({
+  companyOrganization: one(organization, {
+    fields: [researchNeed.companyOrganizationId],
+    references: [organization.id],
+  }),
+  createdBy: one(userAccount, {
+    fields: [researchNeed.createdByUserId],
+    references: [userAccount.id],
+  }),
+  statementVersions: many(needStatementVersion),
+  proposals: many(researchProposal),
+  recommendationRuns: many(recommendationRun),
+}));
+
+export const needStatementVersionRelations = relations(needStatementVersion, ({ one }) => ({
+  researchNeed: one(researchNeed, {
+    fields: [needStatementVersion.researchNeedId],
+    references: [researchNeed.id],
+  }),
+  createdBy: one(userAccount, {
+    fields: [needStatementVersion.createdByUserId],
+    references: [userAccount.id],
+  }),
+}));
+
+export const researchProposalRelations = relations(researchProposal, ({ one }) => ({
+  researchNeed: one(researchNeed, {
+    fields: [researchProposal.researchNeedId],
+    references: [researchNeed.id],
+  }),
+  needStatementVersion: one(needStatementVersion, {
+    fields: [researchProposal.needStatementVersionId],
+    references: [needStatementVersion.id],
+  }),
+  proposerAuthor: one(authorProfile, {
+    fields: [researchProposal.proposerAuthorUserId],
+    references: [authorProfile.userId],
+  }),
+  proposerOrganization: one(organization, {
+    fields: [researchProposal.proposerOrganizationId],
+    references: [organization.id],
+  }),
+  decidedBy: one(userAccount, {
+    fields: [researchProposal.decidedByUserId],
+    references: [userAccount.id],
+  }),
+}));
+
+export const recommendationRunRelations = relations(recommendationRun, ({ one, many }) => ({
+  researchNeed: one(researchNeed, {
+    fields: [recommendationRun.researchNeedId],
+    references: [researchNeed.id],
+  }),
+  needStatementVersion: one(needStatementVersion, {
+    fields: [recommendationRun.needStatementVersionId],
+    references: [needStatementVersion.id],
+  }),
+  companyOrganization: one(organization, {
+    fields: [recommendationRun.companyOrganizationId],
+    references: [organization.id],
+  }),
+  requestedBy: one(userAccount, {
+    fields: [recommendationRun.requestedByUserId],
+    references: [userAccount.id],
+  }),
+  items: many(recommendationItem),
+}));
+
+export const recommendationItemRelations = relations(recommendationItem, ({ one, many }) => ({
+  recommendationRun: one(recommendationRun, {
+    fields: [recommendationItem.recommendationRunId],
+    references: [recommendationRun.id],
+  }),
+  resourceVersion: one(resourceVersion, {
+    fields: [recommendationItem.resourceVersionId],
+    references: [resourceVersion.id],
+  }),
+  citations: many(recommendationCitation),
+}));
+
+export const recommendationCitationRelations = relations(recommendationCitation, ({ one }) => ({
+  recommendationItem: one(recommendationItem, {
+    fields: [recommendationCitation.recommendationItemId],
+    references: [recommendationItem.id],
+  }),
+  citation: one(citation, {
+    fields: [recommendationCitation.citationId],
+    references: [citation.id],
+  }),
+}));
+
+export const caseInitiationRequestRelations = relations(caseInitiationRequest, ({ one }) => ({
+  recommendationItem: one(recommendationItem, {
+    fields: [caseInitiationRequest.recommendationItemId],
+    references: [recommendationItem.id],
+  }),
+  requestingOrganization: one(organization, {
+    fields: [caseInitiationRequest.requestingOrganizationId],
+    references: [organization.id],
+  }),
+  requestedBy: one(userAccount, {
+    fields: [caseInitiationRequest.requestedByUserId],
+    references: [userAccount.id],
+  }),
+  targetAuthor: one(authorProfile, {
+    fields: [caseInitiationRequest.targetAuthorUserId],
+    references: [authorProfile.userId],
+  }),
+  targetOrganization: one(organization, {
+    fields: [caseInitiationRequest.targetOrganizationId],
+    references: [organization.id],
+  }),
+  respondedBy: one(userAccount, {
+    fields: [caseInitiationRequest.respondedByUserId],
+    references: [userAccount.id],
+  }),
+}));
 export type OutboxEventRow = typeof outboxEvent.$inferSelect;

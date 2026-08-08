@@ -12,6 +12,10 @@ export const authorProfile = pgTable("author_profile", {
     .primaryKey()
     .references(() => userAccount.id),
   currentAffiliationOrgId: uuid("current_affiliation_org_id").references(() => organization.id),
+  // Additive (Phase 5 Sprint 5.7): generated automatically when verificationStatus
+  // transitions to VERIFIED (from display name + anti-collision suffix) — never
+  // user-editable at first release. Nullable: unverified authors have no public profile.
+  publicSlug: varchar("public_slug", { length: 160 }).unique(),
   orcid: varchar("orcid", { length: 50 }).unique(),
   bio: text("bio"),
   expertiseTags: text("expertise_tags").array(),

@@ -43,6 +43,13 @@
       "when": 1786099910138,
       "tag": "0005_nervous_arclight",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786183072759,
+      "tag": "0006_clever_inhumans",
+      "breakpoints": true
     }
   ]
 }

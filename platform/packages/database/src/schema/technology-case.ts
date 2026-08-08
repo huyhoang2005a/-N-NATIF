@@ -1,4 +1,5 @@
 import { index, integer, pgTable, text, timestamp, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
+import { caseInitiationRequest, recommendationItem, researchProposal } from "./company-discovery";
 import { userAccount } from "./identity";
 import { organization } from "./organization";
 import { annotation, citation, resourceVersion } from "./resource";
@@ -38,16 +39,22 @@ export const technologyCase = pgTable(
   ],
 );
 
-/** `recommendation_item_id` / `research_proposal_id` / `case_initiation_request_id`
- * (Phase 5 "Discovery & Recommendation" FKs) omitted — those tables don't exist yet.
- * Phase 3 only ever creates `origin_type = MANUAL`. Added additively in Phase 5, same
- * pattern as `resource_access_grant.source_transfer_manifest_id` in Phase 2. */
+/** `recommendationItemId`/`researchProposalId`/`caseInitiationRequestId` added
+ * additively in Phase 5 (Sprint 5.3/5.6) — same pattern as
+ * `resource_access_grant.source_transfer_manifest_id` in Phase 2. Phase 3 only ever set
+ * `origin_type = MANUAL` with these null; exactly one of the 3 must be non-null when
+ * `origin_type` is `RESEARCH_PROPOSAL`/`DISCOVERY_RECOMMENDATION` respectively (enforced at
+ * the application/service layer that creates the case, not a DB CHECK — mirrors how
+ * `origin_type = MANUAL` never gets a CHECK constraint either). */
 export const caseOrigin = pgTable("case_origin", {
   technologyCaseId: uuid("technology_case_id")
     .primaryKey()
     .references(() => technologyCase.id),
   originType: caseOriginTypeEnum("origin_type").notNull(),
   importedSourceReference: text("imported_source_reference"),
+  recommendationItemId: uuid("recommendation_item_id").references(() => recommendationItem.id),
+  researchProposalId: uuid("research_proposal_id").references(() => researchProposal.id),
+  caseInitiationRequestId: uuid("case_initiation_request_id").references(() => caseInitiationRequest.id),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

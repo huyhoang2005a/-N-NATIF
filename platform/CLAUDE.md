@@ -17,6 +17,10 @@ diễn schema/business rule — luôn tra `docs/spec/` trước khi viết code 
 | Biết chi tiết workflow của 1 Phase cụ thể (breakdown sprint, danh sách API/endpoint, business rule, error code, testing checklist, Definition of Done) | `docs/spec/01_workflow_theo_phase.md` — tìm đúng mục "Phase N" |
 | Xem sơ đồ Use Case tổng thể hoặc theo từng bounded context (actor nào gọi UC nào, quan hệ include/extend) | `docs/spec/02_usecase_diagram.md` |
 | Xem Activity Diagram (luồng nghiệp vụ từng bước, actor nào làm gì, decision point nào) của 1 Phase trước khi code | `docs/spec/03_activity_diagrams.md` — tìm đúng mục "Phase N" |
+| Hiểu đầy đủ thiết kế Phase 5 (Company & Discovery + Feed) trước khi code | `docs/spec/06_phase5_full_design.md` — đọc file này TRƯỚC, đây là bản tổng hợp đầy đủ; chỉ mở 04/05/07 khi cần đào sâu 1 phần cụ thể |
+| Đào sâu thuật toán recommendation (Phase 5a full-text / 5b semantic) | `docs/spec/04_phase5_recommendation_detail.md` |
+| Đào sâu quyết định thêm Feed (recommendation không gắn research_need) | `docs/spec/05_phase5_feed_extension.md` |
+| Đào sâu tóm tắt trên card + trang công khai tác giả/tổ chức | `docs/spec/07_phase5_public_profiles.md` |
 
 ## Tech stack bắt buộc (không tự đổi)
 
@@ -108,6 +112,17 @@ Phase nằm trong `docs/spec/01_workflow_theo_phase.md`; activity diagram tươn
   typecheck/lint/test tự động, (2) ít nhất 1 integration test qua NestJS DI
   container thật cho module tổng hợp mới thêm.
 5. Company & Discovery (bao gồm AI recommendation)
++### Lưu ý riêng khi bắt đầu Phase 5
++
++- Đọc `docs/spec/06_phase5_full_design.md` trước — không đọc rời rạc 04/05/07 trừ khi cần đào
++  sâu 1 phần.
++- Kiểm tra `resource_ingestion_job` đã xử lý được ít nhất vài resource thật trước khi test —
++  cả recommendation FOCUSED lẫn Feed đều vô nghĩa nếu `resource_chunk` rỗng.
++- Trình bày kế hoạch migration schema Feed (nullable 2 cột + thêm `company_organization_id` +
++  `run_type` + CHECK constraint) trước khi chạy — đây là thay đổi schema thật đầu tiên kể từ
++  Phase 0 spec lock.
++- Tham khảo `apps/web/app/docs/design/06-phase5-discovery.jsx` khi dựng UI Feed/Nhu cầu nghiên
++  cứu/trang công khai tác giả-tổ chức.
 6. Transfer & Moderation
 7. Production hardening
 
@@ -241,4 +256,5 @@ r2m-v5/
    có citation_id trỏ resource_version) — không dùng trang trí ở chỗ khác dù
    trông hợp mắt.
    
-   | Tham khảo hướng thiết kế UI trước khi dựng page mới | `docs/design/` (5 file .jsx) + docs/design/README.md 
+   
+  + | Tham khảo hướng thiết kế UI trước khi dựng page mới | `apps/web/app/docs/design/` (6 file .jsx: 01-author, 02-company, 03-verifier, 04-admin, 05-auth theo role/đăng nhập; 06-phase5-discovery theo module Company & Discovery + Feed) + README.md trong đó — KHÔNG phải `docs/design/` ở root |
