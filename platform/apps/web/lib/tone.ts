@@ -104,6 +104,38 @@ export const TASK_STATUS_TONE: Record<string, Tone> = {
   CANCELLED: "gray",
 };
 
+/** ResearchNeedStatus — OPEN=green (đang nhận đề xuất, trạng thái "hoạt động"
+ * mong muốn, khác các domain khác nơi green nghĩa là "đã hoàn tất"), PAUSED=amber
+ * (tạm dừng, cần chú ý), CLOSED/ARCHIVED=gray (kết thúc vòng đời). */
+export const NEED_STATUS_TONE: Record<string, Tone> = {
+  DRAFT: "gray",
+  OPEN: "green",
+  PAUSED: "amber",
+  CLOSED: "gray",
+  ARCHIVED: "gray",
+};
+
+/** ProposalStatus — anchored on the same 3-point pattern as the rest of this file:
+ * SUBMITTED=blue (đã nộp, chờ xử lý, tương tự ASSESSMENT_STATUS_TONE.SUBMITTED),
+ * UNDER_REVIEW=amber (đang cần công ty xử lý), ACCEPTED=green, REJECTED=red,
+ * WITHDRAWN=gray (tác giả tự rút, kết thúc trung tính). */
+export const PROPOSAL_STATUS_TONE: Record<string, Tone> = {
+  DRAFT: "gray",
+  SUBMITTED: "blue",
+  UNDER_REVIEW: "amber",
+  ACCEPTED: "green",
+  REJECTED: "red",
+  WITHDRAWN: "gray",
+};
+
+export const CASE_INITIATION_STATUS_TONE: Record<string, Tone> = {
+  PENDING: "amber",
+  ACCEPTED: "green",
+  DECLINED: "red",
+  CANCELLED: "gray",
+  EXPIRED: "gray",
+};
+
 export function toneOf(map: Record<string, Tone>, value: string): Tone {
   return map[value] ?? "gray";
 }

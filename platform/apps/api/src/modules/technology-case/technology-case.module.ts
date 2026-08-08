@@ -22,6 +22,10 @@ import { EvidenceService } from "./evidence.service";
   // (UNDER_ASSESSMENT/GAP_IDENTIFIED/ROADMAP_DRAFT/ROADMAP_APPROVED) exactly the way
   // `EvidenceService` already does for EVIDENCE_COLLECTION — same DI-export requirement
   // as the aggregator modules, see README "Bug thật đã tìm và sửa" #5.
-  exports: [TechnologyCaseRepository, TechnologyCaseService],
+  // `EvidenceRepository` additionally exported for `modules/company-discovery`
+  // (Sprint 5.6) — `CaseInitiationsService.accept` reuses `createEvidence`/
+  // `createEvidenceCitation` directly to turn a recommendation's existing citation into
+  // the new case's starting evidence, without creating a duplicate citation.
+  exports: [TechnologyCaseRepository, TechnologyCaseService, EvidenceRepository],
 })
 export class TechnologyCaseModule {}

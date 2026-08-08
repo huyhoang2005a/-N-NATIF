@@ -19,6 +19,7 @@ import {
 import { Inject, Injectable } from "@nestjs/common";
 import { DATABASE } from "../../database/database.module";
 import { S3Service } from "../../common/storage/s3.service";
+import { slugify } from "../identity-organization/organizations/slug.util";
 import { AuditService } from "../platform-operations/audit/audit.service";
 import { OutboxService } from "../platform-operations/jobs/outbox.service";
 import { assertAuthorProfileTransition } from "./domain/author-profile.state-machine";
@@ -254,6 +255,14 @@ export class AuthorVerificationService {
       newProfileStatus,
     );
 
+    // §3 Sprint 5.7 item 25: generated once, on the UNVERIFIED→VERIFIED transition only —
+    // `profile.publicSlug` already set means this author was VERIFIED before (e.g.
+    // re-approved after a SUSPENDED detour), don't regenerate and break existing links.
+    const publicSlug =
+      decision.decision === "APPROVE" && !profile.publicSlug
+        ? await this.generateUniqueAuthorSlug(existing.authorUserId)
+        : undefined;
+
     const updatedRequest = await this.db.transaction(async (tx) => {
       const decided = await this.authorVerificationRepository.decide(
         requestId,
@@ -269,11 +278,18 @@ export class AuthorVerificationService {
         );
       }
 
+      // `currentAffiliationOrgId` was never actually synced onto `author_profile` anywhere
+      // in the app until now — Sprint 5.7's public org profile page
+      // (`listVerifiedAuthorsByOrganization`) filters on exactly this column, so it must
+      // be set here for that feature to return anything. The claimed `affiliationOrgId`
+      // on the (now-approved) verification request is the authoritative source.
       await this.authorVerificationRepository.updateAuthorProfileStatus(
         existing.authorUserId,
         newProfileStatus,
         tx,
-        decision.decision === "APPROVE" ? { verifiedAt: new Date() } : undefined,
+        decision.decision === "APPROVE"
+          ? { verifiedAt: new Date(), publicSlug, currentAffiliationOrgId: existing.affiliationOrgId }
+          : undefined,
       );
 
       await this.auditService.write(
@@ -320,5 +336,17 @@ export class AuthorVerificationService {
     });
 
     return toRequestResponse(updatedRequest);
+  }
+
+  private async generateUniqueAuthorSlug(authorUserId: string): Promise<string> {
+    const displayName = await this.authorVerificationRepository.findUserDisplayName(authorUserId);
+    const base = slugify(displayName ?? "author") || "author";
+    let candidate = base;
+    let suffix = 2;
+    while (await this.authorVerificationRepository.findAuthorProfileBySlug(candidate)) {
+      candidate = `${base}-${suffix}`;
+      suffix += 1;
+    }
+    return candidate;
   }
 }

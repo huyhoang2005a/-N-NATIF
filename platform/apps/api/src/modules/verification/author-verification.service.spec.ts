@@ -34,6 +34,8 @@ function buildService() {
     claim: vi.fn(),
     decide: vi.fn(),
     findDocumentByRequestId: vi.fn(),
+    findAuthorProfileBySlug: vi.fn().mockResolvedValue(undefined),
+    findUserDisplayName: vi.fn().mockResolvedValue("Test Author"),
   } as unknown as AuthorVerificationRepository;
 
   const auditService = { write: vi.fn().mockResolvedValue(undefined) } as unknown as AuditService;
@@ -184,7 +186,7 @@ describe("AuthorVerificationService.decide (UC-VER-02 pattern)", () => {
       "author-1",
       "VERIFIED",
       {},
-      { verifiedAt: expect.any(Date) },
+      { verifiedAt: expect.any(Date), publicSlug: "test-author" },
     );
     expect(deps.outboxService.append).toHaveBeenCalledWith(
       "author_profile",

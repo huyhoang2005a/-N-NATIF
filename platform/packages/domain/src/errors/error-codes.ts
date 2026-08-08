@@ -125,6 +125,15 @@ export const ErrorCode = {
   DISCOVERY_INITIATION_REQUEST_EXPIRED: "DISCOVERY_INITIATION_REQUEST_EXPIRED",
   DISCOVERY_PROPOSAL_STATE_INVALID: "DISCOVERY_PROPOSAL_STATE_INVALID",
   DISCOVERY_FEED_CONTEXT_MISSING: "DISCOVERY_FEED_CONTEXT_MISSING",
+  // Also not in the mã lỗi table — Sprint 5.2 (UC-DIS-01) needs a code for its own 2 guards:
+  // publish blocked by the "đủ cụ thể" statement-quality gate, and the DRAFT/OPEN/PAUSED/
+  // CLOSED lifecycle transitions, same per-domain `*_INVALID_TRANSITION` pattern as
+  // ROADMAP_INVALID_TRANSITION/CASE_INVALID_TRANSITION above.
+  DISCOVERY_NEED_STATEMENT_INCOMPLETE: "DISCOVERY_NEED_STATEMENT_INCOMPLETE",
+  DISCOVERY_NEED_INVALID_TRANSITION: "DISCOVERY_NEED_INVALID_TRANSITION",
+  // Sprint 5.5 (UC-DISC-F2) — dismiss race guard (item flipped away from ACTIVE between
+  // the read and the update); same naming convention as the rest of this group.
+  DISCOVERY_RECOMMENDATION_ITEM_NOT_ACTIVE: "DISCOVERY_RECOMMENDATION_ITEM_NOT_ACTIVE",
 
   // PUBLIC_PROFILE_* (Phase 5 Sprint 5.7 — public author/organization profile pages)
   PUBLIC_PROFILE_NOT_FOUND: "PUBLIC_PROFILE_NOT_FOUND",

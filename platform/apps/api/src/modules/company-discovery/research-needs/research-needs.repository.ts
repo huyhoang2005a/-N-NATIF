@@ -1,0 +1,72 @@
+import type { Database } from "@r2m/database";
+import { schema } from "@r2m/database";
+import { Inject, Injectable } from "@nestjs/common";
+import { and, desc, eq } from "drizzle-orm";
+import { DATABASE } from "../../../database/database.module";
+
+function firstOrThrow<T>(rows: T[], message: string): T {
+  const row = rows[0];
+  if (!row) throw new Error(message);
+  return row;
+}
+
+@Injectable()
+export class ResearchNeedsRepository {
+  constructor(@Inject(DATABASE) private readonly db: Database) {}
+
+  async createNeed(values: typeof schema.researchNeed.$inferInsert, tx: Database) {
+    const rows = await tx.insert(schema.researchNeed).values(values).returning();
+    return firstOrThrow(rows, "createNeed: insert returned no row");
+  }
+
+  async createVersion(values: typeof schema.needStatementVersion.$inferInsert, tx: Database) {
+    const rows = await tx.insert(schema.needStatementVersion).values(values).returning();
+    return firstOrThrow(rows, "createVersion: insert returned no row");
+  }
+
+  async findById(id: string) {
+    return this.db.query.researchNeed.findFirst({ where: eq(schema.researchNeed.id, id) });
+  }
+
+  async findLatestVersion(researchNeedId: string) {
+    return this.db.query.needStatementVersion.findFirst({
+      where: eq(schema.needStatementVersion.researchNeedId, researchNeedId),
+      orderBy: [desc(schema.needStatementVersion.versionNo)],
+    });
+  }
+
+  async listVersions(researchNeedId: string) {
+    return this.db.query.needStatementVersion.findMany({
+      where: eq(schema.needStatementVersion.researchNeedId, researchNeedId),
+      orderBy: [desc(schema.needStatementVersion.versionNo)],
+    });
+  }
+
+  /** Company managing its own needs — any status/visibility, guarded by
+   * `assertActiveMember` at the service layer. */
+  async listByOrganization(companyOrganizationId: string) {
+    return this.db.query.researchNeed.findMany({
+      where: eq(schema.researchNeed.companyOrganizationId, companyOrganizationId),
+      orderBy: [desc(schema.researchNeed.createdAt)],
+    });
+  }
+
+  /** UC-DIS-01 acceptance criteria: "Public listing chỉ trả OPEN + PUBLIC." */
+  async listPublicOpen() {
+    return this.db.query.researchNeed.findMany({
+      where: and(eq(schema.researchNeed.status, "OPEN"), eq(schema.researchNeed.visibility, "PUBLIC")),
+      orderBy: [desc(schema.researchNeed.publishedAt)],
+    });
+  }
+
+  /** Optimistic lock — mirrors `GapRepository.update`: WHERE id+version, `updated_at`/
+   * `version` bumped by the `set_updated_at_and_version()` DB trigger, not here. */
+  async update(id: string, expectedVersion: number, values: Partial<typeof schema.researchNeed.$inferInsert>, tx: Database) {
+    const rows = await tx
+      .update(schema.researchNeed)
+      .set(values)
+      .where(and(eq(schema.researchNeed.id, id), eq(schema.researchNeed.version, expectedVersion)))
+      .returning();
+    return rows[0];
+  }
+}

@@ -5,6 +5,7 @@ import {
   Database,
   FolderOpen,
   Flag,
+  Handshake,
   LayoutDashboard,
   Send,
   ShieldCheck,
@@ -40,6 +41,7 @@ export const AUTHOR_NAV: ShellNavItem[] = [
   { label: "Tài nguyên", href: "/resources", icon: Database },
   { label: "Case của tôi", href: "/technology-cases", icon: FolderOpen },
   { label: "Đề xuất", href: "/proposals", icon: Send },
+  { label: "Yêu cầu khởi tạo case", href: "/case-initiation-requests", icon: Handshake },
   { label: "Thông báo", href: "/notifications", icon: Bell },
   { label: "Hồ sơ", href: "/profile", icon: User },
 ];

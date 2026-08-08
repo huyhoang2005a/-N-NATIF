@@ -25,7 +25,7 @@ export class AuthorVerificationRepository {
     userId: string,
     status: string,
     tx: Database,
-    extra?: { verifiedAt?: Date | null; suspendedAt?: Date | null },
+    extra?: { verifiedAt?: Date | null; suspendedAt?: Date | null; publicSlug?: string; currentAffiliationOrgId?: string },
   ) {
     const rows = await tx
       .update(schema.authorProfile)
@@ -33,6 +33,17 @@ export class AuthorVerificationRepository {
       .where(eq(schema.authorProfile.userId, userId))
       .returning();
     return rows[0];
+  }
+
+  /** Sprint 5.7 (§3 item 25): "sinh `public_slug` tự động lúc author chuyển VERIFIED (từ
+   * tên + hậu tố chống trùng)". */
+  async findAuthorProfileBySlug(slug: string) {
+    return this.db.query.authorProfile.findFirst({ where: eq(schema.authorProfile.publicSlug, slug) });
+  }
+
+  async findUserDisplayName(userId: string): Promise<string | undefined> {
+    const profile = await this.db.query.userProfile.findFirst({ where: eq(schema.userProfile.userId, userId) });
+    return profile?.displayName;
   }
 
   async findById(id: string) {

@@ -6,6 +6,8 @@ import { RefreshCw, UserPlus } from "lucide-react";
 import type {
   AuthorVerificationRequestResponse,
   AuthorVerificationUploadResponse,
+  CompanyProfileResponse,
+  CreateCompanyProfileRequest,
   MeResponse,
   OrganizationMemberResponse,
   OrganizationResponse,
@@ -247,6 +249,54 @@ export default function ProfilePage() {
         setOrgDocError(err instanceof ApiError ? describeErrorCode(err.code) : "Nộp tài liệu thất bại.");
       })
       .finally(() => setOrgDocStatus("idle"));
+  }
+
+  const [companyProfile, setCompanyProfile] = useState<CompanyProfileResponse | null | undefined>(undefined);
+  const [companyProfileEditing, setCompanyProfileEditing] = useState(false);
+  const [companyProfileForm, setCompanyProfileForm] = useState<CreateCompanyProfileRequest>({});
+  const [companyProfileStatus, setCompanyProfileStatus] = useState<"idle" | "loading">("idle");
+  const [companyProfileError, setCompanyProfileError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!organizations || organizations.length === 0) return;
+    const primaryOrg = organizations[0]!;
+    if (primaryOrg.type !== "ENTERPRISE" || primaryOrg.status !== "ACTIVE") return;
+    authFetch<CompanyProfileResponse>(`/organizations/${primaryOrg.id}/company-profile`)
+      .then((p) => {
+        setCompanyProfile(p);
+        setCompanyProfileForm({ industryCode: p.industryCode ?? undefined, companySize: p.companySize ?? undefined, description: p.description ?? undefined });
+      })
+      .catch((err) => {
+        if (err instanceof ApiError && err.code === "DISCOVERY_COMPANY_PROFILE_NOT_FOUND") {
+          setCompanyProfile(null);
+          return;
+        }
+        // Any other failure (e.g. not owner/admin viewing before membership sync) — just
+        // don't show the section, matching the pendingMembers card's pattern above.
+        setCompanyProfile(null);
+      });
+  }, [organizations]);
+
+  function onSaveCompanyProfile(organizationId: string, mode: "create" | "update", event: React.FormEvent) {
+    event.preventDefault();
+    setCompanyProfileStatus("loading");
+    setCompanyProfileError(null);
+    authFetch<CompanyProfileResponse>(`/organizations/${organizationId}/company-profile`, {
+      method: mode === "create" ? "POST" : "PATCH",
+      body: JSON.stringify(companyProfileForm),
+    })
+      .then((p) => {
+        setCompanyProfile(p);
+        setCompanyProfileEditing(false);
+      })
+      .catch((err) => {
+        if (err instanceof SessionExpiredError) {
+          router.push("/login");
+          return;
+        }
+        setCompanyProfileError(err instanceof ApiError ? describeErrorCode(err.code) : "Lưu hồ sơ công ty thất bại.");
+      })
+      .finally(() => setCompanyProfileStatus("idle"));
   }
 
   const [resendStatus, setResendStatus] = useState<"idle" | "loading">("idle");
@@ -596,6 +646,75 @@ export default function ProfilePage() {
                       );
                     })}
                   </div>
+                )}
+              </Card>
+            )}
+
+            {primaryOrg.type === "ENTERPRISE" && primaryOrg.status === "ACTIVE" && companyProfile !== undefined && (
+              <Card>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <SectionHeader title="Hồ sơ công ty" />
+                  {companyProfile && (
+                    <GhostButton onClick={() => setCompanyProfileEditing((v) => !v)}>
+                      {companyProfileEditing ? "Đóng" : "Chỉnh sửa"}
+                    </GhostButton>
+                  )}
+                </div>
+
+                {companyProfile && !companyProfileEditing && (
+                  <div className="uikit-stack">
+                    <p style={{ fontSize: 13, color: "var(--uikit-slate-500)" }}>
+                      Trang công khai: <code>/organizations/{companyProfile.publicSlug}</code>
+                    </p>
+                    {companyProfile.industryCode && <p style={{ fontSize: 14 }}>Ngành nghề: {companyProfile.industryCode}</p>}
+                    {companyProfile.companySize && <p style={{ fontSize: 14 }}>Quy mô: {companyProfile.companySize}</p>}
+                    {companyProfile.description && <p style={{ fontSize: 14, whiteSpace: "pre-wrap" }}>{companyProfile.description}</p>}
+                    {!companyProfile.industryCode && !companyProfile.companySize && !companyProfile.description && (
+                      <p className="uikit-empty">Chưa có thông tin — bấm &quot;Chỉnh sửa&quot; để bổ sung.</p>
+                    )}
+                  </div>
+                )}
+
+                {(!companyProfile || companyProfileEditing) && (
+                  <form
+                    onSubmit={(e) => onSaveCompanyProfile(primaryOrg.id, companyProfile ? "update" : "create", e)}
+                    className="uikit-stack"
+                    style={companyProfile ? { marginTop: "var(--space-4)", paddingTop: "var(--space-4)", borderTop: "1px solid var(--uikit-slate-100)" } : undefined}
+                  >
+                    {!companyProfile && (
+                      <p style={{ fontSize: 13, color: "var(--uikit-slate-500)" }}>
+                        Hồ sơ công ty giúp tác giả/tổ chức nghiên cứu tìm và đề xuất công nghệ phù hợp với nhu cầu của bạn.
+                      </p>
+                    )}
+                    <TextField
+                      label="Ngành nghề"
+                      optional
+                      value={companyProfileForm.industryCode ?? ""}
+                      onChange={(e) => setCompanyProfileForm({ ...companyProfileForm, industryCode: e.target.value })}
+                    />
+                    <TextField
+                      label="Quy mô nhân sự"
+                      optional
+                      placeholder="VD: 50-200"
+                      value={companyProfileForm.companySize ?? ""}
+                      onChange={(e) => setCompanyProfileForm({ ...companyProfileForm, companySize: e.target.value })}
+                    />
+                    <TextField
+                      label="Mô tả"
+                      as="textarea"
+                      optional
+                      value={companyProfileForm.description ?? ""}
+                      onChange={(e) => setCompanyProfileForm({ ...companyProfileForm, description: e.target.value })}
+                    />
+                    {companyProfileError && (
+                      <p className="uikit-alert-error" role="alert">
+                        {companyProfileError}
+                      </p>
+                    )}
+                    <PrimaryButton type="submit" disabled={companyProfileStatus === "loading"}>
+                      {companyProfileStatus === "loading" ? "Đang lưu…" : companyProfile ? "Lưu thay đổi" : "Tạo hồ sơ công ty"}
+                    </PrimaryButton>
+                  </form>
                 )}
               </Card>
             )}

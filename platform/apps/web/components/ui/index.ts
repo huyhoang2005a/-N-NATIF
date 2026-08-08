@@ -15,3 +15,6 @@ export { BackLink } from "./BackLink";
 export { Shell } from "./Shell";
 export type { ShellNavItem } from "./Shell";
 export { SoonPage } from "./SoonPage";
+export { MatchScoreBadge } from "./MatchScoreBadge";
+export { AbstractText } from "./AbstractText";
+export { AuthorOrgByline } from "./AuthorOrgByline";

@@ -227,3 +227,36 @@ export const DEPENDENCY_TYPE_LABELS: Record<string, string> = {
   START_TO_FINISH: "Bắt đầu trước → Kết thúc sau",
 };
 
+// Phase 5 — Company & Discovery
+export const NEED_STATUS_LABELS: Record<string, string> = {
+  DRAFT: "Nháp",
+  OPEN: "Đang mở",
+  PAUSED: "Tạm dừng",
+  CLOSED: "Đã đóng",
+  ARCHIVED: "Lưu trữ",
+};
+
+export const VISIBILITY_LEVEL_LABELS: Record<string, string> = {
+  PUBLIC: "Công khai",
+  ORGANIZATION_ONLY: "Chỉ nội bộ tổ chức",
+  PARTNERS_ONLY: "Chỉ đối tác",
+  PRIVATE: "Riêng tư",
+};
+
+export const PROPOSAL_STATUS_LABELS: Record<string, string> = {
+  DRAFT: "Nháp",
+  SUBMITTED: "Đã gửi, chờ duyệt",
+  UNDER_REVIEW: "Đang xem xét",
+  ACCEPTED: "Đã chấp nhận",
+  REJECTED: "Đã từ chối",
+  WITHDRAWN: "Đã rút lại",
+};
+
+export const CASE_INITIATION_STATUS_LABELS: Record<string, string> = {
+  PENDING: "Chờ phản hồi",
+  ACCEPTED: "Đã chấp nhận",
+  DECLINED: "Đã từ chối",
+  CANCELLED: "Đã huỷ",
+  EXPIRED: "Đã hết hạn",
+};
+

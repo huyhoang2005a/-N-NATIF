@@ -210,6 +210,41 @@ export interface RoadmapApprovedEvent {
   approvedByUserId: string;
 }
 
+/** Phase 5 Sprint 5.4/5.5 — dùng chung cho cả `runType` FOCUSED và FEED, phân biệt qua
+ * payload (chỉ 1 trong 2 cặp {researchNeedId} / {companyOrganizationId} có giá trị, đúng
+ * CHECK constraint `chk_recommendation_run_context_matches_type`). */
+export interface RecommendationRunRequestedEvent {
+  type: "RecommendationRunRequested";
+  recommendationRunId: string;
+  runType: string;
+  researchNeedId: string | null;
+  companyOrganizationId: string | null;
+}
+
+export interface RecommendationRunCompletedEvent {
+  type: "RecommendationRunCompleted";
+  recommendationRunId: string;
+  runType: string;
+  status: string;
+  itemCount: number;
+}
+
+export interface CaseInitiationRequestedEvent {
+  type: "CaseInitiationRequested";
+  caseInitiationRequestId: string;
+  recommendationItemId: string;
+  requestingOrganizationId: string;
+  targetAuthorUserId: string;
+}
+
+export interface CaseInitiationRequestDecidedEvent {
+  type: "CaseInitiationRequestDecided";
+  caseInitiationRequestId: string;
+  decision: "ACCEPTED" | "DECLINED" | "EXPIRED";
+  requestingOrganizationId: string;
+  requestedByUserId: string;
+}
+
 export type DomainEvent =
   | OrganizationRegisteredEvent
   | OrganizationVerificationRequestedEvent
@@ -238,4 +273,8 @@ export type DomainEvent =
   | AssessmentSubmittedEvent
   | AssessmentApprovedEvent
   | CriticalGapRaisedEvent
-  | RoadmapApprovedEvent;
+  | RoadmapApprovedEvent
+  | RecommendationRunRequestedEvent
+  | RecommendationRunCompletedEvent
+  | CaseInitiationRequestedEvent
+  | CaseInitiationRequestDecidedEvent;

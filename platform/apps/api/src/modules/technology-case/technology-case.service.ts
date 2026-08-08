@@ -14,6 +14,7 @@ import {
   AuthorVerificationStatus,
   CaseMemberRole,
   CaseOrganizationRole,
+  CaseOriginType,
   ConflictError,
   ErrorCode,
   ForbiddenError,
@@ -127,92 +128,165 @@ export class TechnologyCaseService {
     }
     assertActiveMember(actor, input.owningOrganizationId);
 
-    let slug = slugify(input.title);
-    if (await this.repository.findBySlugInOrganization(input.owningOrganizationId, slug)) {
+    const technologyCase = await this.db.transaction((tx) =>
+      this.createCaseCore(tx, {
+        owningOrganizationId: input.owningOrganizationId,
+        title: input.title,
+        description: input.description,
+        summary: input.summary,
+        ownerUserId: actor.userId,
+        createdByUserId: actor.userId,
+        origin: { type: CaseOriginType.MANUAL },
+        auditActorUserId: actor.userId,
+        requestIdHeader,
+      }),
+    );
+
+    return toCaseResponse(technologyCase);
+  }
+
+  /** Shared case-creation transaction body — `register()` (Phase 3, `MANUAL` origin, caller
+   * IS the owner) and Sprint 5.3's `ProposalsService.accept()` (Phase 5, `RESEARCH_PROPOSAL`
+   * origin, the accepting company is a distinct actor from the case owner) both funnel
+   * through here so there is exactly one place that creates a technology case + origin +
+   * profile + OWNING_ORGANIZATION link + OWNER member + status_history + audit + outbox —
+   * per the plan, no second case-creation code path. Caller supplies its own `tx` (either a
+   * fresh transaction, or one it already opened for its own atomic write) and decides who
+   * `ownerUserId`/`owningOrganizationId` are; this method does not re-derive them from an
+   * `ActorContext` so it stays usable when the triggering actor isn't the case owner. */
+  async createCaseCore(
+    tx: Database,
+    params: {
+      owningOrganizationId: string;
+      title: string;
+      description?: string;
+      summary?: string;
+      ownerUserId: string;
+      createdByUserId: string;
+      origin: {
+        type: CaseOriginType;
+        researchProposalId?: string;
+        caseInitiationRequestId?: string;
+        recommendationItemId?: string;
+      };
+      partnerOrganizationId?: string;
+      partnerMemberUserId?: string;
+      auditActorUserId: string;
+      requestIdHeader: string | null;
+    },
+  ): Promise<TechnologyCaseRow> {
+    let slug = slugify(params.title);
+    if (await this.repository.findBySlugInOrganization(params.owningOrganizationId, slug)) {
       slug = `${slug}-${randomUUID().slice(0, 8)}`;
     }
 
-    const technologyCase = await this.db.transaction(async (tx) => {
-      const createdCase = await this.repository.create(
-        {
-          owningOrganizationId: input.owningOrganizationId,
-          title: input.title,
-          slug,
-          description: input.description,
-          createdByUserId: actor.userId,
-        },
-        tx,
-      );
+    const createdCase = await this.repository.create(
+      {
+        owningOrganizationId: params.owningOrganizationId,
+        title: params.title,
+        slug,
+        description: params.description,
+        createdByUserId: params.createdByUserId,
+      },
+      tx,
+    );
 
-      await this.repository.createOrigin(
-        { technologyCaseId: createdCase.id, originType: "MANUAL" },
-        tx,
-      );
-      await this.repository.createProfile(
-        {
-          technologyCaseId: createdCase.id,
-          summary: input.summary,
-          updatedByUserId: actor.userId,
-        },
-        tx,
-      );
+    await this.repository.createOrigin(
+      {
+        technologyCaseId: createdCase.id,
+        originType: params.origin.type,
+        researchProposalId: params.origin.researchProposalId,
+        caseInitiationRequestId: params.origin.caseInitiationRequestId,
+        recommendationItemId: params.origin.recommendationItemId,
+      },
+      tx,
+    );
+    await this.repository.createProfile(
+      {
+        technologyCaseId: createdCase.id,
+        summary: params.summary,
+        updatedByUserId: params.createdByUserId,
+      },
+      tx,
+    );
+    await this.repository.createOrganization(
+      {
+        technologyCaseId: createdCase.id,
+        organizationId: params.owningOrganizationId,
+        role: CaseOrganizationRole.OWNING_ORGANIZATION,
+      },
+      tx,
+    );
+    await this.repository.createMember(
+      {
+        technologyCaseId: createdCase.id,
+        userId: params.ownerUserId,
+        organizationId: params.owningOrganizationId,
+        role: CaseMemberRole.OWNER,
+        status: "ACTIVE",
+      },
+      tx,
+    );
+
+    if (params.partnerOrganizationId) {
       await this.repository.createOrganization(
         {
           technologyCaseId: createdCase.id,
-          organizationId: input.owningOrganizationId,
-          role: CaseOrganizationRole.OWNING_ORGANIZATION,
+          organizationId: params.partnerOrganizationId,
+          role: CaseOrganizationRole.PARTNER_COMPANY,
         },
         tx,
       );
+    }
+    if (params.partnerMemberUserId && params.partnerOrganizationId) {
       await this.repository.createMember(
         {
           technologyCaseId: createdCase.id,
-          userId: actor.userId,
-          organizationId: input.owningOrganizationId,
-          role: CaseMemberRole.OWNER,
+          userId: params.partnerMemberUserId,
+          organizationId: params.partnerOrganizationId,
+          role: CaseMemberRole.PARTNER_MEMBER,
           status: "ACTIVE",
         },
         tx,
       );
-      await this.repository.insertStatusHistory(
-        {
-          technologyCaseId: createdCase.id,
-          fromStatus: null,
-          toStatus: TechnologyCaseStatus.DRAFT,
-          changedByUserId: actor.userId,
-          reason: null,
-        },
-        tx,
-      );
+    }
 
-      await this.auditService.write(
-        {
-          actorUserId: actor.userId,
-          scopeOrganizationId: input.owningOrganizationId,
-          requestId: requestIdHeader,
-          action: "technology_case.register",
-          entityType: "technology_case",
-          entityId: createdCase.id,
-          afterData: createdCase,
-        },
-        tx,
-      );
-      await this.outboxService.append(
-        "technology_case",
-        createdCase.id,
-        {
-          type: "TechnologyCaseCreated",
-          technologyCaseId: createdCase.id,
-          owningOrganizationId: input.owningOrganizationId,
-          createdByUserId: actor.userId,
-        },
-        tx,
-      );
+    await this.repository.insertStatusHistory(
+      {
+        technologyCaseId: createdCase.id,
+        fromStatus: null,
+        toStatus: TechnologyCaseStatus.DRAFT,
+        changedByUserId: params.auditActorUserId,
+        reason: null,
+      },
+      tx,
+    );
 
-      return createdCase;
-    });
+    await this.auditService.write(
+      {
+        actorUserId: params.auditActorUserId,
+        scopeOrganizationId: params.owningOrganizationId,
+        requestId: params.requestIdHeader,
+        action: "technology_case.register",
+        entityType: "technology_case",
+        entityId: createdCase.id,
+        afterData: createdCase,
+      },
+      tx,
+    );
+    await this.outboxService.append(
+      "technology_case",
+      createdCase.id,
+      {
+        type: "TechnologyCaseCreated",
+        technologyCaseId: createdCase.id,
+        owningOrganizationId: params.owningOrganizationId,
+        createdByUserId: params.createdByUserId,
+      },
+      tx,
+    );
 
-    return toCaseResponse(technologyCase);
+    return createdCase;
   }
 
   async getById(actor: ActorContext, id: string): Promise<TechnologyCaseResponse> {

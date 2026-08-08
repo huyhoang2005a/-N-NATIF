@@ -1,11 +1,15 @@
 import type { EmailSender } from "@r2m/domain";
 import { loadEnv } from "@r2m/env";
 import { closeDb, getDb } from "@r2m/database";
+import { sweepExpiredCaseInitiationRequests } from "./case-initiations/sweep-expired";
 import { ConsoleEmailSender } from "./email/console-email-sender";
 import { ResendEmailSender } from "./email/resend-email-sender";
 import { dispatchPendingEvents } from "./outbox-dispatcher";
 
 const POLL_INTERVAL_MS = 2000;
+// `case_initiation_request.expires_at` is a 14-day window — no need to check every
+// 2s tick like the outbox loop; every 5 minutes is more than tight enough.
+const EXPIRY_SWEEP_INTERVAL_MS = 5 * 60 * 1000;
 
 function buildEmailSender(env: ReturnType<typeof loadEnv>): EmailSender {
   if (env.RESEND_API_KEY && env.EMAIL_FROM_ADDRESS && env.EMAIL_FROM_NAME) {
@@ -36,6 +40,7 @@ async function main(): Promise<void> {
   process.on("SIGTERM", shutdown);
 
   console.log("[worker] outbox dispatcher started");
+  let msSinceLastSweep = EXPIRY_SWEEP_INTERVAL_MS; // sweep once on startup, then every interval
   while (!stopping) {
     try {
       const result = await dispatchPendingEvents(db, emailSender);
@@ -45,7 +50,21 @@ async function main(): Promise<void> {
     } catch (error) {
       console.error("[worker] dispatch loop error", error);
     }
+
+    if (msSinceLastSweep >= EXPIRY_SWEEP_INTERVAL_MS) {
+      msSinceLastSweep = 0;
+      try {
+        const expiredCount = await sweepExpiredCaseInitiationRequests(db);
+        if (expiredCount > 0) {
+          console.log(`[worker] expired ${expiredCount} case initiation request(s)`);
+        }
+      } catch (error) {
+        console.error("[worker] expiry sweep error", error);
+      }
+    }
+
     await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+    msSinceLastSweep += POLL_INTERVAL_MS;
   }
 }
 

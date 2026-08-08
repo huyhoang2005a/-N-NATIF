@@ -1,4 +1,7 @@
+import { VisibilityLevel } from "@r2m/domain";
 import { z } from "zod";
+
+const visibilityLevelValues = Object.values(VisibilityLevel) as [VisibilityLevel, ...VisibilityLevel[]];
 
 // ---------- Sprint 5.1: Company Profile ----------
 
@@ -21,4 +24,172 @@ export interface CompanyProfileResponse {
   contactUserId: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+// ---------- Sprint 5.2: Research Need ----------
+
+const needStatementFields = {
+  problemStatement: z.string().trim().min(1),
+  technicalField: z.string().trim().min(1).max(150),
+  desiredOutputType: z.string().trim().min(1).max(100),
+  timeframeMonths: z.number().int().positive().optional(),
+  constraints: z.string().trim().max(4000).optional(),
+  successCriteria: z.string().trim().max(4000).optional(),
+};
+
+export const CreateResearchNeedRequestSchema = z.object({
+  companyOrganizationId: z.string().uuid(),
+  title: z.string().trim().min(1).max(200),
+  visibility: z.enum(visibilityLevelValues).optional(),
+  ...needStatementFields,
+});
+export type CreateResearchNeedRequest = z.infer<typeof CreateResearchNeedRequestSchema>;
+
+export const CreateNeedStatementVersionRequestSchema = z.object(needStatementFields);
+export type CreateNeedStatementVersionRequest = z.infer<typeof CreateNeedStatementVersionRequestSchema>;
+
+export interface NeedStatementVersionResponse {
+  id: string;
+  researchNeedId: string;
+  versionNo: number;
+  problemStatement: string;
+  technicalField: string;
+  desiredOutputType: string;
+  timeframeMonths: number | null;
+  constraints: string | null;
+  successCriteria: string | null;
+  createdByUserId: string;
+  createdAt: string;
+}
+
+export interface ResearchNeedResponse {
+  id: string;
+  companyOrganizationId: string;
+  createdByUserId: string;
+  title: string;
+  visibility: string;
+  status: string;
+  publishedAt: string | null;
+  closedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  version: number;
+}
+
+export interface ResearchNeedDetailResponse extends ResearchNeedResponse {
+  currentVersion: NeedStatementVersionResponse;
+}
+
+// ---------- Sprint 5.3: Research Proposal ----------
+
+export const CreateResearchProposalRequestSchema = z.object({
+  proposerOrganizationId: z.string().uuid(),
+  title: z.string().trim().min(1).max(200),
+  abstract: z.string().trim().min(1),
+  methodology: z.string().trim().min(1),
+  expectedOutcome: z.string().trim().min(1),
+  timelineMonths: z.number().int().positive(),
+});
+export type CreateResearchProposalRequest = z.infer<typeof CreateResearchProposalRequestSchema>;
+
+export const RejectResearchProposalRequestSchema = z.object({
+  decisionReason: z.string().trim().min(1).max(2000),
+});
+export type RejectResearchProposalRequest = z.infer<typeof RejectResearchProposalRequestSchema>;
+
+export interface ResearchProposalResponse {
+  id: string;
+  researchNeedId: string;
+  needStatementVersionId: string;
+  proposerAuthorUserId: string;
+  proposerOrganizationId: string;
+  title: string;
+  abstract: string;
+  methodology: string;
+  expectedOutcome: string;
+  timelineMonths: number;
+  status: string;
+  submittedAt: string | null;
+  decidedByUserId: string | null;
+  decisionReason: string | null;
+  decidedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  version: number;
+}
+
+// ---------- Sprint 5.4: AI Recommendation (FOCUSED) ----------
+
+export interface RecommendationRunResponse {
+  id: string;
+  researchNeedId: string | null;
+  needStatementVersionId: string | null;
+  companyOrganizationId: string | null;
+  runType: string;
+  requestedByUserId: string;
+  status: string;
+  modelProvider: string | null;
+  modelName: string | null;
+  promptVersion: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  errorCode: string | null;
+  errorMessage: string | null;
+  createdAt: string;
+}
+
+export interface RecommendationCitationResponse {
+  id: string;
+  citationId: string;
+  resourceVersionId: string;
+  snippet: string;
+}
+
+export interface RecommendationItemResponse {
+  id: string;
+  recommendationRunId: string;
+  resourceVersionId: string;
+  rank: number;
+  matchScore: number;
+  rationale: string;
+  status: string;
+  citations: RecommendationCitationResponse[];
+  createdAt: string;
+  /** §3 Sprint 5.7 item 24 — card summary. `resourceTitle`/`resourceType` for display,
+   * `summary` = PAPER's `paper_metadata.abstract` or `resource.description` otherwise
+   * (null if neither is set — no placeholder text), `publicationDate` only set for PAPER. */
+  resourceTitle: string;
+  resourceType: string;
+  summary: string | null;
+  publicationDate: string | null;
+}
+
+// ---------- Sprint 5.6: Case Initiation ----------
+
+export const CreateCaseInitiationRequestSchema = z.object({
+  message: z.string().trim().max(2000).optional(),
+});
+export type CreateCaseInitiationRequest = z.infer<typeof CreateCaseInitiationRequestSchema>;
+
+export const DeclineCaseInitiationRequestSchema = z.object({
+  responseNote: z.string().trim().max(2000).optional(),
+});
+export type DeclineCaseInitiationRequest = z.infer<typeof DeclineCaseInitiationRequestSchema>;
+
+export interface CaseInitiationRequestResponse {
+  id: string;
+  recommendationItemId: string;
+  requestingOrganizationId: string;
+  requestedByUserId: string;
+  targetAuthorUserId: string;
+  targetOrganizationId: string;
+  status: string;
+  message: string | null;
+  responseNote: string | null;
+  respondedByUserId: string | null;
+  respondedAt: string | null;
+  expiresAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  version: number;
 }

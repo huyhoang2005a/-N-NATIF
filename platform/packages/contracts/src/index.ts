@@ -9,4 +9,5 @@ export * from "./dto/assessment.dto";
 export * from "./dto/gap.dto";
 export * from "./dto/roadmap.dto";
 export * from "./dto/company-discovery.dto";
+export * from "./dto/public-profile.dto";
 export * from "./events/domain-events";

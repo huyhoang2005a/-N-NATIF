@@ -17,6 +17,7 @@ import {
   listActivePlatformReviewerIds,
   notify,
 } from "./notify";
+import { generateRecommendationRun } from "./recommendation/generate-recommendation-run";
 
 const DEFAULT_BATCH_SIZE = 20;
 const DEFAULT_MAX_ATTEMPTS = 5;
@@ -213,6 +214,42 @@ async function handleEvent(db: Database, event: DomainEvent, emailSender: EmailS
       // Phase 4 simplification (see plan PHẦN D quyết định 9): không notification —
       // đúng tiền lệ Phase 2/3, chỉ giữ event cho audit/outbox, chưa có UI đọc.
       return;
+    case "RecommendationRunRequested": {
+      await generateRecommendationRun(db, event.recommendationRunId);
+      return;
+    }
+    case "RecommendationRunCompleted":
+      // Same "no notification yet" treatment as TechnologyCaseCreated/RoadmapApproved —
+      // no reader-facing UI depends on this event itself; the company reads results via
+      // `GET /recommendation-runs/:id/items`, not a notification.
+      return;
+    case "CaseInitiationRequested": {
+      await notify(db, {
+        recipientUserId: event.targetAuthorUserId,
+        type: "case_initiation.requested",
+        title: "New case initiation request",
+        message: `An organization wants to initiate a technology case from your resource.`,
+        dedupeKey: `case-initiation-requested:${event.caseInitiationRequestId}`,
+      });
+      return;
+    }
+    case "CaseInitiationRequestDecided": {
+      const title =
+        event.decision === "ACCEPTED"
+          ? "Your case initiation request was accepted"
+          : event.decision === "DECLINED"
+            ? "Your case initiation request was declined"
+            : "Your case initiation request expired";
+      await notify(db, {
+        recipientUserId: event.requestedByUserId,
+        scopeOrganizationId: event.requestingOrganizationId,
+        type: "case_initiation.decided",
+        title,
+        message: title,
+        dedupeKey: `case-initiation-decided:${event.caseInitiationRequestId}`,
+      });
+      return;
+    }
     default: {
       const _exhaustive: never = event;
       throw new Error(`Unhandled domain event type: ${JSON.stringify(_exhaustive)}`);

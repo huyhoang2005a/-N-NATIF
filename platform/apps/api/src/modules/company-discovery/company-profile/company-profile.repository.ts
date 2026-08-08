@@ -20,14 +20,16 @@ export class CompanyProfileRepository {
     });
   }
 
-  async create(values: typeof schema.companyProfile.$inferInsert) {
-    const [row] = await this.db.insert(schema.companyProfile).values(values).returning();
+  async create(values: typeof schema.companyProfile.$inferInsert, tx?: Database) {
+    const client = tx ?? this.db;
+    const [row] = await client.insert(schema.companyProfile).values(values).returning();
     if (!row) throw new Error("create: insert returned no row");
     return row;
   }
 
-  async update(organizationId: string, updates: Partial<typeof schema.companyProfile.$inferInsert>) {
-    const [row] = await this.db
+  async update(organizationId: string, updates: Partial<typeof schema.companyProfile.$inferInsert>, tx?: Database) {
+    const client = tx ?? this.db;
+    const [row] = await client
       .update(schema.companyProfile)
       .set({ ...updates, updatedAt: new Date() })
       .where(eq(schema.companyProfile.organizationId, organizationId))

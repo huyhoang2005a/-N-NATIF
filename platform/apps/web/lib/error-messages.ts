@@ -87,6 +87,20 @@ const ERROR_MESSAGES_VI: Record<string, string> = {
   ROADMAP_HAS_NO_MILESTONES: "Roadmap chưa có milestone nào — không thể duyệt.",
   ROADMAP_HAS_UNRESOLVED_CRITICAL_GAPS: "Còn gap mức độ nghiêm trọng chưa xử lý — không thể duyệt roadmap.",
   ROADMAP_INVALID_TRANSITION: "Không thể chuyển roadmap sang trạng thái này lúc này.",
+
+  // Phase 5 — Company & Discovery
+  DISCOVERY_ORG_NOT_ENTERPRISE: "Chỉ tổ chức loại Doanh nghiệp mới có hồ sơ công ty.",
+  DISCOVERY_COMPANY_PROFILE_ALREADY_EXISTS: "Tổ chức này đã có hồ sơ công ty.",
+  DISCOVERY_COMPANY_PROFILE_NOT_FOUND: "Tổ chức chưa có hồ sơ công ty.",
+  DISCOVERY_NEED_NOT_OPEN: "Không tìm thấy nhu cầu nghiên cứu này hoặc bạn không có quyền xem.",
+  DISCOVERY_NEED_STATEMENT_INCOMPLETE: "Nội dung nhu cầu chưa đủ cụ thể — hãy mô tả rõ hơn vấn đề cần giải quyết và lĩnh vực kỹ thuật trước khi xuất bản.",
+  DISCOVERY_NEED_INVALID_TRANSITION: "Không thể chuyển nhu cầu nghiên cứu sang trạng thái này lúc này.",
+  DISCOVERY_AUTHOR_NOT_VERIFIED: "Bạn cần được xác minh là tác giả trước khi gửi đề xuất. Gửi yêu cầu xác minh ở trang Hồ sơ.",
+  DISCOVERY_PROPOSAL_STATE_INVALID: "Không thể thực hiện thao tác này với đề xuất ở trạng thái hiện tại.",
+  DISCOVERY_RUN_ALREADY_IN_PROGRESS: "Đã có một lượt gợi ý đang được xử lý cho nhu cầu này, vui lòng đợi.",
+  DISCOVERY_RECOMMENDATION_ITEM_NOT_ACTIVE: "Gợi ý này vừa được cập nhật, vui lòng tải lại trang.",
+  DISCOVERY_INITIATION_REQUEST_NOT_PENDING: "Yêu cầu này không còn ở trạng thái chờ phản hồi.",
+  DISCOVERY_INITIATION_REQUEST_EXPIRED: "Yêu cầu này đã hết hạn.",
 };
 
 const FALLBACK_MESSAGE_VI = "Đã có lỗi xảy ra, vui lòng thử lại.";

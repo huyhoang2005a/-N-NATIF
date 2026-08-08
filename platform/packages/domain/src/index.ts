@@ -6,6 +6,7 @@ export * from "./enums/resource.enum";
 export * from "./enums/technology-case.enum";
 export * from "./enums/assessment-gap.enum";
 export * from "./enums/roadmap.enum";
+export * from "./enums/company-discovery.enum";
 
 export * from "./errors/error-codes";
 export * from "./errors/domain-error";
