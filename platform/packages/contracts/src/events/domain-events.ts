@@ -260,6 +260,59 @@ export interface OrganizationFollowedEvent {
   followedOrganizationId: string;
 }
 
+/** Phase 6 Sprint 6.1 — transfer manifest lifecycle. Audit-trail event, no reader-facing
+ * notification yet (worker treats it as a no-op, same as e.g. `TechnologyCaseCreated`) —
+ * only `TransferManifestSharedEvent` (Sprint 6.2) notifies recipients. */
+export interface TransferManifestCreatedEvent {
+  type: "TransferManifestCreated";
+  transferManifestId: string;
+  technologyCaseId: string;
+  createdByUserId: string;
+}
+
+/** Phase 6 Sprint 6.2 — fires once per share (not once per recipient), carries both id
+ * lists so the worker can notify each recipient individually. */
+export interface TransferManifestSharedEvent {
+  type: "TransferManifestShared";
+  transferManifestId: string;
+  technologyCaseId: string;
+  recipientUserIds: string[];
+  recipientOrganizationIds: string[];
+}
+
+/** No reader-facing notification requirement in UC-TRF-01 for revoke (only share
+ * notifies) — worker treats this as audit-trail only, same as `TransferManifestCreated`. */
+export interface TransferAccessRevokedEvent {
+  type: "TransferAccessRevoked";
+  transferManifestId: string;
+  technologyCaseId: string;
+  revokedByUserId: string;
+}
+
+/** Phase 6 Sprint 6.3. Notifies active platform reviewers, same precedent as
+ * `AuthorVerificationSubmittedEvent`/`OrganizationVerificationRequestedEvent`. */
+export interface ContentFlagCreatedEvent {
+  type: "ContentFlagCreated";
+  contentFlagId: string;
+  targetType: string;
+  reporterUserId: string;
+}
+
+/** UC-MOD-01 acceptance criteria: "Owner/reporter nhận notification". Carries the raw
+ * target reference (not a resolved owner id) — the worker resolves current ownership at
+ * dispatch time via `findContentOwnerUserId` (`notify.ts`), same "resolve at dispatch,
+ * not at emit" pattern as `OrganizationFollowedEvent` resolving org owners. */
+export interface ModerationDecisionRecordedEvent {
+  type: "ModerationDecisionRecorded";
+  contentFlagId: string;
+  targetType: string;
+  targetResourceId: string | null;
+  targetAnnotationId: string | null;
+  targetTechnologyProfileId: string | null;
+  reporterUserId: string;
+  action: string;
+}
+
 export type DomainEvent =
   | OrganizationRegisteredEvent
   | OrganizationVerificationRequestedEvent
@@ -294,4 +347,9 @@ export type DomainEvent =
   | CaseInitiationRequestedEvent
   | CaseInitiationRequestDecidedEvent
   | AuthorFollowedEvent
-  | OrganizationFollowedEvent;
+  | OrganizationFollowedEvent
+  | TransferManifestCreatedEvent
+  | TransferManifestSharedEvent
+  | TransferAccessRevokedEvent
+  | ContentFlagCreatedEvent
+  | ModerationDecisionRecordedEvent;

@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Ban, Plus, Save, Trash2, UploadCloud } from "lucide-react";
+import { Ban, Flag, Plus, Save, Trash2, UploadCloud } from "lucide-react";
 import type {
   AnnotationResponse,
+  ContentFlagResponse,
   MeResponse,
   OrganizationResponse,
   ResourceAccessGrantResponse,
@@ -14,7 +15,7 @@ import type {
 } from "@r2m/contracts";
 import { ApiError, authFetch, SessionExpiredError } from "../../../lib/api-client";
 import { describeErrorCode } from "../../../lib/error-messages";
-import { PLATFORM_ROLE_LABELS, RESOURCE_ACCESS_LEVEL_LABELS, RESOURCE_TYPE_LABELS } from "../../../lib/labels";
+import { CONTENT_FLAG_REASON_OPTIONS, PLATFORM_ROLE_LABELS, RESOURCE_ACCESS_LEVEL_LABELS, RESOURCE_TYPE_LABELS } from "../../../lib/labels";
 import { navForPersona, personaOf } from "../../../lib/nav";
 import { getAccessToken } from "../../../lib/session";
 import { BackLink, Card, GhostButton, PrimaryButton, SaveButton, SectionHeader, SelectField, Shell, StatusPill, TextField, VoteButton } from "../../../components/ui";
@@ -167,6 +168,25 @@ export default function ResourceDetailPage() {
     });
   }
 
+  // ---------- content flag (Sprint 6.3) ----------
+  const [flaggingTarget, setFlaggingTarget] = useState<{ type: "RESOURCE" | "ANNOTATION"; id: string } | null>(null);
+  const [flagForm, setFlagForm] = useState({ reasonCode: CONTENT_FLAG_REASON_OPTIONS[0].value, details: "" });
+  const [flaggedIds, setFlaggedIds] = useState<Set<string>>(new Set());
+
+  function onSubmitFlag() {
+    if (!flaggingTarget || !flagForm.details.trim()) return Promise.resolve();
+    const target = flaggingTarget;
+    return runAction(`flag-${target.id}`, async () => {
+      await authFetch<ContentFlagResponse>("/content-flags", {
+        method: "POST",
+        body: JSON.stringify({ targetType: target.type, targetId: target.id, reasonCode: flagForm.reasonCode, details: flagForm.details.trim() }),
+      });
+      setFlaggedIds((prev) => new Set(prev).add(target.id));
+      setFlaggingTarget(null);
+      setFlagForm({ reasonCode: CONTENT_FLAG_REASON_OPTIONS[0].value, details: "" });
+    });
+  }
+
   if (!me || !organizations) {
     if (loadError) {
       return (
@@ -228,9 +248,52 @@ export default function ResourceDetailPage() {
               onSessionExpired={() => router.push("/login")}
             />
             <StatusPill tone={resource.status === "ACTIVE" ? "green" : "gray"}>{resource.status}</StatusPill>
+            {flaggedIds.has(resourceId) ? (
+              <span style={{ fontSize: 13, color: "var(--uikit-slate-400)" }}>Đã báo cáo</span>
+            ) : (
+              <GhostButton
+                tone="red"
+                icon={Flag}
+                onClick={() => {
+                  setFlaggingTarget({ type: "RESOURCE", id: resourceId });
+                  setFlagForm({ reasonCode: CONTENT_FLAG_REASON_OPTIONS[0].value, details: "" });
+                }}
+              >
+                Báo cáo nội dung
+              </GhostButton>
+            )}
           </div>
         </div>
         {resource.description && <p style={{ fontSize: 14, color: "var(--uikit-slate-700)" }}>{resource.description}</p>}
+
+        {flaggingTarget?.type === "RESOURCE" && flaggingTarget.id === resourceId && (
+          <Card>
+            <SectionHeader title="Báo cáo nội dung vi phạm" />
+            <div className="uikit-stack" style={{ marginTop: "var(--space-3)" }}>
+              <SelectField
+                label="Lý do"
+                value={flagForm.reasonCode}
+                onChange={(e) => setFlagForm({ ...flagForm, reasonCode: e.target.value })}
+                options={CONTENT_FLAG_REASON_OPTIONS}
+              />
+              <TextField
+                label="Mô tả chi tiết"
+                as="textarea"
+                required
+                value={flagForm.details}
+                onChange={(e) => setFlagForm({ ...flagForm, details: e.target.value })}
+              />
+            </div>
+            <div style={{ display: "flex", gap: "var(--space-3)", marginTop: "var(--space-4)" }}>
+              <PrimaryButton disabled={busyKey === `flag-${resourceId}` || !flagForm.details.trim()} onClick={onSubmitFlag}>
+                {busyKey === `flag-${resourceId}` ? "Đang gửi…" : "Gửi báo cáo"}
+              </PrimaryButton>
+              <GhostButton disabled={busyKey === `flag-${resourceId}`} onClick={() => setFlaggingTarget(null)}>
+                Huỷ
+              </GhostButton>
+            </div>
+          </Card>
+        )}
 
         {actionError && (
           <p className="uikit-alert-error" role="alert">
@@ -282,11 +345,56 @@ export default function ResourceDetailPage() {
           {sessionAnnotations.length > 0 && (
             <div className="uikit-row-list" style={{ marginTop: "var(--space-3)" }}>
               {sessionAnnotations.map((a) => (
-                <div key={a.id} className="uikit-row">
-                  <span style={{ fontSize: 14 }}>{a.content}</span>
-                  <GhostButton tone="red" icon={Trash2} disabled={busyKey === `remove-annotation-${a.id}`} onClick={() => onRemoveAnnotation(a.id)}>
-                    Xoá
-                  </GhostButton>
+                <div key={a.id}>
+                  <div className="uikit-row">
+                    <span style={{ fontSize: 14 }}>{a.content}</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+                      {flaggedIds.has(a.id) ? (
+                        <span style={{ fontSize: 13, color: "var(--uikit-slate-400)" }}>Đã báo cáo</span>
+                      ) : (
+                        <GhostButton
+                          tone="red"
+                          icon={Flag}
+                          onClick={() => {
+                            setFlaggingTarget({ type: "ANNOTATION", id: a.id });
+                            setFlagForm({ reasonCode: CONTENT_FLAG_REASON_OPTIONS[0].value, details: "" });
+                          }}
+                        >
+                          Báo cáo
+                        </GhostButton>
+                      )}
+                      <GhostButton tone="red" icon={Trash2} disabled={busyKey === `remove-annotation-${a.id}`} onClick={() => onRemoveAnnotation(a.id)}>
+                        Xoá
+                      </GhostButton>
+                    </div>
+                  </div>
+                  {flaggingTarget?.type === "ANNOTATION" && flaggingTarget.id === a.id && (
+                    <div style={{ padding: "var(--space-4)", border: "1px solid var(--uikit-slate-200)", borderRadius: "var(--radius-sm)", marginTop: "var(--space-2)" }}>
+                      <div className="uikit-stack">
+                        <SelectField
+                          label="Lý do"
+                          value={flagForm.reasonCode}
+                          onChange={(e) => setFlagForm({ ...flagForm, reasonCode: e.target.value })}
+                          options={CONTENT_FLAG_REASON_OPTIONS}
+                        />
+                        <TextField
+                          label="Mô tả chi tiết"
+                          as="textarea"
+                          required
+                          value={flagForm.details}
+                          onChange={(e) => setFlagForm({ ...flagForm, details: e.target.value })}
+                        />
+                      </div>
+                      <div style={{ display: "flex", gap: "var(--space-3)", marginTop: "var(--space-4)" }}>
+                        <PrimaryButton disabled={busyKey === `flag-${a.id}` || !flagForm.details.trim()} onClick={onSubmitFlag}>
+                          {busyKey === `flag-${a.id}` ? "Đang gửi…" : "Gửi báo cáo"}
+                        </PrimaryButton>
+                        <GhostButton disabled={busyKey === `flag-${a.id}`} onClick={() => setFlaggingTarget(null)}>
+                          Huỷ
+                        </GhostButton>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

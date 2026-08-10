@@ -13,6 +13,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { userAccount } from "./identity";
 import { organization } from "./organization";
+import { transferManifest } from "./transfer";
 import { citext } from "./custom-types";
 import {
   accessGrantStatusEnum,
@@ -227,10 +228,10 @@ export const annotationRevision = pgTable(
 );
 
 /**
- * `source_transfer_manifest_id` from the dbml is intentionally omitted — it FKs to
- * `transfer_manifest`, a Phase 6 table that does not exist yet. Added as an additive
- * migration in Phase 6, same treatment as `verification_document.author_verification_request_id`
- * in Phase 1→2 (see B.0).
+ * `source_transfer_manifest_id` — additive column, added now that Phase 6's `transfer_manifest`
+ * exists (was intentionally omitted in Phase 2, see git history / earlier comment here). Set
+ * when a grant was created by `TransferManifestService.share()`; null for grants created
+ * directly via `POST /resources/:id/access-requests`.
  */
 export const resourceAccessGrant = pgTable(
   "resource_access_grant",
@@ -246,6 +247,7 @@ export const resourceAccessGrant = pgTable(
     grantedByUserId: uuid("granted_by_user_id")
       .notNull()
       .references(() => userAccount.id),
+    sourceTransferManifestId: uuid("source_transfer_manifest_id").references(() => transferManifest.id),
     expiresAt: timestamp("expires_at", { withTimezone: true }),
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
     revokedByUserId: uuid("revoked_by_user_id").references(() => userAccount.id),
@@ -255,5 +257,6 @@ export const resourceAccessGrant = pgTable(
     index("idx_resource_access_grant_resource_status").on(table.resourceId, table.status),
     index("idx_resource_access_grant_recipient_org").on(table.recipientOrganizationId),
     index("idx_resource_access_grant_recipient_user").on(table.recipientUserId),
+    index("idx_resource_access_grant_source_manifest").on(table.sourceTransferManifestId),
   ],
 );

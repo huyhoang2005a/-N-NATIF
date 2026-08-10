@@ -136,6 +136,21 @@ export const CASE_INITIATION_STATUS_TONE: Record<string, Tone> = {
   EXPIRED: "gray",
 };
 
+export const TRANSFER_MANIFEST_STATUS_TONE: Record<string, Tone> = {
+  DRAFT: "gray",
+  READY: "blue",
+  SHARED: "green",
+  EXPIRED: "gray",
+  REVOKED: "red",
+};
+
+export const CONTENT_FLAG_STATUS_TONE: Record<string, Tone> = {
+  PENDING: "amber",
+  IN_REVIEW: "blue",
+  CLOSED: "gray",
+  DISMISSED: "gray",
+};
+
 export function toneOf(map: Record<string, Tone>, value: string): Tone {
   return map[value] ?? "gray";
 }

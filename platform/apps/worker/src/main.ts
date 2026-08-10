@@ -5,6 +5,7 @@ import { sweepExpiredCaseInitiationRequests } from "./case-initiations/sweep-exp
 import { ConsoleEmailSender } from "./email/console-email-sender";
 import { ResendEmailSender } from "./email/resend-email-sender";
 import { dispatchPendingEvents } from "./outbox-dispatcher";
+import { sweepExpiredTransferManifests } from "./transfer-manifests/sweep-expired";
 
 const POLL_INTERVAL_MS = 2000;
 // `case_initiation_request.expires_at` is a 14-day window — no need to check every
@@ -60,6 +61,14 @@ async function main(): Promise<void> {
         }
       } catch (error) {
         console.error("[worker] expiry sweep error", error);
+      }
+      try {
+        const expiredCount = await sweepExpiredTransferManifests(db);
+        if (expiredCount > 0) {
+          console.log(`[worker] expired ${expiredCount} transfer manifest(s)/grant(s)`);
+        }
+      } catch (error) {
+        console.error("[worker] transfer manifest expiry sweep error", error);
       }
     }
 

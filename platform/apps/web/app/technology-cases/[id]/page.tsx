@@ -17,10 +17,13 @@ import type {
   RoadmapMilestoneResponse,
   RoadmapResponse,
   TechnologyCaseResponse,
+  TransferManifestDetailResponse,
+  TransferManifestResponse,
 } from "@r2m/contracts";
 import { ApiError, authFetch, SessionExpiredError } from "../../../lib/api-client";
 import { describeErrorCode } from "../../../lib/error-messages";
 import {
+  ACCESS_PERMISSION_LABELS,
   ASSESSMENT_STATUS_LABELS,
   CASE_MEMBER_ROLE_LABELS,
   CASE_ORGANIZATION_ROLE_LABELS,
@@ -28,6 +31,7 @@ import {
   MILESTONE_STATUS_LABELS,
   PLATFORM_ROLE_LABELS,
   TECHNOLOGY_CASE_STATUS_LABELS,
+  TRANSFER_MANIFEST_STATUS_LABELS,
 } from "../../../lib/labels";
 import { navForPersona, personaOf } from "../../../lib/nav";
 import { getAccessToken } from "../../../lib/session";
@@ -37,10 +41,12 @@ import {
   GAP_SEVERITY_TONE,
   MILESTONE_STATUS_TONE,
   TECHNOLOGY_CASE_STATUS_TONE,
+  TRANSFER_MANIFEST_STATUS_TONE,
 } from "../../../lib/tone";
 import { BackLink, Card, GhostButton, PrimaryButton, SelectField, Shell, StatusDot, StatusPill, Tabs, TextField } from "../../../components/ui";
 
-const TABS = ["Tổng quan", "Bằng chứng", "Đánh giá", "Gap", "Lộ trình"] as const;
+const TABS = ["Tổng quan", "Bằng chứng", "Đánh giá", "Gap", "Lộ trình", "Chuyển giao"] as const;
+const ACCESS_PERMISSIONS = Object.keys(ACCESS_PERMISSION_LABELS);
 const CASE_MEMBER_ROLES = Object.keys(CASE_MEMBER_ROLE_LABELS);
 const CASE_ORGANIZATION_ROLES = Object.keys(CASE_ORGANIZATION_ROLE_LABELS).filter((role) => role !== "OWNING_ORGANIZATION");
 const TECHNOLOGY_CASE_STATUSES = Object.keys(TECHNOLOGY_CASE_STATUS_LABELS);
@@ -63,6 +69,7 @@ export default function TechnologyCaseDetailPage() {
   const [gaps, setGaps] = useState<GapResponse[] | null>(null);
   const [roadmaps, setRoadmaps] = useState<RoadmapResponse[] | null>(null);
   const [milestones, setMilestones] = useState<RoadmapMilestoneResponse[]>([]);
+  const [transferManifests, setTransferManifests] = useState<TransferManifestResponse[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [tab, setTab] = useState<(typeof TABS)[number]>("Tổng quan");
@@ -77,13 +84,22 @@ export default function TechnologyCaseDetailPage() {
     citationSnippet: "",
   });
 
+  // ---------- chuyển giao (transfer manifest) ----------
+  const [manifestDetails, setManifestDetails] = useState<Record<string, TransferManifestDetailResponse>>({});
+  const [expandedManifestId, setExpandedManifestId] = useState<string | null>(null);
+  const [showManifestForm, setShowManifestForm] = useState(false);
+  const [manifestForm, setManifestForm] = useState({ title: "", note: "" });
+  const [itemForm, setItemForm] = useState({ resourceVersionId: "", permission: "VIEW" });
+  const [recipientForm, setRecipientForm] = useState({ recipientUserId: "", recipientOrganizationId: "", permission: "VIEW", expiresAt: "" });
+  const [shareExpiryDrafts, setShareExpiryDrafts] = useState<Record<string, string>>({});
+
   async function load() {
     const [meResponse, myOrgs] = await Promise.all([
       authFetch<MeResponse>("/me"),
       authFetch<OrganizationResponse[]>("/organizations"),
     ]);
     const tc = await authFetch<TechnologyCaseResponse>(`/technology-cases/${caseId}`);
-    const [org, memberRows, caseOrgRows, evidenceRows, assessmentRows, gapRows, roadmapRows] = await Promise.all([
+    const [org, memberRows, caseOrgRows, evidenceRows, assessmentRows, gapRows, roadmapRows, transferManifestRows] = await Promise.all([
       authFetch<OrganizationResponse>(`/organizations/${tc.owningOrganizationId}`),
       authFetch<CaseMemberResponse[]>(`/technology-cases/${caseId}/members`),
       authFetch<CaseOrganizationResponse[]>(`/technology-cases/${caseId}/organizations`),
@@ -91,6 +107,7 @@ export default function TechnologyCaseDetailPage() {
       authFetch<ReadinessAssessmentResponse[]>(`/technology-cases/${caseId}/assessments`),
       authFetch<GapResponse[]>(`/technology-cases/${caseId}/gaps`),
       authFetch<RoadmapResponse[]>(`/technology-cases/${caseId}/roadmaps`),
+      authFetch<TransferManifestResponse[]>(`/technology-cases/${caseId}/transfer-manifests`),
     ]);
     const latestAssessment = assessmentRows[0];
     const [criterionRows, scoreRows] = latestAssessment
@@ -117,6 +134,7 @@ export default function TechnologyCaseDetailPage() {
     setGaps(gapRows);
     setRoadmaps(roadmapRows);
     setMilestones(milestoneRows);
+    setTransferManifests(transferManifestRows);
   }
 
   useEffect(() => {
@@ -176,6 +194,81 @@ export default function TechnologyCaseDetailPage() {
         body: JSON.stringify({}),
       });
       router.push(`/assessments/${created.id}`);
+    });
+  }
+
+  function onCreateManifest() {
+    return runAction("create-manifest", async () => {
+      await authFetch(`/technology-cases/${caseId}/transfer-manifests`, {
+        method: "POST",
+        body: JSON.stringify({ title: manifestForm.title, note: manifestForm.note || undefined }),
+      });
+      setManifestForm({ title: "", note: "" });
+      setShowManifestForm(false);
+      await load();
+    });
+  }
+
+  async function loadManifestDetail(id: string) {
+    const detail = await authFetch<TransferManifestDetailResponse>(`/transfer-manifests/${id}`);
+    setManifestDetails((prev) => ({ ...prev, [id]: detail }));
+  }
+
+  function onToggleManifest(id: string) {
+    if (expandedManifestId === id) {
+      setExpandedManifestId(null);
+      return;
+    }
+    setExpandedManifestId(id);
+    if (!manifestDetails[id]) {
+      loadManifestDetail(id).catch(() => {
+        setActionError("Không tải được chi tiết gói chuyển giao.");
+      });
+    }
+  }
+
+  function onAddItem(manifestId: string) {
+    return runAction(`add-item-${manifestId}`, async () => {
+      await authFetch(`/transfer-manifests/${manifestId}/items`, {
+        method: "POST",
+        body: JSON.stringify({ resourceVersionId: itemForm.resourceVersionId, permission: itemForm.permission }),
+      });
+      setItemForm({ resourceVersionId: "", permission: "VIEW" });
+      await Promise.all([loadManifestDetail(manifestId), load()]);
+    });
+  }
+
+  function onAddRecipient(manifestId: string) {
+    return runAction(`add-recipient-${manifestId}`, async () => {
+      await authFetch(`/transfer-manifests/${manifestId}/recipients`, {
+        method: "POST",
+        body: JSON.stringify({
+          recipientUserId: recipientForm.recipientUserId || undefined,
+          recipientOrganizationId: recipientForm.recipientOrganizationId || undefined,
+          permission: recipientForm.permission,
+          expiresAt: recipientForm.expiresAt ? new Date(recipientForm.expiresAt).toISOString() : undefined,
+        }),
+      });
+      setRecipientForm({ recipientUserId: "", recipientOrganizationId: "", permission: "VIEW", expiresAt: "" });
+      await Promise.all([loadManifestDetail(manifestId), load()]);
+    });
+  }
+
+  function onShareManifest(manifestId: string) {
+    return runAction(`share-manifest-${manifestId}`, async () => {
+      const expiresAt = shareExpiryDrafts[manifestId];
+      await authFetch(`/transfer-manifests/${manifestId}/share`, {
+        method: "POST",
+        body: JSON.stringify({ expiresAt: new Date(expiresAt).toISOString() }),
+      });
+      await Promise.all([loadManifestDetail(manifestId), load()]);
+    });
+  }
+
+  function onRevokeManifest(manifestId: string) {
+    return runAction(`revoke-manifest-${manifestId}`, async () => {
+      await authFetch(`/transfer-manifests/${manifestId}/revoke`, { method: "POST" });
+      await Promise.all([loadManifestDetail(manifestId), load()]);
     });
   }
 
@@ -239,7 +332,7 @@ export default function TechnologyCaseDetailPage() {
     );
   }
 
-  if (!technologyCase || !owningOrg || !members || !caseOrganizations || !evidence || !assessments || !gaps || !roadmaps) {
+  if (!technologyCase || !owningOrg || !members || !caseOrganizations || !evidence || !assessments || !gaps || !roadmaps || !transferManifests) {
     return (
       <Shell brandLabel="R2M" me={me} roleLabel={roleLabel} nav={nav}>
         {null}
@@ -249,6 +342,7 @@ export default function TechnologyCaseDetailPage() {
 
   const owner = members.find((m) => m.role === "OWNER");
   const ownerLabel = owner ? (owner.userId === me.userId ? me.displayName : owner.userId.slice(0, 8)) : "—";
+  const isCaseOwner = owner?.userId === me.userId;
   const latestAssessment = assessments[0];
   const latestRoadmap = roadmaps[0];
 
@@ -486,6 +580,234 @@ export default function TechnologyCaseDetailPage() {
                   </div>
                 )}
               </>
+            )}
+          </Card>
+        )}
+
+        {tab === "Chuyển giao" && (
+          <Card>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-3)" }}>
+              <h2 style={{ fontSize: 14, fontWeight: 600 }}>Gói chuyển giao công nghệ</h2>
+              {isCaseOwner && (
+                <button
+                  type="button"
+                  onClick={() => setShowManifestForm((v) => !v)}
+                  style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 12, fontWeight: 500, color: "var(--uikit-indigo-700)" }}
+                >
+                  {showManifestForm ? "Đóng" : "+ Tạo gói mới"}
+                </button>
+              )}
+            </div>
+
+            {!isCaseOwner && (
+              <p style={{ fontSize: 12, color: "var(--uikit-slate-400)", marginBottom: "var(--space-3)" }}>
+                Chỉ chủ trì (OWNER) của case mới tạo/quản lý được gói chuyển giao — bạn có thể xem danh sách bên dưới.
+              </p>
+            )}
+
+            {transferManifests.length === 0 ? (
+              <p className="uikit-empty">
+                Chưa có gói chuyển giao nào. Tạo gói để đóng gói tài nguyên (chỉ metadata/vị trí,
+                không kèm file gốc) và cấp quyền truy cập có kiểm soát cho đối tác.
+              </p>
+            ) : (
+              <div className="uikit-stack">
+                {transferManifests.map((m) => {
+                  const detail = manifestDetails[m.id];
+                  const isExpanded = expandedManifestId === m.id;
+                  return (
+                    <div key={m.id} style={{ border: "1px solid var(--uikit-slate-200)", borderRadius: "var(--radius-sm)", padding: "var(--space-3)" }}>
+                      <button
+                        type="button"
+                        onClick={() => onToggleManifest(m.id)}
+                        style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left" }}
+                      >
+                        <div>
+                          <p style={{ fontSize: 14, fontWeight: 500, color: "var(--uikit-slate-900)" }}>
+                            {m.title} <span style={{ color: "var(--uikit-slate-400)", fontWeight: 400 }}>· v{m.versionNo}</span>
+                          </p>
+                          <p style={{ marginTop: 2, fontSize: 12, color: "var(--uikit-slate-500)" }}>
+                            {m.itemCount} tài nguyên · {m.recipientCount} người/tổ chức nhận
+                          </p>
+                        </div>
+                        <StatusPill tone={toneOf(TRANSFER_MANIFEST_STATUS_TONE, m.status)}>
+                          {TRANSFER_MANIFEST_STATUS_LABELS[m.status] ?? m.status}
+                        </StatusPill>
+                      </button>
+
+                      {isExpanded && (
+                        <div style={{ marginTop: "var(--space-3)", paddingTop: "var(--space-3)", borderTop: "1px solid var(--uikit-slate-100)" }}>
+                          {!detail ? (
+                            <p className="uikit-empty">Đang tải…</p>
+                          ) : (
+                            <div className="uikit-stack">
+                              {isCaseOwner && (m.status === "DRAFT" || m.status === "READY") && (
+                                <div style={{ display: "flex", alignItems: "flex-end", gap: "var(--space-3)", flexWrap: "wrap" }}>
+                                  <TextField
+                                    label="Hết hạn truy cập (áp dụng cho toàn bộ gói khi chia sẻ)"
+                                    type="datetime-local"
+                                    value={shareExpiryDrafts[m.id] ?? ""}
+                                    onChange={(e) => setShareExpiryDrafts((prev) => ({ ...prev, [m.id]: e.target.value }))}
+                                  />
+                                  <PrimaryButton
+                                    disabled={busyKey === `share-manifest-${m.id}` || !shareExpiryDrafts[m.id]}
+                                    onClick={() => onShareManifest(m.id)}
+                                  >
+                                    {busyKey === `share-manifest-${m.id}` ? "Đang chia sẻ…" : "Chia sẻ"}
+                                  </PrimaryButton>
+                                </div>
+                              )}
+                              {isCaseOwner && m.status === "SHARED" && (
+                                <GhostButton tone="red" disabled={busyKey === `revoke-manifest-${m.id}`} onClick={() => onRevokeManifest(m.id)}>
+                                  {busyKey === `revoke-manifest-${m.id}` ? "Đang thu hồi…" : "Thu hồi quyền truy cập"}
+                                </GhostButton>
+                              )}
+
+                              <div>
+                                <p style={{ fontSize: 12, fontWeight: 600, color: "var(--uikit-slate-500)", marginBottom: "var(--space-2)" }}>
+                                  Tài nguyên trong gói ({detail.items.length})
+                                </p>
+                                {detail.items.length === 0 ? (
+                                  <p className="uikit-empty">Chưa có tài nguyên nào trong gói.</p>
+                                ) : (
+                                  <div className="uikit-row-list">
+                                    {detail.items.map((item) => (
+                                      <div key={item.id} className="uikit-row">
+                                        <span style={{ fontSize: 13, fontFamily: "var(--font-mono)" }}>{item.locationUrlSnapshot}</span>
+                                        <span style={{ fontSize: 12, color: "var(--uikit-slate-500)" }}>
+                                          {ACCESS_PERMISSION_LABELS[item.permission] ?? item.permission}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+
+                              <div>
+                                <p style={{ fontSize: 12, fontWeight: 600, color: "var(--uikit-slate-500)", marginBottom: "var(--space-2)" }}>
+                                  Người/tổ chức nhận ({detail.recipients.length})
+                                </p>
+                                {detail.recipients.length === 0 ? (
+                                  <p className="uikit-empty">Chưa có người nhận nào.</p>
+                                ) : (
+                                  <div className="uikit-row-list">
+                                    {detail.recipients.map((r) => (
+                                      <div key={r.id} className="uikit-row">
+                                        <span style={{ fontSize: 13, fontFamily: "var(--font-mono)" }}>
+                                          {r.recipientUserId ? `User ${r.recipientUserId.slice(0, 8)}` : `Tổ chức ${r.recipientOrganizationId?.slice(0, 8)}`}
+                                        </span>
+                                        <span style={{ fontSize: 12, color: "var(--uikit-slate-500)" }}>
+                                          {ACCESS_PERMISSION_LABELS[r.permission] ?? r.permission}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+
+                              {isCaseOwner && m.status === "DRAFT" && (
+                                <>
+                                  <div className="uikit-stack" style={{ paddingTop: "var(--space-3)", borderTop: "1px solid var(--uikit-slate-100)" }}>
+                                    <p style={{ fontSize: 12, fontWeight: 600, color: "var(--uikit-slate-500)" }}>Thêm tài nguyên</p>
+                                    {evidence.length > 0 ? (
+                                      <SelectField
+                                        label="Chọn từ bằng chứng của case"
+                                        value={itemForm.resourceVersionId}
+                                        onChange={(e) => setItemForm({ ...itemForm, resourceVersionId: e.target.value })}
+                                        options={[
+                                          { value: "", label: "— Chọn —" },
+                                          ...evidence.map((e) => ({ value: e.resourceVersionId, label: e.title })),
+                                        ]}
+                                      />
+                                    ) : (
+                                      <TextField
+                                        label="Resource Version ID"
+                                        hint="Case chưa có bằng chứng nào để chọn — dán UUID resource version thủ công."
+                                        value={itemForm.resourceVersionId}
+                                        onChange={(e) => setItemForm({ ...itemForm, resourceVersionId: e.target.value })}
+                                      />
+                                    )}
+                                    <SelectField
+                                      label="Quyền"
+                                      value={itemForm.permission}
+                                      onChange={(e) => setItemForm({ ...itemForm, permission: e.target.value })}
+                                      options={ACCESS_PERMISSIONS.map((p) => ({ value: p, label: ACCESS_PERMISSION_LABELS[p] ?? p }))}
+                                    />
+                                    <GhostButton
+                                      icon={Plus}
+                                      disabled={busyKey === `add-item-${m.id}` || !itemForm.resourceVersionId}
+                                      onClick={() => onAddItem(m.id)}
+                                    >
+                                      {busyKey === `add-item-${m.id}` ? "Đang thêm…" : "Thêm tài nguyên"}
+                                    </GhostButton>
+                                  </div>
+
+                                  <div className="uikit-stack" style={{ paddingTop: "var(--space-3)", borderTop: "1px solid var(--uikit-slate-100)" }}>
+                                    <p style={{ fontSize: 12, fontWeight: 600, color: "var(--uikit-slate-500)" }}>Thêm người/tổ chức nhận</p>
+                                    <TextField
+                                      label="User ID"
+                                      optional
+                                      hint="Điền User ID HOẶC Organization ID, không điền cả hai"
+                                      value={recipientForm.recipientUserId}
+                                      onChange={(e) => setRecipientForm({ ...recipientForm, recipientUserId: e.target.value })}
+                                    />
+                                    <TextField
+                                      label="Organization ID"
+                                      optional
+                                      value={recipientForm.recipientOrganizationId}
+                                      onChange={(e) => setRecipientForm({ ...recipientForm, recipientOrganizationId: e.target.value })}
+                                    />
+                                    <SelectField
+                                      label="Quyền"
+                                      value={recipientForm.permission}
+                                      onChange={(e) => setRecipientForm({ ...recipientForm, permission: e.target.value })}
+                                      options={ACCESS_PERMISSIONS.map((p) => ({ value: p, label: ACCESS_PERMISSION_LABELS[p] ?? p }))}
+                                    />
+                                    <TextField
+                                      label="Hết hạn truy cập (tuỳ chọn riêng)"
+                                      optional
+                                      type="datetime-local"
+                                      hint="Không điền thì dùng hạn chung khi chia sẻ gói"
+                                      value={recipientForm.expiresAt}
+                                      onChange={(e) => setRecipientForm({ ...recipientForm, expiresAt: e.target.value })}
+                                    />
+                                    <GhostButton
+                                      icon={UserPlus}
+                                      disabled={
+                                        busyKey === `add-recipient-${m.id}` ||
+                                        (!recipientForm.recipientUserId && !recipientForm.recipientOrganizationId)
+                                      }
+                                      onClick={() => onAddRecipient(m.id)}
+                                    >
+                                      {busyKey === `add-recipient-${m.id}` ? "Đang thêm…" : "Thêm người nhận"}
+                                    </GhostButton>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {isCaseOwner && showManifestForm && (
+              <div className="uikit-stack" style={{ marginTop: "var(--space-4)", paddingTop: "var(--space-4)", borderTop: "1px solid var(--uikit-slate-100)" }}>
+                <TextField label="Tiêu đề gói" value={manifestForm.title} onChange={(e) => setManifestForm({ ...manifestForm, title: e.target.value })} />
+                <TextField
+                  label="Ghi chú"
+                  as="textarea"
+                  optional
+                  value={manifestForm.note}
+                  onChange={(e) => setManifestForm({ ...manifestForm, note: e.target.value })}
+                />
+                <PrimaryButton disabled={busyKey === "create-manifest" || !manifestForm.title} onClick={onCreateManifest}>
+                  {busyKey === "create-manifest" ? "Đang tạo…" : "Tạo gói (bản nháp)"}
+                </PrimaryButton>
+              </div>
             )}
           </Card>
         )}

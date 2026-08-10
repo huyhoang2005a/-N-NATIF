@@ -43,8 +43,9 @@ import {
   roadmapReview,
   roadmapTask,
 } from "./roadmap";
+import { transferManifest, transferManifestItem, transferRecipient } from "./transfer";
 import type { outboxEvent } from "./platform-ops";
-import { auditLog, idempotencyKey, notification } from "./platform-ops";
+import { auditLog, contentFlag, idempotencyKey, moderationDecision, notification } from "./platform-ops";
 import { authorFollow, contentSave, contentVote, expertiseEndorsement, organizationFollow } from "./community";
 import {
   caseInitiationRequest,
@@ -281,6 +282,10 @@ export const resourceAccessGrantRelations = relations(resourceAccessGrant, ({ on
   revokedBy: one(userAccount, {
     fields: [resourceAccessGrant.revokedByUserId],
     references: [userAccount.id],
+  }),
+  sourceTransferManifest: one(transferManifest, {
+    fields: [resourceAccessGrant.sourceTransferManifestId],
+    references: [transferManifest.id],
   }),
 }));
 
@@ -628,9 +633,85 @@ export const roadmapReviewRelations = relations(roadmapReview, ({ one }) => ({
   }),
 }));
 
+export const transferManifestRelations = relations(transferManifest, ({ one, many }) => ({
+  technologyCase: one(technologyCase, {
+    fields: [transferManifest.technologyCaseId],
+    references: [technologyCase.id],
+  }),
+  createdBy: one(userAccount, {
+    fields: [transferManifest.createdByUserId],
+    references: [userAccount.id],
+  }),
+  items: many(transferManifestItem),
+  recipients: many(transferRecipient),
+}));
+
+export const transferManifestItemRelations = relations(transferManifestItem, ({ one }) => ({
+  transferManifest: one(transferManifest, {
+    fields: [transferManifestItem.transferManifestId],
+    references: [transferManifest.id],
+  }),
+  resourceVersion: one(resourceVersion, {
+    fields: [transferManifestItem.resourceVersionId],
+    references: [resourceVersion.id],
+  }),
+}));
+
+export const transferRecipientRelations = relations(transferRecipient, ({ one }) => ({
+  transferManifest: one(transferManifest, {
+    fields: [transferRecipient.transferManifestId],
+    references: [transferManifest.id],
+  }),
+  recipientOrganization: one(organization, {
+    fields: [transferRecipient.recipientOrganizationId],
+    references: [organization.id],
+  }),
+  recipientUser: one(userAccount, {
+    fields: [transferRecipient.recipientUserId],
+    references: [userAccount.id],
+  }),
+}));
+
 export const notificationRelations = relations(notification, ({ one }) => ({
   recipient: one(userAccount, {
     fields: [notification.recipientUserId],
+    references: [userAccount.id],
+  }),
+}));
+
+export const contentFlagRelations = relations(contentFlag, ({ one, many }) => ({
+  reporter: one(userAccount, {
+    fields: [contentFlag.reporterUserId],
+    references: [userAccount.id],
+    relationName: "contentFlagReporter",
+  }),
+  targetResource: one(resource, {
+    fields: [contentFlag.targetResourceId],
+    references: [resource.id],
+  }),
+  targetAnnotation: one(annotation, {
+    fields: [contentFlag.targetAnnotationId],
+    references: [annotation.id],
+  }),
+  targetTechnologyProfile: one(technologyProfile, {
+    fields: [contentFlag.targetTechnologyProfileId],
+    references: [technologyProfile.id],
+  }),
+  assignedReviewer: one(userAccount, {
+    fields: [contentFlag.assignedReviewerUserId],
+    references: [userAccount.id],
+    relationName: "contentFlagAssignedReviewer",
+  }),
+  decisions: many(moderationDecision),
+}));
+
+export const moderationDecisionRelations = relations(moderationDecision, ({ one }) => ({
+  contentFlag: one(contentFlag, {
+    fields: [moderationDecision.contentFlagId],
+    references: [contentFlag.id],
+  }),
+  reviewer: one(userAccount, {
+    fields: [moderationDecision.reviewerUserId],
     references: [userAccount.id],
   }),
 }));

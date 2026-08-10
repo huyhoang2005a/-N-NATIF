@@ -344,3 +344,36 @@ export const recommendationRunTypeEnum = pgEnum("recommendation_run_type", [
   "FOCUSED",
   "FEED",
 ]);
+
+// ============================================================
+// Phase 6 — Transfer & Moderation
+// ============================================================
+
+export const transferManifestStatusEnum = pgEnum("transfer_manifest_status", [
+  "DRAFT",
+  "READY",
+  "SHARED",
+  "EXPIRED",
+  "REVOKED",
+]);
+
+export const moderationTargetTypeEnum = pgEnum("moderation_target_type", [
+  "RESOURCE",
+  "ANNOTATION",
+  "TECHNOLOGY_PROFILE",
+]);
+
+export const contentFlagStatusEnum = pgEnum("content_flag_status", [
+  "PENDING",
+  "IN_REVIEW",
+  "CLOSED",
+  "DISMISSED",
+]);
+
+export const moderationActionEnum = pgEnum("moderation_action", [
+  "KEEP",
+  "HIDE",
+  "REMOVE",
+  "RESTRICT_AUTHOR",
+  "RESTORE",
+]);

@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import type {
   AuthorVerificationRequestResponse,
+  ContentFlagResponse,
   MeResponse,
   OrganizationResponse,
   OrganizationVerificationRequestResponse,
@@ -248,15 +249,18 @@ function PlatformOpsDashboardBody({ isAdmin }: { isAdmin: boolean }) {
   const [orgVerifications, setOrgVerifications] = useState<OrganizationVerificationRequestResponse[] | null>(null);
   const [authorVerifications, setAuthorVerifications] = useState<AuthorVerificationRequestResponse[] | null>(null);
   const [reviewQueue, setReviewQueue] = useState<ReviewQueueItem[] | null>(null);
+  const [contentFlags, setContentFlags] = useState<ContentFlagResponse[] | null>(null);
 
   useEffect(() => {
     Promise.all([
       authFetch<OrganizationVerificationRequestResponse[]>("/platform/organization-verifications"),
       authFetch<AuthorVerificationRequestResponse[]>("/platform/author-verifications"),
       authFetch<TechnologyCaseResponse[]>("/technology-cases"),
-    ]).then(async ([orgReqs, authorReqs, cases]) => {
+      authFetch<ContentFlagResponse[]>("/platform/content-flags"),
+    ]).then(async ([orgReqs, authorReqs, cases, flags]) => {
       setOrgVerifications(orgReqs);
       setAuthorVerifications(authorReqs);
+      setContentFlags(flags);
 
       const items: ReviewQueueItem[] = [];
       await Promise.all(
@@ -281,11 +285,12 @@ function PlatformOpsDashboardBody({ isAdmin }: { isAdmin: boolean }) {
     });
   }, []);
 
-  if (!orgVerifications || !authorVerifications || !reviewQueue) return null;
+  if (!orgVerifications || !authorVerifications || !reviewQueue || !contentFlags) return null;
 
   const pendingOrg = orgVerifications.filter((r) => r.status === "PENDING");
   const pendingAuthor = authorVerifications.filter((r) => r.status === "PENDING");
   const recentOrg = orgVerifications.slice(0, 3);
+  const openFlags = contentFlags.filter((f) => f.status === "PENDING" || f.status === "IN_REVIEW");
 
   return (
     <div className="uikit-stack">
@@ -301,7 +306,9 @@ function PlatformOpsDashboardBody({ isAdmin }: { isAdmin: boolean }) {
         {isAdmin && <SoonStatTile label="Case đang xử lý" icon={FolderOpen} />}
         <StatCard label="Chờ xác minh" value={pendingOrg.length + pendingAuthor.length} icon={ShieldCheck} tone="amber" />
         <StatCard label="Đánh giá & lộ trình chờ duyệt" value={reviewQueue.length} icon={ClipboardCheck} tone="indigo" />
-        <SoonStatTile label="Nội dung bị gắn cờ" icon={Flag} />
+        <Link href="/platform/flags" style={{ textDecoration: "none", color: "inherit" }}>
+          <StatCard label="Nội dung bị gắn cờ" value={openFlags.length} icon={Flag} tone="rose" />
+        </Link>
       </div>
 
       <Card>

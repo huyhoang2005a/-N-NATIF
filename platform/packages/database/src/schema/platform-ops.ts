@@ -12,7 +12,15 @@ import {
 } from "drizzle-orm/pg-core";
 import { userAccount } from "./identity";
 import { organization } from "./organization";
-import { notificationStatusEnum, outboxStatusEnum } from "./enums";
+import { annotation, resource } from "./resource";
+import { technologyProfile } from "./technology-case";
+import {
+  contentFlagStatusEnum,
+  moderationActionEnum,
+  moderationTargetTypeEnum,
+  notificationStatusEnum,
+  outboxStatusEnum,
+} from "./enums";
 
 export const notification = pgTable(
   "notification",
@@ -106,4 +114,54 @@ export const idempotencyKey = pgTable(
     uniqueIndex("uq_idempotency_key_user_key").on(table.userId, table.key),
     index("idx_idempotency_key_expires_at").on(table.expiresAt),
   ],
+);
+
+/** Phase 6 Sprint 6.3 — kiểm duyệt nội dung. `targetResourceId`/`targetAnnotationId`/
+ * `targetTechnologyProfileId` — đúng 1 non-null, khớp `targetType` (CHECK trong manual
+ * migration, cùng kỹ thuật `chk_content_flag_exactly_one_target` +
+ * `chk_content_flag_target_matches_type` trong spec file gốc). Không có cột `version` —
+ * concurrency giữa 2 reviewer cùng claim 1 flag chặn bằng WHERE status='PENDING' lúc
+ * update (cùng pattern optimistic-lock-qua-status đã dùng ở
+ * `case-initiations`/`transfer-manifests` sweep). */
+export const contentFlag = pgTable(
+  "content_flag",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    reporterUserId: uuid("reporter_user_id")
+      .notNull()
+      .references(() => userAccount.id),
+    targetType: moderationTargetTypeEnum("target_type").notNull(),
+    targetResourceId: uuid("target_resource_id").references(() => resource.id),
+    targetAnnotationId: uuid("target_annotation_id").references(() => annotation.id),
+    targetTechnologyProfileId: uuid("target_technology_profile_id").references(() => technologyProfile.id),
+    reasonCode: varchar("reason_code", { length: 100 }).notNull(),
+    details: text("details").notNull(),
+    status: contentFlagStatusEnum("status").notNull().default("PENDING"),
+    assignedReviewerUserId: uuid("assigned_reviewer_user_id").references(() => userAccount.id),
+    hiddenAt: timestamp("hidden_at", { withTimezone: true }),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("idx_content_flag_status_created").on(table.status, table.createdAt),
+    index("idx_content_flag_assigned_reviewer").on(table.assignedReviewerUserId),
+  ],
+);
+
+export const moderationDecision = pgTable(
+  "moderation_decision",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    contentFlagId: uuid("content_flag_id")
+      .notNull()
+      .references(() => contentFlag.id),
+    reviewerUserId: uuid("reviewer_user_id")
+      .notNull()
+      .references(() => userAccount.id),
+    action: moderationActionEnum("action").notNull(),
+    rationale: text("rationale").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("idx_moderation_decision_flag_created").on(table.contentFlagId, table.createdAt)],
 );

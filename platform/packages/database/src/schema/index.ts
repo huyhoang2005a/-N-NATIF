@@ -7,6 +7,7 @@ export * from "./resource";
 export * from "./technology-case";
 export * from "./assessment-gap";
 export * from "./roadmap";
+export * from "./transfer";
 export * from "./company-discovery";
 export * from "./community";
 export * from "./platform-ops";

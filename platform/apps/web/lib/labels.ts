@@ -260,3 +260,48 @@ export const CASE_INITIATION_STATUS_LABELS: Record<string, string> = {
   EXPIRED: "Đã hết hạn",
 };
 
+// ---------- Phase 6: Transfer & Moderation ----------
+
+export const TRANSFER_MANIFEST_STATUS_LABELS: Record<string, string> = {
+  DRAFT: "Bản nháp",
+  READY: "Sẵn sàng chia sẻ",
+  SHARED: "Đã chia sẻ",
+  EXPIRED: "Đã hết hạn",
+  REVOKED: "Đã thu hồi",
+};
+
+export const ACCESS_PERMISSION_LABELS: Record<string, string> = {
+  VIEW: "Xem",
+  DOWNLOAD: "Tải xuống",
+  MANAGE: "Quản lý",
+};
+
+export const CONTENT_FLAG_STATUS_LABELS: Record<string, string> = {
+  PENDING: "Chờ xử lý",
+  IN_REVIEW: "Đang xử lý",
+  CLOSED: "Đã xử lý",
+  DISMISSED: "Đã bác bỏ",
+};
+
+export const MODERATION_ACTION_LABELS: Record<string, string> = {
+  KEEP: "Giữ nguyên (bác bỏ báo cáo)",
+  HIDE: "Ẩn nội dung",
+  REMOVE: "Gỡ nội dung",
+  RESTRICT_AUTHOR: "Hạn chế tác giả",
+  RESTORE: "Khôi phục nội dung",
+};
+
+export const MODERATION_TARGET_TYPE_LABELS: Record<string, string> = {
+  RESOURCE: "Tài nguyên",
+  ANNOTATION: "Chú giải",
+  TECHNOLOGY_PROFILE: "Hồ sơ công nghệ",
+};
+
+export const CONTENT_FLAG_REASON_OPTIONS = [
+  { value: "Vi phạm bản quyền", label: "Vi phạm bản quyền" },
+  { value: "Nội dung sai lệch/gây hiểu nhầm", label: "Nội dung sai lệch/gây hiểu nhầm" },
+  { value: "Spam/quảng cáo", label: "Spam/quảng cáo" },
+  { value: "Nội dung không phù hợp", label: "Nội dung không phù hợp" },
+  { value: "Khác", label: "Khác" },
+];
+

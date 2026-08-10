@@ -1371,6 +1371,7 @@ select {
   color: var(--uikit-slate-700);
 }
 .uikit-topbar__icon-btn {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1387,6 +1388,21 @@ select {
 .uikit-topbar__icon-btn svg {
   width: 18px;
   height: 18px;
+}
+.uikit-topbar__icon-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: var(--uikit-rose-500);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 15px;
+  text-align: center;
 }
 .uikit-avatar {
   width: 28px;

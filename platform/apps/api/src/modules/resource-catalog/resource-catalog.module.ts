@@ -39,6 +39,11 @@ import { ResourceAccessGrantsService } from "./resource-access-grants.service";
   // actor can read a resource version before linking it as evidence) — same DI-export
   // requirement as the aggregator modules in identity-organization/platform-operations,
   // see README "Bug thật đã tìm và sửa" #5.
-  exports: [ResourcesRepository, ResourcesService],
+  // `ResourceAccessGrantsRepository` additionally exported for Phase 6
+  // `roadmap-transfer/transfer/transfer.service.ts` — `share()` creates N
+  // `resource_access_grant` rows in the SAME transaction as the manifest status update,
+  // so it injects the repository directly (not `ResourceAccessGrantsService`, which owns
+  // its own transaction + authorization check that can't compose into that transaction).
+  exports: [ResourcesRepository, ResourcesService, ResourceAccessGrantsRepository],
 })
 export class ResourceCatalogModule {}

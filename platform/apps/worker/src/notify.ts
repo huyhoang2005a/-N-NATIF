@@ -65,3 +65,34 @@ export async function listActivePlatformReviewerIds(db: Database): Promise<strin
     .filter((user) => user.platformRole === "PLATFORM_REVIEWER" || user.platformRole === "PLATFORM_ADMIN")
     .map((user) => user.id);
 }
+
+/** Phase 6 Sprint 6.3 — `ModerationDecisionRecordedEvent` carries the raw target
+ * reference, not a resolved owner id (resolve-at-dispatch, same reasoning as
+ * `listActiveOrgOwnersAndAdmins` for `OrganizationFollowedEvent`). `TECHNOLOGY_PROFILE`
+ * has no direct `created_by`/`owner` column — its "owner" is the case's active OWNER
+ * `case_member`, resolved via `technology_profile.technology_case_id`. Returns
+ * `undefined` if the target (or its owner) can no longer be found — the caller should
+ * skip notifying in that case, same "no crash on stale reference" treatment as
+ * `findActiveOrgOwnerUserId`. */
+export async function findContentOwnerUserId(
+  db: Database,
+  target: { targetType: string; targetResourceId: string | null; targetAnnotationId: string | null; targetTechnologyProfileId: string | null },
+): Promise<string | undefined> {
+  if (target.targetType === "RESOURCE" && target.targetResourceId) {
+    const resource = await db.query.resource.findFirst({ where: eq(schema.resource.id, target.targetResourceId) });
+    return resource?.createdByUserId;
+  }
+  if (target.targetType === "ANNOTATION" && target.targetAnnotationId) {
+    const annotation = await db.query.annotation.findFirst({ where: eq(schema.annotation.id, target.targetAnnotationId) });
+    return annotation?.createdByUserId;
+  }
+  if (target.targetType === "TECHNOLOGY_PROFILE" && target.targetTechnologyProfileId) {
+    const profile = await db.query.technologyProfile.findFirst({ where: eq(schema.technologyProfile.id, target.targetTechnologyProfileId) });
+    if (!profile) return undefined;
+    const owner = await db.query.caseMember.findFirst({
+      where: and(eq(schema.caseMember.technologyCaseId, profile.technologyCaseId), eq(schema.caseMember.role, "OWNER"), eq(schema.caseMember.status, "ACTIVE")),
+    });
+    return owner?.userId;
+  }
+  return undefined;
+}

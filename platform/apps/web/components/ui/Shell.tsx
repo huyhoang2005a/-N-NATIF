@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Bell, LogOut, Search } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import type { MeResponse } from "@r2m/contracts";
-import { apiFetch } from "../../lib/api-client";
+import type { MeResponse, NotificationResponse } from "@r2m/contracts";
+import { apiFetch, authFetch } from "../../lib/api-client";
 import { clearTokens } from "../../lib/session";
 import { BrandMark } from "./BrandMark";
 
@@ -36,6 +36,16 @@ export function Shell({
   const pathname = usePathname();
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    authFetch<NotificationResponse[]>("/notifications?status=UNREAD")
+      .then((rows) => setUnreadCount(rows.length))
+      .catch(() => {
+        // Badge chuông là tiện ích phụ, không chặn render Shell nếu request lỗi
+        // (vd session sắp hết hạn) — trang gọi Shell đã tự xử lý session riêng.
+      });
+  }, [pathname]);
 
   async function onLogout() {
     try {
@@ -100,6 +110,9 @@ export function Shell({
             <span className="uikit-topbar__role">{roleLabel}</span>
             <Link href="/notifications" className="uikit-topbar__icon-btn" aria-label="Thông báo" title="Thông báo">
               <Bell aria-hidden="true" />
+              {unreadCount > 0 && (
+                <span className="uikit-topbar__icon-badge">{unreadCount > 9 ? "9+" : unreadCount}</span>
+              )}
             </Link>
             <span className="uikit-topbar__user">{me.displayName}</span>
             <div className="uikit-avatar" aria-hidden="true">

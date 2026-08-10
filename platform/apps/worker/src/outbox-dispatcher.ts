@@ -12,6 +12,7 @@ import {
 } from "./email/templates";
 import {
   findActiveOrgOwnerUserId,
+  findContentOwnerUserId,
   findUserEmail,
   listActiveOrgOwnersAndAdmins,
   listActivePlatformReviewerIds,
@@ -271,6 +272,74 @@ async function handleEvent(db: Database, event: DomainEvent, emailSender: EmailS
             title: "Your organization has a new follower",
             message: "Someone started following your organization's public profile.",
             dedupeKey: `org-followed:${event.followerUserId}:${event.followedOrganizationId}`,
+          }),
+        ),
+      );
+      return;
+    }
+    case "TransferManifestCreated":
+      // Phase 6 Sprint 6.1 — audit-trail only, same "no notification yet" treatment as
+      // TechnologyCaseCreated. Only TransferManifestShared (Sprint 6.2) notifies anyone.
+      return;
+    case "TransferManifestShared": {
+      const orgRecipientNotifies = event.recipientOrganizationIds.map(async (organizationId) => {
+        const recipientIds = await listActiveOrgOwnersAndAdmins(db, organizationId);
+        await Promise.all(
+          recipientIds.map((recipientUserId) =>
+            notify(db, {
+              recipientUserId,
+              scopeOrganizationId: organizationId,
+              type: "transfer_manifest.shared",
+              title: "Your organization was granted access to a technology transfer package",
+              message: "A technology case owner shared a transfer package with your organization.",
+              dedupeKey: `transfer-manifest-shared:${event.transferManifestId}:org:${organizationId}`,
+            }),
+          ),
+        );
+      });
+      const userRecipientNotifies = event.recipientUserIds.map((recipientUserId) =>
+        notify(db, {
+          recipientUserId,
+          type: "transfer_manifest.shared",
+          title: "You were granted access to a technology transfer package",
+          message: "A technology case owner shared a transfer package with you.",
+          dedupeKey: `transfer-manifest-shared:${event.transferManifestId}:user:${recipientUserId}`,
+        }),
+      );
+      await Promise.all([...orgRecipientNotifies, ...userRecipientNotifies]);
+      return;
+    }
+    case "TransferAccessRevoked":
+      // Phase 6 Sprint 6.2 — no reader-facing notification requirement in UC-TRF-01 for
+      // revoke (only share notifies); audit-trail only, same as TransferManifestCreated.
+      return;
+    case "ContentFlagCreated": {
+      const reviewerIds = await listActivePlatformReviewerIds(db);
+      await Promise.all(
+        reviewerIds.map((recipientUserId) =>
+          notify(db, {
+            recipientUserId,
+            type: "content_flag.requested",
+            title: "New content flag to review",
+            message: `A ${event.targetType.toLowerCase()} was flagged and needs review.`,
+            dedupeKey: `content-flag-requested:${event.contentFlagId}`,
+          }),
+        ),
+      );
+      return;
+    }
+    case "ModerationDecisionRecorded": {
+      const ownerUserId = await findContentOwnerUserId(db, event);
+      const title = "A content flag you're involved in was resolved";
+      const recipientIds = [...new Set([event.reporterUserId, ...(ownerUserId ? [ownerUserId] : [])])];
+      await Promise.all(
+        recipientIds.map((recipientUserId) =>
+          notify(db, {
+            recipientUserId,
+            type: "content_flag.decided",
+            title,
+            message: `Decision: ${event.action}.`,
+            dedupeKey: `content-flag-decided:${event.contentFlagId}:${recipientUserId}`,
           }),
         ),
       );

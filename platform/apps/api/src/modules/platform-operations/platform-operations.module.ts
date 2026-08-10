@@ -1,10 +1,22 @@
 import { Module } from "@nestjs/common";
 import { AuditModule } from "./audit/audit.module";
 import { JobsModule } from "./jobs/jobs.module";
+import { ContentFlagsController, PlatformContentFlagsController } from "./moderation/moderation.controller";
+import { ModerationRepository } from "./moderation/moderation.repository";
+import { ModerationService } from "./moderation/moderation.service";
+import { NotificationsController } from "./notifications/notifications.controller";
+import { NotificationsRepository } from "./notifications/notifications.repository";
+import { NotificationsService } from "./notifications/notifications.service";
 
+/** Phase 6 Sprint 6.3 — moderation (content_flag/moderation_decision) là sub-feature thật
+ * đầu tiên của bounded context này, nên module chuyển từ "pure re-export aggregator"
+ * (chỉ Audit+Jobs) sang có controller/provider riêng — vẫn giữ AuditModule/JobsModule
+ * export cho các module khác đã dùng (IdentityOrganizationModule cùng lý do). Sprint 6.4
+ * thêm notification vào cùng module này, không tạo module mới. */
 @Module({
   imports: [AuditModule, JobsModule],
-  // Re-export for the same reason as IdentityOrganizationModule — see comment there.
+  controllers: [ContentFlagsController, PlatformContentFlagsController, NotificationsController],
+  providers: [ModerationRepository, ModerationService, NotificationsRepository, NotificationsService],
   exports: [AuditModule, JobsModule],
 })
 export class PlatformOperationsModule {}

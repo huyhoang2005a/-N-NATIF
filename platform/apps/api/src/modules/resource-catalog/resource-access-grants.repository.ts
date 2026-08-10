@@ -57,4 +57,19 @@ export class ResourceAccessGrantsRepository {
       .returning();
     return rows[0];
   }
+
+  /** Phase 6 Sprint 6.2 — `TransferManifestService.revoke()` revokes every grant a share
+   * created in one call, instead of the caller looping `revoke()` one at a time. */
+  async revokeAllBySourceManifest(sourceTransferManifestId: string, revokedByUserId: string, tx: Database) {
+    return tx
+      .update(schema.resourceAccessGrant)
+      .set({ status: "REVOKED", revokedAt: new Date(), revokedByUserId })
+      .where(
+        and(
+          eq(schema.resourceAccessGrant.sourceTransferManifestId, sourceTransferManifestId),
+          eq(schema.resourceAccessGrant.status, "ACTIVE"),
+        ),
+      )
+      .returning();
+  }
 }
