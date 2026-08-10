@@ -411,8 +411,16 @@ export class ResearchNeedsService {
     return this.decorateAndSort(actor, needs, sort);
   }
 
-  async listPublic(actor: ActorContext, sort: ResearchNeedListSort = "new"): Promise<ResearchNeedResponse[]> {
-    const needs = await this.repository.listPublicOpen();
+  async listPublic(actor: ActorContext, sort: ResearchNeedListSort = "new", field?: string): Promise<ResearchNeedResponse[]> {
+    const needs = await this.repository.listPublicOpen(field);
     return this.decorateAndSort(actor, needs, sort);
+  }
+
+  /** Đợt 7 (Cộng đồng — duyệt theo lĩnh vực kỹ thuật, "subreddit" kiểu Reddit). Scope
+   * intentionally narrow: research_need only, not resource — resource has no
+   * `technical_field`-equivalent column, adding one would be inventing a field the schema
+   * doesn't have. */
+  listTechnicalFields(): Promise<{ field: string; count: number }[]> {
+    return this.repository.listTechnicalFieldCounts();
   }
 }

@@ -85,6 +85,14 @@ export interface ResearchNeedDetailResponse extends ResearchNeedResponse {
   currentVersion: NeedStatementVersionResponse;
 }
 
+/** `GET /research-needs/fields` (Cộng đồng đợt 7 — duyệt theo lĩnh vực kỹ thuật). `field`
+ * is each need's LATEST version's `technicalField`, `count` = how many OPEN+PUBLIC needs
+ * currently sit under it. */
+export interface TechnicalFieldSummaryResponse {
+  field: string;
+  count: number;
+}
+
 // ---------- Sprint 5.3: Research Proposal ----------
 
 export const CreateResearchProposalRequestSchema = z.object({

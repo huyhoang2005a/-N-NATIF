@@ -4,6 +4,7 @@ import type {
   NeedStatementVersionResponse,
   ResearchNeedDetailResponse,
   ResearchNeedResponse,
+  TechnicalFieldSummaryResponse,
 } from "@r2m/contracts";
 import { CreateNeedStatementVersionRequestSchema, CreateResearchNeedRequestSchema } from "@r2m/contracts";
 import type { ActorContext } from "@r2m/authz";
@@ -23,8 +24,20 @@ export class ResearchNeedsController {
   constructor(private readonly service: ResearchNeedsService) {}
 
   @Get()
-  listPublic(@CurrentActor() actor: ActorContext, @Query("sort") sort?: ResearchNeedListSort): Promise<ResearchNeedResponse[]> {
-    return this.service.listPublic(actor, sort);
+  listPublic(
+    @CurrentActor() actor: ActorContext,
+    @Query("sort") sort?: ResearchNeedListSort,
+    @Query("field") field?: string,
+  ): Promise<ResearchNeedResponse[]> {
+    return this.service.listPublic(actor, sort, field);
+  }
+
+  /** Cộng đồng đợt 7 — duyệt theo lĩnh vực kỹ thuật. Route "fields" phải khai báo TRƯỚC
+   * `:id` bên dưới — Nest khớp route theo thứ tự khai báo, nếu để sau thì "fields" sẽ bị
+   * `:id` "nuốt" mất, gọi `getById(actor, "fields")` thay vì route này. */
+  @Get("fields")
+  listTechnicalFields(): Promise<TechnicalFieldSummaryResponse[]> {
+    return this.service.listTechnicalFields();
   }
 
   @Get(":id")
