@@ -5,6 +5,8 @@ import { AuditModule } from "../platform-operations/audit/audit.module";
 import { JobsModule } from "../platform-operations/jobs/jobs.module";
 import { ResourceCatalogModule } from "../resource-catalog/resource-catalog.module";
 import { TechnologyCaseModule } from "../technology-case/technology-case.module";
+import { ActivityFeedController } from "./activity-feed/activity-feed.controller";
+import { ActivityFeedService } from "./activity-feed/activity-feed.service";
 import {
   CaseInitiationRequestsController,
   OrganizationCaseInitiationsController,
@@ -67,6 +69,7 @@ import { SavedItemsService } from "./saved-items/saved-items.service";
     PublicOrganizationProfileController,
     MeFollowsController,
     SavedItemsController,
+    ActivityFeedController,
   ],
   providers: [
     CompanyProfileRepository,
@@ -83,6 +86,7 @@ import { SavedItemsService } from "./saved-items/saved-items.service";
     PublicProfilesService,
     FollowActionsService,
     SavedItemsService,
+    ActivityFeedService,
   ],
 })
 export class CompanyDiscoveryModule {}

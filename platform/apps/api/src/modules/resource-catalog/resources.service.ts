@@ -25,7 +25,7 @@ import { ResourcesRepository } from "./resources.repository";
 
 export type ResourceListSort = "new" | "top" | "hot";
 
-function toResourceResponse(
+export function toResourceResponse(
   resource: {
     id: string;
     ownerOrganizationId: string;

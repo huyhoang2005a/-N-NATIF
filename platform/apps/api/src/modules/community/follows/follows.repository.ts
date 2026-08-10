@@ -45,6 +45,15 @@ export class FollowsRepository {
     return row?.count ?? 0;
   }
 
+  /** Đợt 4 (activity feed) — every author this user follows, no cap: feeds off of it via
+   * a separately-capped feed query, not this list itself. */
+  async listFollowedAuthorIds(followerUserId: string): Promise<string[]> {
+    const rows = await this.db.query.authorFollow.findMany({
+      where: eq(schema.authorFollow.followerUserId, followerUserId),
+    });
+    return rows.map((r) => r.followedAuthorUserId);
+  }
+
   /** Returns whether a row was actually inserted — same "notify only on genuinely new
    * follow" reasoning as `followAuthor` above. */
   async followOrganization(followerUserId: string, followedOrganizationId: string): Promise<boolean> {
@@ -83,5 +92,13 @@ export class FollowsRepository {
       .from(schema.organizationFollow)
       .where(eq(schema.organizationFollow.followedOrganizationId, followedOrganizationId));
     return row?.count ?? 0;
+  }
+
+  /** Đợt 4 (activity feed) — every organization this user follows. */
+  async listFollowedOrganizationIds(followerUserId: string): Promise<string[]> {
+    const rows = await this.db.query.organizationFollow.findMany({
+      where: eq(schema.organizationFollow.followerUserId, followerUserId),
+    });
+    return rows.map((r) => r.followedOrganizationId);
   }
 }

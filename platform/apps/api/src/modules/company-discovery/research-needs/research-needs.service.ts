@@ -28,7 +28,7 @@ const MIN_PROBLEM_STATEMENT_LENGTH = 50;
 
 export type ResearchNeedListSort = "new" | "top" | "hot";
 
-function toNeedResponse(
+export function toNeedResponse(
   row: {
     id: string;
     companyOrganizationId: string;

@@ -25,6 +25,10 @@ export class FollowsService {
     return this.repository.countAuthorFollowers(followedAuthorUserId);
   }
 
+  listFollowedAuthorIds(followerUserId: string): Promise<string[]> {
+    return this.repository.listFollowedAuthorIds(followerUserId);
+  }
+
   followOrganization(followerUserId: string, followedOrganizationId: string): Promise<boolean> {
     return this.repository.followOrganization(followerUserId, followedOrganizationId);
   }
@@ -39,5 +43,9 @@ export class FollowsService {
 
   countOrganizationFollowers(followedOrganizationId: string): Promise<number> {
     return this.repository.countOrganizationFollowers(followedOrganizationId);
+  }
+
+  listFollowedOrganizationIds(followerUserId: string): Promise<string[]> {
+    return this.repository.listFollowedOrganizationIds(followerUserId);
   }
 }

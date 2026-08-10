@@ -62,6 +62,30 @@ export class ResourcesRepository {
     });
   }
 
+  /** Đợt 4 (activity feed) — resources from followed authors OR owned by followed
+   * organizations, same `PUBLIC`+`ACTIVE`+`ACTIVE` visibility rule as
+   * `PublicProfilesRepository.listPublicResourcesByAuthor/Organization` (this is
+   * feed content, not a permissioned view — an actor's own grants/memberships don't
+   * widen what shows up here). */
+  async listRecentPublicForFeed(input: { authorIds: string[]; organizationIds: string[]; limit: number }) {
+    const { authorIds, organizationIds, limit } = input;
+    if (authorIds.length === 0 && organizationIds.length === 0) return [];
+
+    return this.db.query.resource.findMany({
+      where: and(
+        eq(schema.resource.accessLevel, "PUBLIC"),
+        eq(schema.resource.status, "ACTIVE"),
+        eq(schema.resource.moderationStatus, "ACTIVE"),
+        or(
+          authorIds.length > 0 ? inArray(schema.resource.createdByUserId, authorIds) : undefined,
+          organizationIds.length > 0 ? inArray(schema.resource.ownerOrganizationId, organizationIds) : undefined,
+        ),
+      ),
+      orderBy: [desc(schema.resource.createdAt)],
+      limit,
+    });
+  }
+
   async updateStatus(id: string, expectedVersion: number, status: string) {
     const rows = await this.db
       .update(schema.resource)

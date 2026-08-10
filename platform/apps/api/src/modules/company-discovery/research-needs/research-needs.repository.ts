@@ -1,7 +1,7 @@
 import type { Database } from "@r2m/database";
 import { schema } from "@r2m/database";
 import { Inject, Injectable } from "@nestjs/common";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { DATABASE } from "../../../database/database.module";
 
 function firstOrThrow<T>(rows: T[], message: string): T {
@@ -56,6 +56,21 @@ export class ResearchNeedsRepository {
     return this.db.query.researchNeed.findMany({
       where: and(eq(schema.researchNeed.status, "OPEN"), eq(schema.researchNeed.visibility, "PUBLIC")),
       orderBy: [desc(schema.researchNeed.publishedAt)],
+    });
+  }
+
+  /** Đợt 4 (activity feed) — needs from followed organizations only (no individual
+   * "author" concept for a research need). */
+  async listRecentPublicOpenForOrganizations(organizationIds: string[], limit: number) {
+    if (organizationIds.length === 0) return [];
+    return this.db.query.researchNeed.findMany({
+      where: and(
+        eq(schema.researchNeed.status, "OPEN"),
+        eq(schema.researchNeed.visibility, "PUBLIC"),
+        inArray(schema.researchNeed.companyOrganizationId, organizationIds),
+      ),
+      orderBy: [desc(schema.researchNeed.publishedAt)],
+      limit,
     });
   }
 

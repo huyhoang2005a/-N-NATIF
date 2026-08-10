@@ -8,6 +8,7 @@ import {
   Flag,
   Handshake,
   LayoutDashboard,
+  Rss,
   Send,
   ShieldCheck,
   Sparkles,
@@ -39,6 +40,7 @@ export function personaOf(me: MeResponse, organizations: OrganizationResponse[])
 
 export const AUTHOR_NAV: ShellNavItem[] = [
   { label: "Tổng quan", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Bảng tin", href: "/activity-feed", icon: Rss },
   { label: "Tài nguyên", href: "/resources", icon: Database },
   { label: "Case của tôi", href: "/technology-cases", icon: FolderOpen },
   { label: "Đề xuất", href: "/proposals", icon: Send },
@@ -50,6 +52,7 @@ export const AUTHOR_NAV: ShellNavItem[] = [
 
 export const COMPANY_NAV: ShellNavItem[] = [
   { label: "Tổng quan", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Bảng tin", href: "/activity-feed", icon: Rss },
   { label: "Nhu cầu nghiên cứu", href: "/needs", icon: Target },
   { label: "Gợi ý công nghệ", href: "/recommendations", icon: Sparkles },
   { label: "Đề xuất nhận được", href: "/proposals-received", icon: Send },

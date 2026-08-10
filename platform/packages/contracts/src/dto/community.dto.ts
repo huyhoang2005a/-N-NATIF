@@ -16,3 +16,12 @@ export interface FollowActionResponse {
   followed: boolean;
   followerCount: number;
 }
+
+/** `GET /activity-feed` (đợt 4, Cộng đồng) — resources/needs from authors & organizations
+ * the actor follows, merged into one time-ordered list. Same discriminated-union shape as
+ * `SavedItemResponse`; `occurredAt` is the resource's `createdAt` or the need's
+ * `publishedAt` (whichever marks "this became visible to followers"), not a separate
+ * feed-event timestamp — there's no event log, this is computed fresh on every read. */
+export type ActivityFeedItemResponse =
+  | { type: "RESOURCE"; occurredAt: string; resource: ResourceResponse }
+  | { type: "RESEARCH_NEED"; occurredAt: string; researchNeed: ResearchNeedResponse };
