@@ -33,6 +33,17 @@ export class VotesRepository {
 
   /** Batched — used when decorating a list response (avoids N+1 for e.g. 50 resource
    * cards). Returns 0 for ids with no votes (not present in the map). */
+  /** Đợt 5 (Cộng đồng) — "tổng upvote nhận được" cho public profile tác giả: 1 tổng qua
+   * SQL, không lấy `countVotesForResources` (per-resource map) rồi cộng trong JS. */
+  async sumVotesForResources(resourceIds: string[]): Promise<number> {
+    if (resourceIds.length === 0) return 0;
+    const [row] = await this.db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(schema.contentVote)
+      .where(inArray(schema.contentVote.resourceId, resourceIds));
+    return row?.total ?? 0;
+  }
+
   async countVotesForResources(resourceIds: string[]): Promise<Map<string, number>> {
     if (resourceIds.length === 0) return new Map();
     const rows = await this.db

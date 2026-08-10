@@ -1,7 +1,7 @@
 import type { Database } from "@r2m/database";
 import { schema } from "@r2m/database";
 import { Inject, Injectable } from "@nestjs/common";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { DATABASE } from "../../../database/database.module";
 
 function firstOrThrow<T>(rows: T[], message: string): T {
@@ -35,6 +35,16 @@ export class ProposalsRepository {
       where: eq(schema.researchProposal.proposerAuthorUserId, proposerAuthorUserId),
       orderBy: [desc(schema.researchProposal.createdAt)],
     });
+  }
+
+  /** Đợt 5 (Cộng đồng) — điểm ghi nhận tác giả trên public profile: đếm đề xuất đã được
+   * chấp nhận, không kéo cả list về rồi filter/count trong JS. */
+  async countAcceptedByAuthor(proposerAuthorUserId: string): Promise<number> {
+    const [row] = await this.db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(schema.researchProposal)
+      .where(and(eq(schema.researchProposal.proposerAuthorUserId, proposerAuthorUserId), eq(schema.researchProposal.status, "ACCEPTED")));
+    return row?.count ?? 0;
   }
 
   /** Optimistic lock — mirrors `GapRepository.update`/`ResearchNeedsRepository.update`:

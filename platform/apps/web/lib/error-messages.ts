@@ -101,6 +101,9 @@ const ERROR_MESSAGES_VI: Record<string, string> = {
   DISCOVERY_RECOMMENDATION_ITEM_NOT_ACTIVE: "Gợi ý này vừa được cập nhật, vui lòng tải lại trang.",
   DISCOVERY_INITIATION_REQUEST_NOT_PENDING: "Yêu cầu này không còn ở trạng thái chờ phản hồi.",
   DISCOVERY_INITIATION_REQUEST_EXPIRED: "Yêu cầu này đã hết hạn.",
+
+  // Cộng đồng đợt 6 — endorse kỹ năng
+  PUBLIC_PROFILE_ENDORSEMENT_INVALID_TAG: "Kỹ năng này hiện không nằm trong danh sách kỹ năng của tác giả.",
 };
 
 const FALLBACK_MESSAGE_VI = "Đã có lỗi xảy ra, vui lòng thử lại.";

@@ -9,12 +9,21 @@ export interface PublicResourceSummaryResponse {
   summary: string | null;
 }
 
+/** Community đợt 6 — `expertiseTags` was `string[]` before this batch; `endorsementCount`
+ * is plain/actor-independent (safe here), `endorsedByMe` is NOT included (same
+ * actor-blindness split as `votedByMe`/`followedByMe` — see `GET /me/endorsements/
+ * authors/:slug` instead). */
+export interface ExpertiseTagResponse {
+  tag: string;
+  endorsementCount: number;
+}
+
 export interface PublicAuthorProfileResponse {
   displayName: string;
   publicSlug: string;
   affiliationOrganizationName: string | null;
   affiliationOrganizationSlug: string | null;
-  expertiseTags: string[];
+  expertiseTags: ExpertiseTagResponse[];
   orcid: string | null;
   bio: string | null;
   resources: PublicResourceSummaryResponse[];
@@ -22,6 +31,12 @@ export interface PublicAuthorProfileResponse {
    * (unlike `followedByMe`, which is actor-specific and deliberately NOT here — see
    * `GET /me/follows/authors/:slug` instead, same actor-blindness rule as `votedByMe`). */
   followerCount: number;
+  /** Community đợt 5 — điểm ghi nhận tác giả. 2 con số minh bạch, riêng biệt (đã chốt:
+   * KHÔNG gộp thành 1 "điểm karma" mập mờ/bịa công thức). `totalUpvotesReceived` = tổng
+   * upvote trên các resource PUBLIC của tác giả; `acceptedProposalCount` = số đề xuất
+   * nghiên cứu (research_proposal) của tác giả đã được doanh nghiệp chấp nhận. */
+  totalUpvotesReceived: number;
+  acceptedProposalCount: number;
 }
 
 export interface PublicOrganizationAuthorResponse {
@@ -44,4 +59,19 @@ export interface PublicOrganizationProfileResponse {
  * above (same split as `votedByMe`/`savedByMe` vs. the public listing endpoints). */
 export interface FollowStatusResponse {
   followed: boolean;
+}
+
+/** `POST/DELETE /authors/:slug/expertise/:tag/endorsements` (đợt 6) — mirrors
+ * `FollowActionResponse`: returns the new state directly, no second round-trip needed. */
+export interface EndorseActionResponse {
+  tag: string;
+  endorsed: boolean;
+  endorsementCount: number;
+}
+
+/** `GET /me/endorsements/authors/:slug` — every tag of this author the actor has already
+ * endorsed, in one call instead of one per tag (same actor-blindness split as
+ * `FollowStatusResponse` above). */
+export interface MyEndorsementsResponse {
+  endorsedTags: string[];
 }

@@ -1,6 +1,8 @@
 import type {
+  EndorseActionResponse,
   FollowActionResponse,
   FollowStatusResponse,
+  MyEndorsementsResponse,
   PublicAuthorProfileResponse,
   PublicOrganizationProfileResponse,
 } from "@r2m/contracts";
@@ -8,6 +10,7 @@ import type { ActorContext } from "@r2m/authz";
 import { Controller, Delete, Get, Param, Post } from "@nestjs/common";
 import { CurrentActor } from "../../../common/decorators/current-actor.decorator";
 import { Public } from "../../../common/decorators/public.decorator";
+import { EndorseActionsService } from "./endorse-actions.service";
 import { FollowActionsService } from "./follow-actions.service";
 import { PublicProfilesService } from "./public-profiles.service";
 
@@ -16,6 +19,7 @@ export class PublicAuthorProfileController {
   constructor(
     private readonly service: PublicProfilesService,
     private readonly followActions: FollowActionsService,
+    private readonly endorseActions: EndorseActionsService,
   ) {}
 
   @Public()
@@ -35,6 +39,25 @@ export class PublicAuthorProfileController {
   @Delete(":slug/follow")
   unfollow(@CurrentActor() actor: ActorContext, @Param("slug") slug: string): Promise<FollowActionResponse> {
     return this.followActions.unfollowAuthor(actor, slug);
+  }
+
+  /** Cộng đồng đợt 6 — endorse, cùng nguyên tắc idempotent + KHÔNG @Public() như follow. */
+  @Post(":slug/expertise/:tag/endorsements")
+  endorse(
+    @CurrentActor() actor: ActorContext,
+    @Param("slug") slug: string,
+    @Param("tag") tag: string,
+  ): Promise<EndorseActionResponse> {
+    return this.endorseActions.endorse(actor, slug, tag);
+  }
+
+  @Delete(":slug/expertise/:tag/endorsements")
+  unendorse(
+    @CurrentActor() actor: ActorContext,
+    @Param("slug") slug: string,
+    @Param("tag") tag: string,
+  ): Promise<EndorseActionResponse> {
+    return this.endorseActions.unendorse(actor, slug, tag);
   }
 }
 
@@ -77,5 +100,17 @@ export class MeFollowsController {
   @Get("organizations/:slug")
   organizationStatus(@CurrentActor() actor: ActorContext, @Param("slug") slug: string): Promise<FollowStatusResponse> {
     return this.followActions.organizationFollowStatus(actor, slug);
+  }
+}
+
+/** `GET /me/endorsements/authors/:slug` — every tag of this author the actor has already
+ * endorsed, same actor-blindness split as `MeFollowsController` above. */
+@Controller("me/endorsements")
+export class MeEndorsementsController {
+  constructor(private readonly endorseActions: EndorseActionsService) {}
+
+  @Get("authors/:slug")
+  authorEndorsements(@CurrentActor() actor: ActorContext, @Param("slug") slug: string): Promise<MyEndorsementsResponse> {
+    return this.endorseActions.myEndorsements(actor, slug);
   }
 }

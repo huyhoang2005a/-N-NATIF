@@ -1,13 +1,12 @@
-import { pgTable, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { pgTable, timestamp, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
 import { userAccount } from "./identity";
 import { organization } from "./organization";
 import { researchNeed } from "./company-discovery";
 import { resource } from "./resource";
 
 /** Community & networking layer (Reddit-style discovery + LinkedIn-style network) — new
- * bounded context, not part of the locked spec. Đợt 1 (upvote) + Đợt 2 (save/bookmark) so
- * far; `author_follow` / `organization_follow` / `expertise_endorsement` tables land in
- * later batches per the approved plan, same "không dồn" discipline as Phase 5.
+ * bounded context, not part of the locked spec. Đợt 1 (upvote) + Đợt 2 (save/bookmark) +
+ * Đợt 3 (follow) + Đợt 6 (endorse) so far, same "không dồn" discipline as Phase 5.
  *
  * `resourceId`/`researchNeedId` mirror `case_origin`'s "exactly one FK non-null" pattern —
  * CHECK constraint + 2 partial unique indexes are hand-written in a manual migration
@@ -70,5 +69,32 @@ export const organizationFollow = pgTable(
   },
   (table) => ({
     uqFollowerOrg: uniqueIndex("uq_organization_follow_follower_org").on(table.followerUserId, table.followedOrganizationId),
+  }),
+);
+
+/** Đợt 6 — endorse kỹ năng. `tag` is a free-text string, not an FK — `author_profile.
+ * expertise_tags` is itself a free `text[]` column with no lookup table (see that
+ * column's own comment in `author.ts`), so there is nothing to reference; "is this tag
+ * currently one of the author's expertise tags" is a service-layer check against that
+ * array at endorse-time, not a DB constraint. */
+export const expertiseEndorsement = pgTable(
+  "expertise_endorsement",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    endorserUserId: uuid("endorser_user_id")
+      .notNull()
+      .references(() => userAccount.id),
+    authorUserId: uuid("author_user_id")
+      .notNull()
+      .references(() => userAccount.id),
+    tag: varchar("tag", { length: 100 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    uqEndorserAuthorTag: uniqueIndex("uq_expertise_endorsement_endorser_author_tag").on(
+      table.endorserUserId,
+      table.authorUserId,
+      table.tag,
+    ),
   }),
 );

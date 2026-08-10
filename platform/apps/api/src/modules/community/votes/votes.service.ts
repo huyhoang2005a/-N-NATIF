@@ -29,6 +29,10 @@ export class VotesService {
     return this.repository.unvoteResearchNeed(actorUserId, researchNeedId);
   }
 
+  sumVotesForResources(resourceIds: string[]): Promise<number> {
+    return this.repository.sumVotesForResources(resourceIds);
+  }
+
   async voteInfoForResource(actorUserId: string, resourceId: string): Promise<VoteInfo> {
     const map = await this.voteInfoForResources(actorUserId, [resourceId]);
     return map.get(resourceId)!;

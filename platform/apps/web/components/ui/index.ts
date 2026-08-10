@@ -21,3 +21,4 @@ export { AuthorOrgByline } from "./AuthorOrgByline";
 export { VoteButton } from "./VoteButton";
 export { SaveButton } from "./SaveButton";
 export { FollowButton } from "./FollowButton";
+export { EndorseButton } from "./EndorseButton";

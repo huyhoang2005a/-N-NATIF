@@ -28,8 +28,10 @@ import {
 } from "./recommendations/recommendations.controller";
 import { RecommendationsRepository } from "./recommendations/recommendations.repository";
 import { RecommendationsService } from "./recommendations/recommendations.service";
+import { EndorseActionsService } from "./public-profiles/endorse-actions.service";
 import { FollowActionsService } from "./public-profiles/follow-actions.service";
 import {
+  MeEndorsementsController,
   MeFollowsController,
   PublicAuthorProfileController,
   PublicOrganizationProfileController,
@@ -68,6 +70,7 @@ import { SavedItemsService } from "./saved-items/saved-items.service";
     PublicAuthorProfileController,
     PublicOrganizationProfileController,
     MeFollowsController,
+    MeEndorsementsController,
     SavedItemsController,
     ActivityFeedController,
   ],
@@ -85,6 +88,7 @@ import { SavedItemsService } from "./saved-items/saved-items.service";
     PublicProfilesRepository,
     PublicProfilesService,
     FollowActionsService,
+    EndorseActionsService,
     SavedItemsService,
     ActivityFeedService,
   ],

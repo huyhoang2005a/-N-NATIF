@@ -71,6 +71,13 @@
       "when": 1786331038675,
       "tag": "0009_rapid_tarantula",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1786333736813,
+      "tag": "0010_sloppy_radioactive_man",
+      "breakpoints": true
     }
   ]
 }

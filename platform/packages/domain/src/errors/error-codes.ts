@@ -137,6 +137,10 @@ export const ErrorCode = {
 
   // PUBLIC_PROFILE_* (Phase 5 Sprint 5.7 — public author/organization profile pages)
   PUBLIC_PROFILE_NOT_FOUND: "PUBLIC_PROFILE_NOT_FOUND",
+  // Cộng đồng đợt 6 (endorse kỹ năng) — tag being endorsed must currently be one of the
+  // author's `expertise_tags`; no FK possible (that column is free-text), so this is the
+  // service-layer stand-in guard, same naming group as PUBLIC_PROFILE_NOT_FOUND above.
+  PUBLIC_PROFILE_ENDORSEMENT_INVALID_TAG: "PUBLIC_PROFILE_ENDORSEMENT_INVALID_TAG",
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];

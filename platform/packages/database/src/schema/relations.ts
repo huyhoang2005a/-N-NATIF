@@ -45,7 +45,7 @@ import {
 } from "./roadmap";
 import type { outboxEvent } from "./platform-ops";
 import { auditLog, idempotencyKey, notification } from "./platform-ops";
-import { authorFollow, contentSave, contentVote, organizationFollow } from "./community";
+import { authorFollow, contentSave, contentVote, expertiseEndorsement, organizationFollow } from "./community";
 import {
   caseInitiationRequest,
   companyProfile,
@@ -830,6 +830,18 @@ export const organizationFollowRelations = relations(organizationFollow, ({ one 
   followedOrganization: one(organization, {
     fields: [organizationFollow.followedOrganizationId],
     references: [organization.id],
+  }),
+}));
+export const expertiseEndorsementRelations = relations(expertiseEndorsement, ({ one }) => ({
+  endorser: one(userAccount, {
+    fields: [expertiseEndorsement.endorserUserId],
+    references: [userAccount.id],
+    relationName: "expertiseEndorsementEndorser",
+  }),
+  author: one(userAccount, {
+    fields: [expertiseEndorsement.authorUserId],
+    references: [userAccount.id],
+    relationName: "expertiseEndorsementAuthor",
   }),
 }));
 

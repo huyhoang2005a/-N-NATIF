@@ -1,4 +1,6 @@
 import { Module } from "@nestjs/common";
+import { EndorsementsRepository } from "./endorsements/endorsements.repository";
+import { EndorsementsService } from "./endorsements/endorsements.service";
 import { FollowsRepository } from "./follows/follows.repository";
 import { FollowsService } from "./follows/follows.service";
 import { SavesRepository } from "./saves/saves.repository";
@@ -9,7 +11,7 @@ import { VotesService } from "./votes/votes.service";
 /** Community & networking layer (Reddit-style discovery + LinkedIn-style network) — new
  * bounded context, not part of the locked spec (explicitly authorized by the user, same
  * category as the earlier self-service join-organization feature). Built in small batches;
- * đợt 1 (upvote) + đợt 2 (save/bookmark) + đợt 3 (follow) so far.
+ * đợt 1 (upvote) + đợt 2 (save/bookmark) + đợt 3 (follow) + đợt 6 (endorse) so far.
  *
  * No controllers of its own for the toggle actions: the vote/save mutation routes
  * (`POST/DELETE .../votes`, `.../saves`) live on the EXISTING `ResourcesController`/
@@ -37,7 +39,25 @@ import { VotesService } from "./votes/votes.service";
  * exported `ResourcesService` with no cycle (`ResourceCatalogModule` doesn't depend back on
  * `CompanyDiscoveryModule`), and already has `ResearchNeedsService` as a local provider. */
 @Module({
-  providers: [VotesRepository, VotesService, SavesRepository, SavesService, FollowsRepository, FollowsService],
-  exports: [VotesRepository, VotesService, SavesRepository, SavesService, FollowsRepository, FollowsService],
+  providers: [
+    VotesRepository,
+    VotesService,
+    SavesRepository,
+    SavesService,
+    FollowsRepository,
+    FollowsService,
+    EndorsementsRepository,
+    EndorsementsService,
+  ],
+  exports: [
+    VotesRepository,
+    VotesService,
+    SavesRepository,
+    SavesService,
+    FollowsRepository,
+    FollowsService,
+    EndorsementsRepository,
+    EndorsementsService,
+  ],
 })
 export class CommunityModule {}

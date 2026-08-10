@@ -1,7 +1,10 @@
-import type { PublicAuthorProfileResponse, PublicOrganizationProfileResponse, PublicResourceSummaryResponse } from "@r2m/contracts";
+import type { ExpertiseTagResponse, PublicAuthorProfileResponse, PublicOrganizationProfileResponse, PublicResourceSummaryResponse } from "@r2m/contracts";
 import { ErrorCode, NotFoundError } from "@r2m/domain";
 import { Injectable } from "@nestjs/common";
+import { EndorsementsService } from "../../community/endorsements/endorsements.service";
 import { FollowsService } from "../../community/follows/follows.service";
+import { VotesService } from "../../community/votes/votes.service";
+import { ProposalsRepository } from "../proposals/proposals.repository";
 import { PublicProfilesRepository } from "./public-profiles.repository";
 
 function toResourceSummary(resource: {
@@ -28,6 +31,9 @@ export class PublicProfilesService {
   constructor(
     private readonly repository: PublicProfilesRepository,
     private readonly followsService: FollowsService,
+    private readonly votesService: VotesService,
+    private readonly proposalsRepository: ProposalsRepository,
+    private readonly endorsementsService: EndorsementsService,
   ) {}
 
   async getAuthorProfile(slug: string): Promise<PublicAuthorProfileResponse> {
@@ -39,21 +45,31 @@ export class PublicProfilesService {
     if (!userProfile) {
       throw new Error(`author_profile ${author.userId} has no user_profile — data integrity violation.`);
     }
-    const [resources, followerCount] = await Promise.all([
+    const expertiseTags = author.expertiseTags ?? [];
+    const [resources, followerCount, acceptedProposalCount, endorsementCounts] = await Promise.all([
       this.repository.listPublicResourcesByAuthor(author.userId),
       this.followsService.countAuthorFollowers(author.userId),
+      this.proposalsRepository.countAcceptedByAuthor(author.userId),
+      this.endorsementsService.countEndorsementsByTag(author.userId, expertiseTags),
     ]);
+    const totalUpvotesReceived = await this.votesService.sumVotesForResources(resources.map((r) => r.id));
+    const expertiseTagResponses: ExpertiseTagResponse[] = expertiseTags.map((tag) => ({
+      tag,
+      endorsementCount: endorsementCounts.get(tag) ?? 0,
+    }));
 
     return {
       displayName: userProfile.displayName,
       publicSlug: author.publicSlug!,
       affiliationOrganizationName: author.currentAffiliationOrg?.name ?? null,
       affiliationOrganizationSlug: author.currentAffiliationOrg?.slug ?? null,
-      expertiseTags: author.expertiseTags ?? [],
+      expertiseTags: expertiseTagResponses,
       orcid: author.orcid,
       bio: author.bio,
       resources: resources.map(toResourceSummary),
       followerCount,
+      totalUpvotesReceived,
+      acceptedProposalCount,
     };
   }
 
@@ -103,6 +119,18 @@ export class PublicProfilesService {
       throw new NotFoundError(ErrorCode.PUBLIC_PROFILE_NOT_FOUND, "Author profile not found.");
     }
     return author.userId;
+  }
+
+  /** Đợt 6 — used by `EndorseActionsService`, which (unlike follow) also needs the
+   * author's CURRENT expertise tags to validate the tag being endorsed is actually one of
+   * them (see `community.ts`'s `expertiseEndorsement` comment — no FK possible, this is
+   * the service-layer check that stands in for one). */
+  async resolveAuthorForEndorsement(slug: string): Promise<{ userId: string; expertiseTags: string[] }> {
+    const author = await this.repository.findVerifiedAuthorBySlug(slug);
+    if (!author) {
+      throw new NotFoundError(ErrorCode.PUBLIC_PROFILE_NOT_FOUND, "Author profile not found.");
+    }
+    return { userId: author.userId, expertiseTags: author.expertiseTags ?? [] };
   }
 
   async resolveOrganizationIdBySlug(slug: string): Promise<string> {
