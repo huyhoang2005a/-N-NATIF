@@ -1126,6 +1126,44 @@ select {
   flex-shrink: 0;
 }
 
+/* ---------- vote button (Cộng đồng đợt 1) ---------- */
+
+.uikit-vote-btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 3px;
+  border: 1px solid var(--uikit-slate-200);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--uikit-slate-500);
+  padding: 4px 10px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.uikit-vote-btn:hover:not(:disabled) {
+  border-color: var(--uikit-indigo-700);
+  color: var(--uikit-indigo-700);
+}
+.uikit-vote-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.uikit-vote-btn--active {
+  background: var(--uikit-indigo-50);
+  border-color: var(--uikit-indigo-700);
+  color: var(--uikit-indigo-700);
+}
+.uikit-vote-btn__icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
 /* ---------- form fields ---------- */
 
 .uikit-field {

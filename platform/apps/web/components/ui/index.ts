@@ -18,3 +18,5 @@ export { SoonPage } from "./SoonPage";
 export { MatchScoreBadge } from "./MatchScoreBadge";
 export { AbstractText } from "./AbstractText";
 export { AuthorOrgByline } from "./AuthorOrgByline";
+export { VoteButton } from "./VoteButton";
+export { SaveButton } from "./SaveButton";

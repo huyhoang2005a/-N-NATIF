@@ -1,5 +1,6 @@
 import {
   Bell,
+  Bookmark,
   Building2,
   ClipboardCheck,
   Database,
@@ -43,6 +44,7 @@ export const AUTHOR_NAV: ShellNavItem[] = [
   { label: "Đề xuất", href: "/proposals", icon: Send },
   { label: "Yêu cầu khởi tạo case", href: "/case-initiation-requests", icon: Handshake },
   { label: "Thông báo", href: "/notifications", icon: Bell },
+  { label: "Đã lưu", href: "/saved", icon: Bookmark },
   { label: "Hồ sơ", href: "/profile", icon: User },
 ];
 
@@ -52,6 +54,7 @@ export const COMPANY_NAV: ShellNavItem[] = [
   { label: "Gợi ý công nghệ", href: "/recommendations", icon: Sparkles },
   { label: "Đề xuất nhận được", href: "/proposals-received", icon: Send },
   { label: "Case của tôi", href: "/technology-cases", icon: FolderOpen },
+  { label: "Đã lưu", href: "/saved", icon: Bookmark },
   { label: "Hồ sơ", href: "/profile", icon: User },
 ];
 

@@ -7,10 +7,11 @@ import type {
 } from "@r2m/contracts";
 import { CreateNeedStatementVersionRequestSchema, CreateResearchNeedRequestSchema } from "@r2m/contracts";
 import type { ActorContext } from "@r2m/authz";
-import { Body, Controller, Get, Param, Post, Req, UsePipes } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Post, Query, Req, UsePipes } from "@nestjs/common";
 import type { Request } from "express";
 import { CurrentActor } from "../../../common/decorators/current-actor.decorator";
 import { ZodValidationPipe } from "../../../common/pipes/zod-validation.pipe";
+import type { ResearchNeedListSort } from "./research-needs.service";
 import { ResearchNeedsService } from "./research-needs.service";
 
 function requestId(req: Request): string | null {
@@ -22,13 +23,35 @@ export class ResearchNeedsController {
   constructor(private readonly service: ResearchNeedsService) {}
 
   @Get()
-  listPublic(): Promise<ResearchNeedResponse[]> {
-    return this.service.listPublic();
+  listPublic(@CurrentActor() actor: ActorContext, @Query("sort") sort?: ResearchNeedListSort): Promise<ResearchNeedResponse[]> {
+    return this.service.listPublic(actor, sort);
   }
 
   @Get(":id")
   getById(@CurrentActor() actor: ActorContext, @Param("id") id: string): Promise<ResearchNeedDetailResponse> {
     return this.service.getById(actor, id);
+  }
+
+  /** Cộng đồng đợt 1 — upvote, không downvote. Idempotent. */
+  @Post(":id/votes")
+  vote(@CurrentActor() actor: ActorContext, @Param("id") id: string): Promise<ResearchNeedResponse> {
+    return this.service.vote(actor, id);
+  }
+
+  @Delete(":id/votes")
+  unvote(@CurrentActor() actor: ActorContext, @Param("id") id: string): Promise<ResearchNeedResponse> {
+    return this.service.unvote(actor, id);
+  }
+
+  /** Cộng đồng đợt 2 — bookmark, cùng nguyên tắc idempotent như vote ở trên. */
+  @Post(":id/saves")
+  save(@CurrentActor() actor: ActorContext, @Param("id") id: string): Promise<ResearchNeedResponse> {
+    return this.service.save(actor, id);
+  }
+
+  @Delete(":id/saves")
+  unsave(@CurrentActor() actor: ActorContext, @Param("id") id: string): Promise<ResearchNeedResponse> {
+    return this.service.unsave(actor, id);
   }
 
   @Get(":id/versions")
@@ -83,7 +106,11 @@ export class OrganizationResearchNeedsController {
   constructor(private readonly service: ResearchNeedsService) {}
 
   @Get()
-  listForOrganization(@CurrentActor() actor: ActorContext, @Param("id") id: string): Promise<ResearchNeedResponse[]> {
-    return this.service.listForOrganization(actor, id);
+  listForOrganization(
+    @CurrentActor() actor: ActorContext,
+    @Param("id") id: string,
+    @Query("sort") sort?: ResearchNeedListSort,
+  ): Promise<ResearchNeedResponse[]> {
+    return this.service.listForOrganization(actor, id, sort);
   }
 }

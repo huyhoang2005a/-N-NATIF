@@ -5,6 +5,8 @@ import type { ResourcesRepository } from "./resources.repository";
 import type { AuditService } from "../platform-operations/audit/audit.service";
 import type { OutboxService } from "../platform-operations/jobs/outbox.service";
 import type { S3Service } from "../../common/storage/s3.service";
+import type { SavesService } from "../community/saves/saves.service";
+import type { VotesService } from "../community/votes/votes.service";
 
 const verifiedAuthorInOrg: ActorContext = {
   userId: "author-1",
@@ -51,10 +53,30 @@ function buildService() {
     computeResourceContentSha256: vi.fn().mockResolvedValue("deadbeef"),
   } as unknown as S3Service;
   const db = { transaction: vi.fn((cb: (tx: unknown) => Promise<unknown>) => cb({})) };
+  const votesService = {
+    voteInfoForResource: vi.fn().mockResolvedValue({ voteCount: 0, votedByMe: false }),
+    voteInfoForResources: vi.fn().mockResolvedValue(new Map()),
+    voteResource: vi.fn().mockResolvedValue(undefined),
+    unvoteResource: vi.fn().mockResolvedValue(undefined),
+  } as unknown as VotesService;
+  const savesService = {
+    savedByMeForResource: vi.fn().mockResolvedValue(false),
+    savedByMeForResources: vi.fn().mockResolvedValue(new Map()),
+    saveResource: vi.fn().mockResolvedValue(undefined),
+    unsaveResource: vi.fn().mockResolvedValue(undefined),
+  } as unknown as SavesService;
 
-  const service = new ResourcesService(resourcesRepository, auditService, outboxService, s3Service, db as never);
+  const service = new ResourcesService(
+    resourcesRepository,
+    auditService,
+    outboxService,
+    s3Service,
+    votesService,
+    savesService,
+    db as never,
+  );
 
-  return { service, resourcesRepository, auditService, outboxService, s3Service };
+  return { service, resourcesRepository, auditService, outboxService, s3Service, votesService, savesService };
 }
 
 const registerInput = {

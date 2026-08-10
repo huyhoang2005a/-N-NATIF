@@ -18,12 +18,13 @@ import {
   RequestResourceUploadSchema,
 } from "@r2m/contracts";
 import type { ActorContext } from "@r2m/authz";
-import { Body, Controller, Get, Param, Post, Query, Req, UsePipes } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Post, Query, Req, UsePipes } from "@nestjs/common";
 import type { Request } from "express";
 import { CurrentActor } from "../../common/decorators/current-actor.decorator";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
 import { AnnotationsService } from "./annotations.service";
 import { ResourceAccessGrantsService } from "./resource-access-grants.service";
+import type { ResourceListSort } from "./resources.service";
 import { ResourcesService } from "./resources.service";
 
 function requestId(req: Request): string | null {
@@ -61,13 +62,40 @@ export class ResourcesController {
    * search trì hoãn tới khi có embedding stack thật (Phase 5) — xác nhận không làm ở
    * Phase 2. */
   @Get()
-  list(@CurrentActor() actor: ActorContext, @Query("q") q?: string): Promise<ResourceResponse[]> {
-    return this.resourcesService.list(actor, q);
+  list(
+    @CurrentActor() actor: ActorContext,
+    @Query("q") q?: string,
+    @Query("sort") sort?: ResourceListSort,
+  ): Promise<ResourceResponse[]> {
+    return this.resourcesService.list(actor, q, sort);
   }
 
   @Get(":id")
   getById(@CurrentActor() actor: ActorContext, @Param("id") id: string): Promise<ResourceResponse> {
     return this.resourcesService.getById(actor, id);
+  }
+
+  /** Cộng đồng đợt 1 — upvote, không downvote (đã chốt cùng người dùng). Idempotent: vote
+   * lại khi đã vote / unvote khi chưa vote đều không lỗi. */
+  @Post(":id/votes")
+  vote(@CurrentActor() actor: ActorContext, @Param("id") id: string): Promise<ResourceResponse> {
+    return this.resourcesService.vote(actor, id);
+  }
+
+  @Delete(":id/votes")
+  unvote(@CurrentActor() actor: ActorContext, @Param("id") id: string): Promise<ResourceResponse> {
+    return this.resourcesService.unvote(actor, id);
+  }
+
+  /** Cộng đồng đợt 2 — bookmark, cùng nguyên tắc idempotent như vote ở trên. */
+  @Post(":id/saves")
+  save(@CurrentActor() actor: ActorContext, @Param("id") id: string): Promise<ResourceResponse> {
+    return this.resourcesService.save(actor, id);
+  }
+
+  @Delete(":id/saves")
+  unsave(@CurrentActor() actor: ActorContext, @Param("id") id: string): Promise<ResourceResponse> {
+    return this.resourcesService.unsave(actor, id);
   }
 
   @Post(":id/versions")

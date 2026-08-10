@@ -29,11 +29,13 @@ import {
   GhostButton,
   MatchScoreBadge,
   PrimaryButton,
+  SaveButton,
   SectionHeader,
   SelectField,
   Shell,
   StatusPill,
   TextField,
+  VoteButton,
 } from "../../../components/ui";
 
 export default function ResearchNeedDetailPage() {
@@ -317,7 +319,22 @@ export default function ResearchNeedDetailPage() {
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "var(--space-3)" }}>
           <h1 style={{ fontSize: 22 }}>{need.title}</h1>
-          <StatusPill tone={toneOf(NEED_STATUS_TONE, need.status)}>{NEED_STATUS_LABELS[need.status] ?? need.status}</StatusPill>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+            <VoteButton
+              path={`/research-needs/${needId}/votes`}
+              votedByMe={need.votedByMe}
+              voteCount={need.voteCount}
+              onChange={(next) => setNeed((prev) => (prev ? { ...prev, ...next } : prev))}
+              onSessionExpired={() => router.push("/login")}
+            />
+            <SaveButton
+              path={`/research-needs/${needId}/saves`}
+              savedByMe={need.savedByMe}
+              onChange={(next) => setNeed((prev) => (prev ? { ...prev, ...next } : prev))}
+              onSessionExpired={() => router.push("/login")}
+            />
+            <StatusPill tone={toneOf(NEED_STATUS_TONE, need.status)}>{NEED_STATUS_LABELS[need.status] ?? need.status}</StatusPill>
+          </div>
         </div>
         <p style={{ fontSize: 13, color: "var(--uikit-slate-500)" }}>
           {VISIBILITY_LEVEL_LABELS[need.visibility] ?? need.visibility}

@@ -74,6 +74,11 @@ export interface ResearchNeedResponse {
   createdAt: string;
   updatedAt: string;
   version: number;
+  /** Community layer (đợt 1) — see `ResourceResponse.voteCount`/`.votedByMe`. */
+  voteCount: number;
+  votedByMe: boolean;
+  /** Community layer (đợt 2) — see `ResourceResponse.savedByMe`. */
+  savedByMe: boolean;
 }
 
 export interface ResearchNeedDetailResponse extends ResearchNeedResponse {

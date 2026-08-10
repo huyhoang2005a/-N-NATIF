@@ -1,7 +1,9 @@
 import { Module } from "@nestjs/common";
+import { CommunityModule } from "../community/community.module";
 import { OrganizationsModule } from "../identity-organization/organizations/organizations.module";
 import { AuditModule } from "../platform-operations/audit/audit.module";
 import { JobsModule } from "../platform-operations/jobs/jobs.module";
+import { ResourceCatalogModule } from "../resource-catalog/resource-catalog.module";
 import { TechnologyCaseModule } from "../technology-case/technology-case.module";
 import {
   CaseInitiationRequestsController,
@@ -33,6 +35,8 @@ import { PublicProfilesService } from "./public-profiles/public-profiles.service
 import { OrganizationResearchNeedsController, ResearchNeedsController } from "./research-needs/research-needs.controller";
 import { ResearchNeedsRepository } from "./research-needs/research-needs.repository";
 import { ResearchNeedsService } from "./research-needs/research-needs.service";
+import { SavedItemsController } from "./saved-items/saved-items.controller";
+import { SavedItemsService } from "./saved-items/saved-items.service";
 
 /** Company & Discovery bounded context (Phase 5, §9.8). 1 aggregator module for the
  * whole context, sub-features added sprint by sprint (5.1 Company Profile, 5.2 Research
@@ -43,7 +47,7 @@ import { ResearchNeedsService } from "./research-needs/research-needs.service";
  * generated asynchronously by the worker via the same outbox pattern as every other
  * side-effect in this app, no separate queue infra. */
 @Module({
-  imports: [OrganizationsModule, AuditModule, JobsModule, TechnologyCaseModule],
+  imports: [OrganizationsModule, AuditModule, JobsModule, TechnologyCaseModule, CommunityModule, ResourceCatalogModule],
   controllers: [
     CompanyProfileController,
     ResearchNeedsController,
@@ -59,6 +63,7 @@ import { ResearchNeedsService } from "./research-needs/research-needs.service";
     OrganizationCaseInitiationsController,
     PublicAuthorProfileController,
     PublicOrganizationProfileController,
+    SavedItemsController,
   ],
   providers: [
     CompanyProfileRepository,
@@ -73,6 +78,7 @@ import { ResearchNeedsService } from "./research-needs/research-needs.service";
     CaseInitiationsService,
     PublicProfilesRepository,
     PublicProfilesService,
+    SavedItemsService,
   ],
 })
 export class CompanyDiscoveryModule {}

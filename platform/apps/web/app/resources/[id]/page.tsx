@@ -17,7 +17,7 @@ import { describeErrorCode } from "../../../lib/error-messages";
 import { PLATFORM_ROLE_LABELS, RESOURCE_ACCESS_LEVEL_LABELS, RESOURCE_TYPE_LABELS } from "../../../lib/labels";
 import { navForPersona, personaOf } from "../../../lib/nav";
 import { getAccessToken } from "../../../lib/session";
-import { BackLink, Card, GhostButton, PrimaryButton, SectionHeader, SelectField, Shell, StatusPill, TextField } from "../../../components/ui";
+import { BackLink, Card, GhostButton, PrimaryButton, SaveButton, SectionHeader, SelectField, Shell, StatusPill, TextField, VoteButton } from "../../../components/ui";
 
 const PERMISSION_OPTIONS = [
   { value: "VIEW", label: "Xem" },
@@ -213,7 +213,22 @@ export default function ResourceDetailPage() {
               {RESOURCE_TYPE_LABELS[resource.type] ?? resource.type} · {RESOURCE_ACCESS_LEVEL_LABELS[resource.accessLevel] ?? resource.accessLevel}
             </p>
           </div>
-          <StatusPill tone={resource.status === "ACTIVE" ? "green" : "gray"}>{resource.status}</StatusPill>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+            <VoteButton
+              path={`/resources/${resourceId}/votes`}
+              votedByMe={resource.votedByMe}
+              voteCount={resource.voteCount}
+              onChange={(next) => setResource((prev) => (prev ? { ...prev, ...next } : prev))}
+              onSessionExpired={() => router.push("/login")}
+            />
+            <SaveButton
+              path={`/resources/${resourceId}/saves`}
+              savedByMe={resource.savedByMe}
+              onChange={(next) => setResource((prev) => (prev ? { ...prev, ...next } : prev))}
+              onSessionExpired={() => router.push("/login")}
+            />
+            <StatusPill tone={resource.status === "ACTIVE" ? "green" : "gray"}>{resource.status}</StatusPill>
+          </div>
         </div>
         {resource.description && <p style={{ fontSize: 14, color: "var(--uikit-slate-700)" }}>{resource.description}</p>}
 

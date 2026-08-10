@@ -137,6 +137,14 @@ export interface ResourceResponse {
   createdAt: string;
   updatedAt: string;
   version: number;
+  /** Community layer (đợt 1) — upvote count is actor-independent (safe on any
+   * authenticated response); `votedByMe` only meaningful when fetched by an authenticated
+   * actor, always present here since this type is never returned by an unauthenticated
+   * endpoint. */
+  voteCount: number;
+  votedByMe: boolean;
+  /** Community layer (đợt 2) — bookmark, same actor-scoping note as `votedByMe` above. */
+  savedByMe: boolean;
 }
 
 export interface ResourceVersionResponse {

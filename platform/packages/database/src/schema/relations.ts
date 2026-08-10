@@ -45,6 +45,7 @@ import {
 } from "./roadmap";
 import type { outboxEvent } from "./platform-ops";
 import { auditLog, idempotencyKey, notification } from "./platform-ops";
+import { contentSave, contentVote } from "./community";
 import {
   caseInitiationRequest,
   companyProfile,
@@ -781,4 +782,33 @@ export const caseInitiationRequestRelations = relations(caseInitiationRequest, (
     references: [userAccount.id],
   }),
 }));
+export const contentVoteRelations = relations(contentVote, ({ one }) => ({
+  voter: one(userAccount, {
+    fields: [contentVote.voterUserId],
+    references: [userAccount.id],
+  }),
+  resource: one(resource, {
+    fields: [contentVote.resourceId],
+    references: [resource.id],
+  }),
+  researchNeed: one(researchNeed, {
+    fields: [contentVote.researchNeedId],
+    references: [researchNeed.id],
+  }),
+}));
+export const contentSaveRelations = relations(contentSave, ({ one }) => ({
+  saver: one(userAccount, {
+    fields: [contentSave.saverUserId],
+    references: [userAccount.id],
+  }),
+  resource: one(resource, {
+    fields: [contentSave.resourceId],
+    references: [resource.id],
+  }),
+  researchNeed: one(researchNeed, {
+    fields: [contentSave.researchNeedId],
+    references: [researchNeed.id],
+  }),
+}));
+
 export type OutboxEventRow = typeof outboxEvent.$inferSelect;

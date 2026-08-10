@@ -14,27 +14,36 @@ import { ConflictError, ErrorCode, ForbiddenError, NotFoundError, ResourceStatus
 import { Inject, Injectable } from "@nestjs/common";
 import { DATABASE } from "../../database/database.module";
 import { S3Service } from "../../common/storage/s3.service";
+import { SavesService } from "../community/saves/saves.service";
+import type { VoteInfo } from "../community/votes/votes.service";
+import { VotesService } from "../community/votes/votes.service";
 import { AuditService } from "../platform-operations/audit/audit.service";
 import { OutboxService } from "../platform-operations/jobs/outbox.service";
 import { assertResourceTransition } from "./domain/resource.state-machine";
 import { assertResourceVersionTransition } from "./domain/resource-version.state-machine";
 import { ResourcesRepository } from "./resources.repository";
 
-function toResourceResponse(resource: {
-  id: string;
-  ownerOrganizationId: string;
-  createdByUserId: string;
-  type: string;
-  title: string;
-  description: string | null;
-  accessLevel: string;
-  status: string;
-  moderationStatus: string;
-  externalIdentifier: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-  version: number;
-}): ResourceResponse {
+export type ResourceListSort = "new" | "top" | "hot";
+
+function toResourceResponse(
+  resource: {
+    id: string;
+    ownerOrganizationId: string;
+    createdByUserId: string;
+    type: string;
+    title: string;
+    description: string | null;
+    accessLevel: string;
+    status: string;
+    moderationStatus: string;
+    externalIdentifier: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+    version: number;
+  },
+  vote: VoteInfo,
+  savedByMe: boolean,
+): ResourceResponse {
   return {
     id: resource.id,
     ownerOrganizationId: resource.ownerOrganizationId,
@@ -49,6 +58,9 @@ function toResourceResponse(resource: {
     createdAt: resource.createdAt.toISOString(),
     updatedAt: resource.updatedAt.toISOString(),
     version: resource.version,
+    voteCount: vote.voteCount,
+    votedByMe: vote.votedByMe,
+    savedByMe,
   };
 }
 
@@ -88,6 +100,8 @@ export class ResourcesService {
     private readonly auditService: AuditService,
     private readonly outboxService: OutboxService,
     private readonly s3Service: S3Service,
+    private readonly votesService: VotesService,
+    private readonly savesService: SavesService,
     @Inject(DATABASE) private readonly db: Database,
   ) {}
 
@@ -207,7 +221,8 @@ export class ResourcesService {
       return createdResource;
     });
 
-    return toResourceResponse(resource);
+    // Just-created resource: 0 votes, not voted/saved by anyone — no query needed.
+    return toResourceResponse(resource, { voteCount: 0, votedByMe: false }, false);
   }
 
   async getById(actor: ActorContext, id: string): Promise<ResourceResponse> {
@@ -216,15 +231,65 @@ export class ResourcesService {
       throw new NotFoundError(ErrorCode.RESOURCE_NOT_FOUND, "Resource not found.");
     }
     await this.assertVisible(actor, resource);
-    return toResourceResponse(resource);
+    const [vote, savedByMe] = await Promise.all([
+      this.votesService.voteInfoForResource(actor.userId, id),
+      this.savesService.savedByMeForResource(actor.userId, id),
+    ]);
+    return toResourceResponse(resource, vote, savedByMe);
   }
 
-  async list(actor: ActorContext, q?: string): Promise<ResourceResponse[]> {
+  /** Cộng đồng đợt 1: `sort` re-orders the SAME already-permission-filtered, already-
+   * capped-at-50 candidate set `listVisible` has always returned (no real pagination yet,
+   * a known pre-existing limit — see plan) — "top"/"hot" rank within the 50 most recent
+   * resources, not across the full catalog. Re-sorting a small in-memory array is simpler
+   * and safer than rewriting the permission-filter SQL to order by a joined vote count. */
+  async list(actor: ActorContext, q?: string, sort: ResourceListSort = "new"): Promise<ResourceResponse[]> {
     const actorOrgIds = actor.memberships
       .filter((membership) => membership.status === "ACTIVE")
       .map((membership) => membership.organizationId);
     const rows = await this.resourcesRepository.listVisible({ q, actorUserId: actor.userId, actorOrgIds });
-    return rows.map(toResourceResponse);
+    const resourceIds = rows.map((r) => r.id);
+    const [votes, saved] = await Promise.all([
+      this.votesService.voteInfoForResources(actor.userId, resourceIds),
+      this.savesService.savedByMeForResources(actor.userId, resourceIds),
+    ]);
+    const responses = rows.map((row) => toResourceResponse(row, votes.get(row.id)!, saved.get(row.id) ?? false));
+
+    if (sort === "top") {
+      return [...responses].sort((a, b) => b.voteCount - a.voteCount);
+    }
+    if (sort === "hot") {
+      const hotScore = (r: ResourceResponse) => {
+        const ageHours = (Date.now() - new Date(r.createdAt).getTime()) / 3_600_000;
+        return r.voteCount / (ageHours + 2);
+      };
+      return [...responses].sort((a, b) => hotScore(b) - hotScore(a));
+    }
+    return responses;
+  }
+
+  async vote(actor: ActorContext, id: string): Promise<ResourceResponse> {
+    await this.getById(actor, id); // 404/visibility guard before writing
+    await this.votesService.voteResource(actor.userId, id);
+    return this.getById(actor, id);
+  }
+
+  async unvote(actor: ActorContext, id: string): Promise<ResourceResponse> {
+    await this.getById(actor, id);
+    await this.votesService.unvoteResource(actor.userId, id);
+    return this.getById(actor, id);
+  }
+
+  async save(actor: ActorContext, id: string): Promise<ResourceResponse> {
+    await this.getById(actor, id); // 404/visibility guard before writing
+    await this.savesService.saveResource(actor.userId, id);
+    return this.getById(actor, id);
+  }
+
+  async unsave(actor: ActorContext, id: string): Promise<ResourceResponse> {
+    await this.getById(actor, id);
+    await this.savesService.unsaveResource(actor.userId, id);
+    return this.getById(actor, id);
   }
 
   async createVersion(

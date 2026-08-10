@@ -9,7 +9,14 @@ import { NEED_STATUS_LABELS, PLATFORM_ROLE_LABELS } from "../../lib/labels";
 import { navForPersona, personaOf } from "../../lib/nav";
 import { getAccessToken } from "../../lib/session";
 import { NEED_STATUS_TONE, toneOf } from "../../lib/tone";
-import { Card, PrimaryButtonLink, Shell, StatusDot } from "../../components/ui";
+import { Card, PrimaryButtonLink, SaveButton, Shell, StatusDot, Tabs, VoteButton } from "../../components/ui";
+
+const SORT_TABS = ["Mới nhất", "Điểm cao nhất", "Thịnh hành"] as const;
+const SORT_TAB_TO_VALUE: Record<(typeof SORT_TABS)[number], "new" | "top" | "hot"> = {
+  "Mới nhất": "new",
+  "Điểm cao nhất": "top",
+  "Thịnh hành": "hot",
+};
 
 export default function NeedsPage() {
   const router = useRouter();
@@ -18,16 +25,18 @@ export default function NeedsPage() {
   const [needs, setNeeds] = useState<ResearchNeedResponse[] | null>(null);
   const [publicNeeds, setPublicNeeds] = useState<ResearchNeedResponse[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [sortTab, setSortTab] = useState<(typeof SORT_TABS)[number]>("Mới nhất");
 
   useEffect(() => {
     if (!getAccessToken()) {
       router.push("/login");
       return;
     }
+    const sort = SORT_TAB_TO_VALUE[sortTab];
     Promise.all([
       authFetch<MeResponse>("/me"),
       authFetch<OrganizationResponse[]>("/organizations"),
-      authFetch<ResearchNeedResponse[]>("/research-needs"),
+      authFetch<ResearchNeedResponse[]>(`/research-needs?sort=${sort}`),
     ])
       .then(([meResponse, orgs, pub]) => {
         setMe(meResponse);
@@ -47,7 +56,15 @@ export default function NeedsPage() {
         }
         setError("Không tải được danh sách nhu cầu nghiên cứu.");
       });
-  }, [router]);
+  }, [router, sortTab]);
+
+  function onVoteChange(needId: string, next: { voteCount: number; votedByMe: boolean }) {
+    setPublicNeeds((prev) => (prev ? prev.map((n) => (n.id === needId ? { ...n, ...next } : n)) : prev));
+  }
+
+  function onSaveChange(needId: string, next: { savedByMe: boolean }) {
+    setPublicNeeds((prev) => (prev ? prev.map((n) => (n.id === needId ? { ...n, ...next } : n)) : prev));
+  }
 
   if (error) {
     return (
@@ -99,18 +116,38 @@ export default function NeedsPage() {
         )}
 
         <Card>
-          <p style={{ fontSize: 12, fontWeight: 600, color: "var(--uikit-slate-500)", marginBottom: "var(--space-3)" }}>
-            Nhu cầu công khai đang mở
-          </p>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "var(--space-3)", marginBottom: "var(--space-3)" }}>
+            <p style={{ fontSize: 12, fontWeight: 600, color: "var(--uikit-slate-500)" }}>
+              Nhu cầu công khai đang mở
+            </p>
+            <Tabs tabs={[...SORT_TABS]} active={sortTab} onChange={(t) => setSortTab(t as (typeof SORT_TABS)[number])} />
+          </div>
           {otherPublicNeeds.length === 0 ? (
             <p className="uikit-empty">Hiện chưa có nhu cầu công khai nào đang mở từ tổ chức khác.</p>
           ) : (
             <div className="uikit-row-list">
               {otherPublicNeeds.map((n) => (
-                <Link key={n.id} href={`/needs/${n.id}`} className="uikit-row-link">
-                  <span style={{ fontSize: 14, fontWeight: 500 }}>{n.title}</span>
-                  <StatusDot tone={toneOf(NEED_STATUS_TONE, n.status)} label={NEED_STATUS_LABELS[n.status] ?? n.status} />
-                </Link>
+                <div key={n.id} className="uikit-row">
+                  <Link href={`/needs/${n.id}`} style={{ fontSize: 14, fontWeight: 500, color: "var(--uikit-slate-900)", textDecoration: "none" }}>
+                    {n.title}
+                  </Link>
+                  <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+                    <VoteButton
+                      path={`/research-needs/${n.id}/votes`}
+                      votedByMe={n.votedByMe}
+                      voteCount={n.voteCount}
+                      onChange={(next) => onVoteChange(n.id, next)}
+                      onSessionExpired={() => router.push("/login")}
+                    />
+                    <SaveButton
+                      path={`/research-needs/${n.id}/saves`}
+                      savedByMe={n.savedByMe}
+                      onChange={(next) => onSaveChange(n.id, next)}
+                      onSessionExpired={() => router.push("/login")}
+                    />
+                    <StatusDot tone={toneOf(NEED_STATUS_TONE, n.status)} label={NEED_STATUS_LABELS[n.status] ?? n.status} />
+                  </div>
+                </div>
               ))}
             </div>
           )}

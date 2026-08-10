@@ -11,6 +11,9 @@ import type { Database } from "@r2m/database";
 import { ConflictError, ErrorCode, NotFoundError, ResearchNeedStatus } from "@r2m/domain";
 import { Inject, Injectable } from "@nestjs/common";
 import { DATABASE } from "../../../database/database.module";
+import { SavesService } from "../../community/saves/saves.service";
+import type { VoteInfo } from "../../community/votes/votes.service";
+import { VotesService } from "../../community/votes/votes.service";
 import { AuditService } from "../../platform-operations/audit/audit.service";
 import { CompanyProfileRepository } from "../company-profile/company-profile.repository";
 import { assertResearchNeedTransition } from "../domain/research-need.state-machine";
@@ -23,19 +26,25 @@ import { ResearchNeedsRepository } from "./research-needs.repository";
  * revisit, not buried as a magic literal. */
 const MIN_PROBLEM_STATEMENT_LENGTH = 50;
 
-function toNeedResponse(row: {
-  id: string;
-  companyOrganizationId: string;
-  createdByUserId: string;
-  title: string;
-  visibility: string;
-  status: string;
-  publishedAt: Date | null;
-  closedAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
-  version: number;
-}): ResearchNeedResponse {
+export type ResearchNeedListSort = "new" | "top" | "hot";
+
+function toNeedResponse(
+  row: {
+    id: string;
+    companyOrganizationId: string;
+    createdByUserId: string;
+    title: string;
+    visibility: string;
+    status: string;
+    publishedAt: Date | null;
+    closedAt: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+    version: number;
+  },
+  vote: VoteInfo,
+  savedByMe: boolean,
+): ResearchNeedResponse {
   return {
     id: row.id,
     companyOrganizationId: row.companyOrganizationId,
@@ -48,6 +57,9 @@ function toNeedResponse(row: {
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     version: row.version,
+    voteCount: vote.voteCount,
+    votedByMe: vote.votedByMe,
+    savedByMe,
   };
 }
 
@@ -87,6 +99,8 @@ export class ResearchNeedsService {
     private readonly repository: ResearchNeedsRepository,
     private readonly companyProfileRepository: CompanyProfileRepository,
     private readonly auditService: AuditService,
+    private readonly votesService: VotesService,
+    private readonly savesService: SavesService,
   ) {}
 
   /** Visible to: any active member of the owning org (any status/visibility), or anyone
@@ -153,7 +167,11 @@ export class ResearchNeedsService {
       return { need, version };
     });
 
-    return { ...toNeedResponse(need), currentVersion: toVersionResponse(version) };
+    // Just-created need: 0 votes, not voted/saved by anyone — no query needed.
+    return {
+      ...toNeedResponse(need, { voteCount: 0, votedByMe: false }, false),
+      currentVersion: toVersionResponse(version),
+    };
   }
 
   async createVersion(
@@ -250,7 +268,11 @@ export class ResearchNeedsService {
       return result;
     });
 
-    return toNeedResponse(updated);
+    const [vote, savedByMe] = await Promise.all([
+      this.votesService.voteInfoForResearchNeed(actor.userId, researchNeedId),
+      this.savesService.savedByMeForResearchNeed(actor.userId, researchNeedId),
+    ]);
+    return toNeedResponse(updated, vote, savedByMe);
   }
 
   publish(actor: ActorContext, id: string, requestIdHeader: string | null) {
@@ -283,7 +305,67 @@ export class ResearchNeedsService {
     if (!latest) {
       throw new Error(`Research need ${id} has no statement version — data integrity violation.`);
     }
-    return { ...toNeedResponse(need), currentVersion: toVersionResponse(latest) };
+    const [vote, savedByMe] = await Promise.all([
+      this.votesService.voteInfoForResearchNeed(actor.userId, id),
+      this.savesService.savedByMeForResearchNeed(actor.userId, id),
+    ]);
+    return { ...toNeedResponse(need, vote, savedByMe), currentVersion: toVersionResponse(latest) };
+  }
+
+  async vote(actor: ActorContext, id: string): Promise<ResearchNeedResponse> {
+    const need = await this.repository.findById(id);
+    if (!need) {
+      throw new NotFoundError(ErrorCode.DISCOVERY_NEED_NOT_OPEN, "Research need not found.");
+    }
+    await this.assertVisible(actor, need); // 404/visibility guard before writing
+    await this.votesService.voteResearchNeed(actor.userId, id);
+    const [vote, savedByMe] = await Promise.all([
+      this.votesService.voteInfoForResearchNeed(actor.userId, id),
+      this.savesService.savedByMeForResearchNeed(actor.userId, id),
+    ]);
+    return toNeedResponse(need, vote, savedByMe);
+  }
+
+  async unvote(actor: ActorContext, id: string): Promise<ResearchNeedResponse> {
+    const need = await this.repository.findById(id);
+    if (!need) {
+      throw new NotFoundError(ErrorCode.DISCOVERY_NEED_NOT_OPEN, "Research need not found.");
+    }
+    await this.assertVisible(actor, need);
+    await this.votesService.unvoteResearchNeed(actor.userId, id);
+    const [vote, savedByMe] = await Promise.all([
+      this.votesService.voteInfoForResearchNeed(actor.userId, id),
+      this.savesService.savedByMeForResearchNeed(actor.userId, id),
+    ]);
+    return toNeedResponse(need, vote, savedByMe);
+  }
+
+  async save(actor: ActorContext, id: string): Promise<ResearchNeedResponse> {
+    const need = await this.repository.findById(id);
+    if (!need) {
+      throw new NotFoundError(ErrorCode.DISCOVERY_NEED_NOT_OPEN, "Research need not found.");
+    }
+    await this.assertVisible(actor, need); // 404/visibility guard before writing
+    await this.savesService.saveResearchNeed(actor.userId, id);
+    const [vote, savedByMe] = await Promise.all([
+      this.votesService.voteInfoForResearchNeed(actor.userId, id),
+      this.savesService.savedByMeForResearchNeed(actor.userId, id),
+    ]);
+    return toNeedResponse(need, vote, savedByMe);
+  }
+
+  async unsave(actor: ActorContext, id: string): Promise<ResearchNeedResponse> {
+    const need = await this.repository.findById(id);
+    if (!need) {
+      throw new NotFoundError(ErrorCode.DISCOVERY_NEED_NOT_OPEN, "Research need not found.");
+    }
+    await this.assertVisible(actor, need);
+    await this.savesService.unsaveResearchNeed(actor.userId, id);
+    const [vote, savedByMe] = await Promise.all([
+      this.votesService.voteInfoForResearchNeed(actor.userId, id),
+      this.savesService.savedByMeForResearchNeed(actor.userId, id),
+    ]);
+    return toNeedResponse(need, vote, savedByMe);
   }
 
   async listVersions(actor: ActorContext, id: string): Promise<NeedStatementVersionResponse[]> {
@@ -296,14 +378,41 @@ export class ResearchNeedsService {
     return versions.map(toVersionResponse);
   }
 
-  async listForOrganization(actor: ActorContext, organizationId: string): Promise<ResearchNeedResponse[]> {
-    assertActiveMember(actor, organizationId);
-    const needs = await this.repository.listByOrganization(organizationId);
-    return needs.map(toNeedResponse);
+  /** Cộng đồng đợt 1: same in-memory re-sort trade-off as `ResourcesService.list` — ranks
+   * within whatever the underlying query already returned, no real pagination yet. */
+  private async decorateAndSort(
+    actor: ActorContext,
+    needs: Parameters<typeof toNeedResponse>[0][],
+    sort: ResearchNeedListSort,
+  ): Promise<ResearchNeedResponse[]> {
+    const needIds = needs.map((n) => n.id);
+    const [votes, saved] = await Promise.all([
+      this.votesService.voteInfoForResearchNeeds(actor.userId, needIds),
+      this.savesService.savedByMeForResearchNeeds(actor.userId, needIds),
+    ]);
+    const responses = needs.map((n) => toNeedResponse(n, votes.get(n.id)!, saved.get(n.id) ?? false));
+
+    if (sort === "top") {
+      return [...responses].sort((a, b) => b.voteCount - a.voteCount);
+    }
+    if (sort === "hot") {
+      const hotScore = (r: ResearchNeedResponse) => {
+        const ageHours = (Date.now() - new Date(r.createdAt).getTime()) / 3_600_000;
+        return r.voteCount / (ageHours + 2);
+      };
+      return [...responses].sort((a, b) => hotScore(b) - hotScore(a));
+    }
+    return responses;
   }
 
-  async listPublic(): Promise<ResearchNeedResponse[]> {
+  async listForOrganization(actor: ActorContext, organizationId: string, sort: ResearchNeedListSort = "new"): Promise<ResearchNeedResponse[]> {
+    assertActiveMember(actor, organizationId);
+    const needs = await this.repository.listByOrganization(organizationId);
+    return this.decorateAndSort(actor, needs, sort);
+  }
+
+  async listPublic(actor: ActorContext, sort: ResearchNeedListSort = "new"): Promise<ResearchNeedResponse[]> {
     const needs = await this.repository.listPublicOpen();
-    return needs.map(toNeedResponse);
+    return this.decorateAndSort(actor, needs, sort);
   }
 }
