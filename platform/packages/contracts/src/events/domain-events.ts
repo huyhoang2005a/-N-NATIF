@@ -245,6 +245,21 @@ export interface CaseInitiationRequestDecidedEvent {
   requestedByUserId: string;
 }
 
+/** Community đợt 3 — follow. `followerUserId` is who did the following, not the
+ * notification recipient — the recipient is the followed author/org (see
+ * `outbox-dispatcher.ts` handler). */
+export interface AuthorFollowedEvent {
+  type: "AuthorFollowed";
+  followerUserId: string;
+  followedAuthorUserId: string;
+}
+
+export interface OrganizationFollowedEvent {
+  type: "OrganizationFollowed";
+  followerUserId: string;
+  followedOrganizationId: string;
+}
+
 export type DomainEvent =
   | OrganizationRegisteredEvent
   | OrganizationVerificationRequestedEvent
@@ -277,4 +292,6 @@ export type DomainEvent =
   | RecommendationRunRequestedEvent
   | RecommendationRunCompletedEvent
   | CaseInitiationRequestedEvent
-  | CaseInitiationRequestDecidedEvent;
+  | CaseInitiationRequestDecidedEvent
+  | AuthorFollowedEvent
+  | OrganizationFollowedEvent;

@@ -64,6 +64,13 @@
       "when": 1786329655555,
       "tag": "0008_pink_lord_hawal",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1786331038675,
+      "tag": "0009_rapid_tarantula",
+      "breakpoints": true
     }
   ]
 }

@@ -18,6 +18,10 @@ export interface PublicAuthorProfileResponse {
   orcid: string | null;
   bio: string | null;
   resources: PublicResourceSummaryResponse[];
+  /** Community đợt 3 — plain count, actor-independent, safe on this `@Public()` response
+   * (unlike `followedByMe`, which is actor-specific and deliberately NOT here — see
+   * `GET /me/follows/authors/:slug` instead, same actor-blindness rule as `votedByMe`). */
+  followerCount: number;
 }
 
 export interface PublicOrganizationAuthorResponse {
@@ -31,4 +35,13 @@ export interface PublicOrganizationProfileResponse {
   description: string | null;
   authors: PublicOrganizationAuthorResponse[];
   resources: PublicResourceSummaryResponse[];
+  /** Community đợt 3 — see `PublicAuthorProfileResponse.followerCount`. */
+  followerCount: number;
+}
+
+/** `GET /me/follows/authors/:slug` / `.../organizations/:slug` — actor-specific, so it
+ * lives on its own authenticated endpoint rather than in the `@Public()` profile response
+ * above (same split as `votedByMe`/`savedByMe` vs. the public listing endpoints). */
+export interface FollowStatusResponse {
+  followed: boolean;
 }

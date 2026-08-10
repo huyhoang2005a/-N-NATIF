@@ -6,7 +6,7 @@ import { useParams } from "next/navigation";
 import type { PublicAuthorProfileResponse } from "@r2m/contracts";
 import { ApiError, apiFetch } from "../../../lib/api-client";
 import { describeErrorCode } from "../../../lib/error-messages";
-import { AbstractText, AuthorOrgByline, BrandMark, Card } from "../../../components/ui";
+import { AbstractText, AuthorOrgByline, BrandMark, Card, FollowButton } from "../../../components/ui";
 
 /** Public, unauthenticated — no `Shell`/sidebar, no auth check. `06_phase5_full_design.md`
  * §5: only `PUBLIC` resources, no case/evidence/assessment data at all. */
@@ -39,11 +39,23 @@ export default function PublicAuthorProfilePage() {
       {profile && (
         <div className="uikit-stack">
           <Card>
-            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
-              <h1 style={{ fontSize: 22 }}>{profile.displayName}</h1>
-              <span className="uikit-pill uikit-pill--green">
-                <span className="uikit-dot uikit-dot--green" /> Tác giả đã xác minh
-              </span>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "var(--space-3)", flexWrap: "wrap" }}>
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+                  <h1 style={{ fontSize: 22 }}>{profile.displayName}</h1>
+                  <span className="uikit-pill uikit-pill--green">
+                    <span className="uikit-dot uikit-dot--green" /> Tác giả đã xác minh
+                  </span>
+                </div>
+                <p style={{ marginTop: 4, fontSize: 13, color: "var(--uikit-slate-500)" }}>
+                  {profile.followerCount} người theo dõi
+                </p>
+              </div>
+              <FollowButton
+                kind="authors"
+                slug={profile.publicSlug}
+                onFollowerCountChange={(count) => setProfile((prev) => (prev ? { ...prev, followerCount: count } : prev))}
+              />
             </div>
             <AuthorOrgByline organizationName={profile.affiliationOrganizationName} organizationSlug={profile.affiliationOrganizationSlug} />
             {profile.orcid && <p style={{ marginTop: "var(--space-2)", fontSize: 13, color: "var(--uikit-slate-500)" }}>ORCID: {profile.orcid}</p>}

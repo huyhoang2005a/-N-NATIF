@@ -26,7 +26,9 @@ import {
 } from "./recommendations/recommendations.controller";
 import { RecommendationsRepository } from "./recommendations/recommendations.repository";
 import { RecommendationsService } from "./recommendations/recommendations.service";
+import { FollowActionsService } from "./public-profiles/follow-actions.service";
 import {
+  MeFollowsController,
   PublicAuthorProfileController,
   PublicOrganizationProfileController,
 } from "./public-profiles/public-profiles.controller";
@@ -63,6 +65,7 @@ import { SavedItemsService } from "./saved-items/saved-items.service";
     OrganizationCaseInitiationsController,
     PublicAuthorProfileController,
     PublicOrganizationProfileController,
+    MeFollowsController,
     SavedItemsController,
   ],
   providers: [
@@ -78,6 +81,7 @@ import { SavedItemsService } from "./saved-items/saved-items.service";
     CaseInitiationsService,
     PublicProfilesRepository,
     PublicProfilesService,
+    FollowActionsService,
     SavedItemsService,
   ],
 })

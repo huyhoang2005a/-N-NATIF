@@ -250,6 +250,32 @@ async function handleEvent(db: Database, event: DomainEvent, emailSender: EmailS
       });
       return;
     }
+    case "AuthorFollowed": {
+      await notify(db, {
+        recipientUserId: event.followedAuthorUserId,
+        type: "author.followed",
+        title: "You have a new follower",
+        message: "Someone started following your author profile.",
+        dedupeKey: `author-followed:${event.followerUserId}:${event.followedAuthorUserId}`,
+      });
+      return;
+    }
+    case "OrganizationFollowed": {
+      const recipientIds = await listActiveOrgOwnersAndAdmins(db, event.followedOrganizationId);
+      await Promise.all(
+        recipientIds.map((recipientUserId) =>
+          notify(db, {
+            recipientUserId,
+            scopeOrganizationId: event.followedOrganizationId,
+            type: "organization.followed",
+            title: "Your organization has a new follower",
+            message: "Someone started following your organization's public profile.",
+            dedupeKey: `org-followed:${event.followerUserId}:${event.followedOrganizationId}`,
+          }),
+        ),
+      );
+      return;
+    }
     default: {
       const _exhaustive: never = event;
       throw new Error(`Unhandled domain event type: ${JSON.stringify(_exhaustive)}`);

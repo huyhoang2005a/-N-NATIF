@@ -6,7 +6,7 @@ import { useParams } from "next/navigation";
 import type { PublicOrganizationProfileResponse } from "@r2m/contracts";
 import { ApiError, apiFetch } from "../../../lib/api-client";
 import { describeErrorCode } from "../../../lib/error-messages";
-import { AbstractText, AuthorOrgByline, BrandMark, Card } from "../../../components/ui";
+import { AbstractText, AuthorOrgByline, BrandMark, Card, FollowButton } from "../../../components/ui";
 
 /** Public, unauthenticated — same scope rules as `/authors/[slug]`: `PUBLIC` resources
  * only, `VERIFIED` authors only, no case/evidence/assessment data. */
@@ -39,7 +39,19 @@ export default function PublicOrganizationProfilePage() {
       {profile && (
         <div className="uikit-stack">
           <Card>
-            <h1 style={{ fontSize: 22 }}>{profile.name}</h1>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "var(--space-3)", flexWrap: "wrap" }}>
+              <div>
+                <h1 style={{ fontSize: 22 }}>{profile.name}</h1>
+                <p style={{ marginTop: 4, fontSize: 13, color: "var(--uikit-slate-500)" }}>
+                  {profile.followerCount} người theo dõi
+                </p>
+              </div>
+              <FollowButton
+                kind="organizations"
+                slug={profile.slug}
+                onFollowerCountChange={(count) => setProfile((prev) => (prev ? { ...prev, followerCount: count } : prev))}
+              />
+            </div>
             <AbstractText text={profile.description} />
           </Card>
 
