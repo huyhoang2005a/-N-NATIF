@@ -1,0 +1,15 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  # apps/api and apps/worker run directly on the host (not in this docker-compose stack),
+  # so scrape via host.docker.internal rather than a compose service name.
+  - job_name: r2m-api
+    metrics_path: /v1/metrics
+    static_configs:
+      - targets: ["host.docker.internal:3000"]
+
+  - job_name: r2m-worker
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["host.docker.internal:9200"]

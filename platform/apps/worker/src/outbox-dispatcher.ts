@@ -10,6 +10,8 @@ import {
   organizationRejectedTemplate,
   verifyEmailTemplate,
 } from "./email/templates";
+import { scanResourceUpload } from "./file-safety/scan-resource-upload";
+import { logger } from "./logger";
 import {
   findActiveOrgOwnerUserId,
   findContentOwnerUserId,
@@ -19,9 +21,20 @@ import {
   notify,
 } from "./notify";
 import { generateRecommendationRun } from "./recommendation/generate-recommendation-run";
+import { withLinkedSpan } from "./trace-context";
 
 const DEFAULT_BATCH_SIZE = 20;
 const DEFAULT_MAX_ATTEMPTS = 5;
+// Phase 7 Sprint 7.2 — spec §7.5 ("mọi background job phải có chiến lược retry + dead-letter")
+// and architecture plan line ~1631 ("retry exponential backoff, max attempts và dead-letter
+// state") — previously a failed row was retried on the very next 2s poll tick regardless of
+// why it failed, hammering a possibly-still-broken downstream (e.g. Resend down) every 2s.
+const BACKOFF_BASE_MS = 5000;
+const BACKOFF_MAX_MS = 10 * 60 * 1000;
+
+function computeBackoffDelayMs(attemptCount: number): number {
+  return Math.min(BACKOFF_BASE_MS * 2 ** (attemptCount - 1), BACKOFF_MAX_MS);
+}
 
 /**
  * Turns a domain event into an in-app notification. Events with no reader-facing meaning
@@ -189,11 +202,15 @@ async function handleEvent(db: Database, event: DomainEvent, emailSender: EmailS
       }
       return;
     }
+    case "ResourceIngestionQueued": {
+      // Phase 7 Sprint 7.4 — real MIME sniff + malware scan, replacing the Phase 2 no-op.
+      await scanResourceUpload(db, event.resourceVersionId, event.ingestionJobId);
+      return;
+    }
     case "OrganizationRegistered":
     case "UserProfileUpdated":
     case "ResourceRegistered":
     case "ResourceVersionPublished":
-    case "ResourceIngestionQueued":
     case "AnnotationCreated":
     case "AnnotationRevised":
     case "AnnotationRemoved":
@@ -355,6 +372,18 @@ async function handleEvent(db: Database, event: DomainEvent, emailSender: EmailS
 export interface DispatchResult {
   processed: number;
   failed: number;
+  deadLetter: number;
+}
+
+/** Phase 7 Sprint 7.3 — `now() - oldest still-pending row's available_at`, 0 if the queue
+ * is empty. Feeds `outbox_dispatch_lag_seconds` (NFR-05: outbox lag p95<=30s). */
+export async function computeOutboxLagSeconds(db: Database): Promise<number> {
+  const oldest = await db.query.outboxEvent.findFirst({
+    where: inArray(schema.outboxEvent.status, ["PENDING", "FAILED"]),
+    orderBy: (event, { asc }) => [asc(event.availableAt)],
+  });
+  if (!oldest) return 0;
+  return Math.max(0, (Date.now() - oldest.availableAt.getTime()) / 1000);
 }
 
 /** Polls `outbox_event` and delivers PENDING/FAILED rows whose available_at has passed. */
@@ -376,6 +405,7 @@ export async function dispatchPendingEvents(
 
   let processed = 0;
   let failed = 0;
+  let deadLetter = 0;
 
   for (const row of rows) {
     await db
@@ -383,8 +413,14 @@ export async function dispatchPendingEvents(
       .set({ status: "PROCESSING" })
       .where(eq(schema.outboxEvent.id, row.id));
 
+    // Phase 7 Sprint 7.3 — correlates this log line back to the API request that produced
+    // the event, when the caller passed `context` to `OutboxService.append()`.
+    if (row.requestId) {
+      logger.info({ requestId: row.requestId, eventType: row.eventType, outboxEventId: row.id }, "processing outbox event");
+    }
+
     try {
-      await handleEvent(db, row.payload as DomainEvent, emailSender);
+      await withLinkedSpan(row.traceparent, `outbox.handle ${row.eventType}`, () => handleEvent(db, row.payload as DomainEvent, emailSender));
       await db
         .update(schema.outboxEvent)
         .set({ status: "PUBLISHED", publishedAt: new Date() })
@@ -399,11 +435,18 @@ export async function dispatchPendingEvents(
           status: nextStatus,
           attemptCount,
           lastError: error instanceof Error ? error.message : String(error),
+          // DEAD_LETTER rows are done retrying — availableAt no longer matters for them,
+          // left as-is rather than pushed further out.
+          ...(nextStatus === "FAILED" ? { availableAt: new Date(Date.now() + computeBackoffDelayMs(attemptCount)) } : {}),
         })
         .where(eq(schema.outboxEvent.id, row.id));
-      failed += 1;
+      if (nextStatus === "DEAD_LETTER") {
+        deadLetter += 1;
+      } else {
+        failed += 1;
+      }
     }
   }
 
-  return { processed, failed };
+  return { processed, failed, deadLetter };
 }

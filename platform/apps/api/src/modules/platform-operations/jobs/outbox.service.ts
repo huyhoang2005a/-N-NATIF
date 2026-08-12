@@ -13,11 +13,16 @@ import { DATABASE } from "../../../database/database.module";
 export class OutboxService {
   constructor(@Inject(DATABASE) private readonly db: Database) {}
 
+  /** `context.requestId`/`context.traceparent` are optional (Phase 7 Sprint 7.3) —
+   * correlates the worker's later async processing of this event back to the API request
+   * that produced it, for structured logs and OpenTelemetry tracing respectively. Existing
+   * call sites that don't pass `context` are unaffected. */
   async append(
     aggregateType: string,
     aggregateId: string,
     event: DomainEvent,
     tx?: Database,
+    context?: { requestId?: string | null; traceparent?: string | null },
   ): Promise<void> {
     const client = tx ?? this.db;
     await client.insert(schema.outboxEvent).values({
@@ -25,6 +30,8 @@ export class OutboxService {
       aggregateId,
       eventType: event.type,
       payload: event,
+      requestId: context?.requestId ?? undefined,
+      traceparent: context?.traceparent ?? undefined,
     });
   }
 }

@@ -4,7 +4,9 @@ import type { ActorContext } from "@r2m/authz";
 import { Body, Controller, Get, Param, Post, Req, UsePipes } from "@nestjs/common";
 import type { Request } from "express";
 import { CurrentActor } from "../../../common/decorators/current-actor.decorator";
+import { withIdempotencyKey } from "../../../common/idempotency/with-idempotency-key.util";
 import { ZodValidationPipe } from "../../../common/pipes/zod-validation.pipe";
+import { IdempotencyService } from "../../platform-operations/jobs/idempotency.service";
 import { CaseInitiationsService } from "./case-initiations.service";
 
 function requestId(req: Request): string | null {
@@ -13,7 +15,10 @@ function requestId(req: Request): string | null {
 
 @Controller("recommendation-items/:id/case-initiation-requests")
 export class RecommendationItemCaseInitiationsController {
-  constructor(private readonly service: CaseInitiationsService) {}
+  constructor(
+    private readonly service: CaseInitiationsService,
+    private readonly idempotencyService: IdempotencyService,
+  ) {}
 
   @Post()
   @UsePipes(new ZodValidationPipe(CreateCaseInitiationRequestSchema))
@@ -23,7 +28,9 @@ export class RecommendationItemCaseInitiationsController {
     @Body() body: CreateCaseInitiationRequest,
     @Req() req: Request,
   ): Promise<CaseInitiationRequestResponse> {
-    return this.service.create(actor, id, body, requestId(req));
+    return withIdempotencyKey(this.idempotencyService, actor.userId, req, body, 201, () =>
+      this.service.create(actor, id, body, requestId(req)),
+    );
   }
 }
 

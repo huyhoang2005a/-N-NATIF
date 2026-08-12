@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { loadEnv } from "@r2m/env";
 import {
   CreateBucketCommand,
+  DeleteObjectCommand,
   GetObjectCommand,
   HeadBucketCommand,
   PutObjectCommand,
@@ -95,6 +96,30 @@ export class S3Service {
       hash.update(chunk as Buffer);
     }
     return hash.digest("hex");
+  }
+
+  /** Phase 7 Sprint 7.4 — full buffer for MIME sniff + malware scan (author-verification's
+   * confirm step, which — unlike org-verification's server-side upload — only learns about
+   * the object after the client already PUT it directly to a presigned URL). */
+  async getObjectBuffer(bucket: string, key: string): Promise<Buffer> {
+    const response = await this.client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+    const chunks: Buffer[] = [];
+    for await (const chunk of response.Body as Readable) {
+      chunks.push(chunk as Buffer);
+    }
+    return Buffer.concat(chunks);
+  }
+
+  async deleteObject(bucket: string, key: string): Promise<void> {
+    await this.client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+  }
+
+  getVerificationDocumentBuffer(key: string): Promise<Buffer> {
+    return this.getObjectBuffer(this.verificationBucket, key);
+  }
+
+  deleteVerificationDocument(key: string): Promise<void> {
+    return this.deleteObject(this.verificationBucket, key);
   }
 
   // Bucket-aware convenience wrappers — callers never need to read S3_*_BUCKET / call

@@ -50,3 +50,13 @@ export class UnauthenticatedError extends DomainError {
     this.name = "UnauthenticatedError";
   }
 }
+
+/** Phase 7 Sprint 7.2 — distinct from `ConflictError` (409, used for business-level
+ * cooldowns like `AUTH_EMAIL_VERIFICATION_RATE_LIMITED`): this is the infra-level HTTP 429
+ * spec §7.6 calls for, thrown by `RateLimitGuard`. */
+export class RateLimitedError extends DomainError {
+  constructor(code: ErrorCode, message: string, details?: Record<string, unknown>) {
+    super(code, message, { httpStatus: 429, details });
+    this.name = "RateLimitedError";
+  }
+}

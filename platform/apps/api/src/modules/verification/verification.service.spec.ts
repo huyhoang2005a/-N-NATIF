@@ -6,6 +6,7 @@ import type { OrganizationsRepository } from "../identity-organization/organizat
 import type { AuditService } from "../platform-operations/audit/audit.service";
 import type { OutboxService } from "../platform-operations/jobs/outbox.service";
 import type { S3Service } from "../../common/storage/s3.service";
+import type { FileSafetyService } from "../../common/file-safety/file-safety.service";
 
 const reviewer: ActorContext = {
   userId: "reviewer-1",
@@ -46,6 +47,10 @@ function buildService() {
   const s3Service = {
     uploadVerificationDocument: vi.fn().mockResolvedValue(undefined),
   } as unknown as S3Service;
+  const fileSafetyService = {
+    sniffMimeType: vi.fn().mockReturnValue("application/pdf"),
+    scanForMalware: vi.fn().mockResolvedValue({ clean: true }),
+  } as unknown as FileSafetyService;
   const db = { transaction: vi.fn((cb: (tx: unknown) => Promise<unknown>) => cb({})) };
 
   const service = new VerificationService(
@@ -54,10 +59,11 @@ function buildService() {
     auditService,
     outboxService,
     s3Service,
+    fileSafetyService,
     db as never,
   );
 
-  return { service, verificationRepository, organizationsRepository, auditService, outboxService, s3Service };
+  return { service, verificationRepository, organizationsRepository, auditService, outboxService, s3Service, fileSafetyService };
 }
 
 describe("VerificationService (organization verification, UC-VER-02 pattern)", () => {

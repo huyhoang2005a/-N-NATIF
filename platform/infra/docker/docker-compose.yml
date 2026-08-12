@@ -39,6 +39,60 @@ services:
     volumes:
       - r2m-minio-data:/data
 
+  # Phase 7 Sprint 7.4 — malware scanning for uploads (resource ingestion +
+  # org/author-verification documents). `clamd` (the daemon `packages/file-safety` talks
+  # to over TCP, INSTREAM protocol) needs virus definitions downloaded on first start
+  # (freshclam) — the container's healthcheck waits for that, so it can take a few minutes
+  # to become "healthy" the very first time.
+  clamav:
+    image: clamav/clamav:1.4
+    ports:
+      - "3310:3310"
+    healthcheck:
+      test: ["CMD", "clamdcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 5m
+
+  # Phase 7 Sprint 7.3 — distributed tracing. All-in-one image (collector + storage +
+  # query UI in one process) is intentional for local dev; a real deployment would run the
+  # collector separately with a real backend (Elasticsearch/Cassandra), not in-memory.
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686" # UI
+      - "4317:4317" # OTLP gRPC
+      - "4318:4318" # OTLP HTTP
+
+  # Phase 7 Sprint 7.3 — scrapes apps/api's /v1/metrics and apps/worker's /metrics.
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # Phase 7 Sprint 7.3 — dashboards provisioned declaratively (infra/docker/grafana/), no
+  # manual click-through setup needed after `docker compose up`.
+  grafana:
+    image: grafana/grafana:11.4.0
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_SECURITY_ADMIN_PASSWORD: r2m-secret
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/etc/grafana/dashboards:ro
+    ports:
+      - "3300:3000"
+    depends_on:
+      - prometheus
+
 volumes:
   r2m-postgres-data:
   r2m-minio-data:

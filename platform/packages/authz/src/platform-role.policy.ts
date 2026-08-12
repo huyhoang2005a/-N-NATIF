@@ -20,3 +20,12 @@ export function assertPlatformReviewerOrAdmin(actor: ActorContext): void {
     );
   }
 }
+
+/** Phase 7 Sprint 7.4 — stricter than `assertPlatformReviewerOrAdmin`: used for the
+ * verification-document retention endpoint, which is a PII/legal-retention decision
+ * (spec: retention policy needs organizational sign-off), not a routine review action. */
+export function assertPlatformAdmin(actor: ActorContext): void {
+  if (!isPlatformAdmin(actor)) {
+    throw new ForbiddenError(ErrorCode.AUTH_FORBIDDEN, "Only a platform admin may perform this action.");
+  }
+}

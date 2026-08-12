@@ -18,9 +18,11 @@ import {
   RequestResourceUploadSchema,
 } from "@r2m/contracts";
 import type { ActorContext } from "@r2m/authz";
-import { Body, Controller, Delete, Get, Param, Post, Query, Req, UsePipes } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Post, Query, Req, UseGuards, UsePipes } from "@nestjs/common";
 import type { Request } from "express";
 import { CurrentActor } from "../../common/decorators/current-actor.decorator";
+import { RateLimit } from "../../common/decorators/rate-limit.decorator";
+import { RateLimitGuard } from "../../common/guards/rate-limit.guard";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
 import { AnnotationsService } from "./annotations.service";
 import { ResourceAccessGrantsService } from "./resource-access-grants.service";
@@ -38,6 +40,8 @@ export class ResourcesController {
     private readonly accessGrantsService: ResourceAccessGrantsService,
   ) {}
 
+  @UseGuards(RateLimitGuard)
+  @RateLimit({ keyPrefix: "resource-upload", points: 20, durationSeconds: 60 })
   @Post("uploads")
   @UsePipes(new ZodValidationPipe(RequestResourceUploadSchema))
   requestUpload(

@@ -20,7 +20,9 @@ import type { ActorContext } from "@r2m/authz";
 import { Body, Controller, Get, Param, Post, Req, UsePipes } from "@nestjs/common";
 import type { Request } from "express";
 import { CurrentActor } from "../../common/decorators/current-actor.decorator";
+import { withIdempotencyKey } from "../../common/idempotency/with-idempotency-key.util";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
+import { IdempotencyService } from "../platform-operations/jobs/idempotency.service";
 import { EvidenceService } from "./evidence.service";
 import { TechnologyCaseService } from "./technology-case.service";
 
@@ -33,6 +35,7 @@ export class TechnologyCasesController {
   constructor(
     private readonly technologyCaseService: TechnologyCaseService,
     private readonly evidenceService: EvidenceService,
+    private readonly idempotencyService: IdempotencyService,
   ) {}
 
   @Post()
@@ -42,7 +45,9 @@ export class TechnologyCasesController {
     @Body() body: RegisterTechnologyCaseRequest,
     @Req() req: Request,
   ): Promise<TechnologyCaseResponse> {
-    return this.technologyCaseService.register(actor, body, requestId(req));
+    return withIdempotencyKey(this.idempotencyService, actor.userId, req, body, 201, () =>
+      this.technologyCaseService.register(actor, body, requestId(req)),
+    );
   }
 
   @Get()

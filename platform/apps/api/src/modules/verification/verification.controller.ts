@@ -2,11 +2,14 @@ import type {
   OrganizationVerificationDecisionRequest,
   OrganizationVerificationDocumentResponse,
   OrganizationVerificationRequestResponse,
+  SetVerificationDocumentRetentionRequest,
   SubmitOrganizationVerificationDocumentRequest,
+  VerificationDocumentRetentionResponse,
 } from "@r2m/contracts";
 import {
   MAX_DOCUMENT_SIZE_BYTES,
   OrganizationVerificationDecisionRequestSchema,
+  SetVerificationDocumentRetentionRequestSchema,
   SubmitOrganizationVerificationDocumentSchema,
 } from "@r2m/contracts";
 import type { ActorContext } from "@r2m/authz";
@@ -66,6 +69,25 @@ export class PlatformOrganizationVerificationController {
     @Req() req: Request,
   ): Promise<OrganizationVerificationRequestResponse> {
     return this.verificationService.decide(actor, id, body, requestId(req));
+  }
+}
+
+/** Phase 7 Sprint 7.4 — `verification_document` is shared between org and author
+ * verification, so this lives at its own top-level path rather than nested under either. */
+@Controller("platform/verification-documents")
+export class PlatformVerificationDocumentController {
+  constructor(private readonly verificationService: VerificationService) {}
+
+  @Post(":id/retention")
+  @UsePipes(new ZodValidationPipe(SetVerificationDocumentRetentionRequestSchema))
+  async setRetention(
+    @CurrentActor() actor: ActorContext,
+    @Param("id") id: string,
+    @Body() body: SetVerificationDocumentRetentionRequest,
+    @Req() req: Request,
+  ): Promise<VerificationDocumentRetentionResponse> {
+    const result = await this.verificationService.setDocumentRetention(actor, id, new Date(body.retentionUntil), requestId(req));
+    return { id: result.id, retentionUntil: result.retentionUntil.toISOString() };
   }
 }
 

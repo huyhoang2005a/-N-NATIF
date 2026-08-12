@@ -88,6 +88,15 @@ export const outboxEvent = pgTable(
     attemptCount: integer("attempt_count").notNull().default(0),
     lastError: text("last_error"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    // Phase 7 Sprint 7.3 — additive, both nullable (same pattern as
+    // `resource_access_grant.source_transfer_manifest_id`). Optional correlation from the
+    // API request that produced this event through to the worker's async processing of it:
+    // `requestId` feeds structured logs, `traceparent` (W3C Trace Context) lets
+    // OpenTelemetry link the worker's span back to the originating HTTP request's trace in
+    // Jaeger. Populated only where `OutboxService.append()` is called with the optional
+    // `context` argument — existing call sites remain valid unchanged.
+    requestId: varchar("request_id", { length: 100 }),
+    traceparent: varchar("traceparent", { length: 100 }),
   },
   (table) => [
     index("idx_outbox_status_available").on(table.status, table.availableAt),

@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type {
   AuthorVerificationDecisionRequest,
   AuthorVerificationRequestResponse,
@@ -18,6 +18,7 @@ import {
 } from "@r2m/domain";
 import { Inject, Injectable } from "@nestjs/common";
 import { DATABASE } from "../../database/database.module";
+import { FileSafetyService } from "../../common/file-safety/file-safety.service";
 import { S3Service } from "../../common/storage/s3.service";
 import { slugify } from "../identity-organization/organizations/slug.util";
 import { AuditService } from "../platform-operations/audit/audit.service";
@@ -57,6 +58,7 @@ export class AuthorVerificationService {
     private readonly auditService: AuditService,
     private readonly outboxService: OutboxService,
     private readonly s3Service: S3Service,
+    private readonly fileSafetyService: FileSafetyService,
     @Inject(DATABASE) private readonly db: Database,
   ) {}
 
@@ -95,17 +97,37 @@ export class AuthorVerificationService {
       );
     }
 
-    let checksumSha256: string;
+    // Phase 7 Sprint 7.4 — client uploaded straight to a presigned URL, so this confirm
+    // call is the FIRST time the server ever sees the bytes; fetch once and reuse the
+    // buffer for both the checksum (previously a separate streamed hash) and the
+    // MIME sniff + malware scan. Reject-and-quarantine (delete from storage) on failure —
+    // unlike org-verification's pre-upload scan, the object already exists here.
+    let buffer: Buffer;
     try {
-      checksumSha256 = await this.s3Service.computeVerificationDocumentSha256(
-        input.documentStorageObjectKey,
-      );
+      buffer = await this.s3Service.getVerificationDocumentBuffer(input.documentStorageObjectKey);
     } catch {
       throw new ConflictError(
         ErrorCode.AUTHOR_VERIFICATION_DOCUMENT_INVALID,
         "The uploaded document could not be found — request a new upload URL and try again.",
       );
     }
+
+    if (!this.fileSafetyService.sniffMimeType(buffer)) {
+      await this.s3Service.deleteVerificationDocument(input.documentStorageObjectKey);
+      throw new ConflictError(
+        ErrorCode.VERIFICATION_DOCUMENT_REJECTED,
+        "Uploaded document does not match any accepted file type (PDF/JPEG/PNG).",
+      );
+    }
+    const scanResult = await this.fileSafetyService.scanForMalware(buffer);
+    if (!scanResult.clean) {
+      await this.s3Service.deleteVerificationDocument(input.documentStorageObjectKey);
+      throw new ConflictError(ErrorCode.VERIFICATION_DOCUMENT_REJECTED, "Uploaded document failed malware scan.", {
+        signature: scanResult.signature,
+      });
+    }
+
+    const checksumSha256 = createHash("sha256").update(buffer).digest("hex");
 
     const created = await this.db.transaction(async (tx) => {
       if (!existingProfile) {

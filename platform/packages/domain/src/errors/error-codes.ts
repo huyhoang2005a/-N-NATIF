@@ -35,9 +35,14 @@ export const ErrorCode = {
   VERIFICATION_REASON_REQUIRED: "VERIFICATION_REASON_REQUIRED",
   VERIFICATION_INVALID_TRANSITION: "VERIFICATION_INVALID_TRANSITION",
   VERIFICATION_MISSING_DOCUMENT: "VERIFICATION_MISSING_DOCUMENT",
+  // Phase 7 Sprint 7.4 — MIME sniff failed or malware detected before/after storing.
+  VERIFICATION_DOCUMENT_REJECTED: "VERIFICATION_DOCUMENT_REJECTED",
+  VERIFICATION_DOCUMENT_NOT_FOUND: "VERIFICATION_DOCUMENT_NOT_FOUND",
 
   // SYSTEM_* (Platform Operations: audit/outbox/idempotency — cross-cutting, no single UC-* group in §10)
   SYSTEM_IDEMPOTENCY_KEY_REUSED: "SYSTEM_IDEMPOTENCY_KEY_REUSED",
+  // Phase 7 Sprint 7.2 — infra-level (not a business rule), HTTP 429.
+  SYSTEM_RATE_LIMITED: "SYSTEM_RATE_LIMITED",
 
   // AUTHOR_* (UC-VER-01/02 applied to author verification — reuses VERIFICATION_* codes
   // above for the request lifecycle itself; these cover author-specific checks only)
@@ -54,6 +59,9 @@ export const ErrorCode = {
   RESOURCE_INVALID_TRANSITION: "RESOURCE_INVALID_TRANSITION",
   RESOURCE_ACCESS_DENIED: "RESOURCE_ACCESS_DENIED",
   RESOURCE_AUTHOR_NOT_VERIFIED: "RESOURCE_AUTHOR_NOT_VERIFIED",
+  // Phase 7 Sprint 7.4 — publish gate: the version's ingestion job (MIME sniff + malware
+  // scan) hasn't reached COMPLETED yet, or failed (MIME_MISMATCH/MALWARE_DETECTED).
+  RESOURCE_VERSION_NOT_SCANNED: "RESOURCE_VERSION_NOT_SCANNED",
 
   // ANNOTATION_* (UC-RES-02)
   ANNOTATION_NOT_FOUND: "ANNOTATION_NOT_FOUND",

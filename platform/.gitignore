@@ -7,3 +7,5 @@ coverage/
 .env
 .env.*.local
 .DS_Store
+# Phase 7 Sprint 7.4 — database dumps produced by infra/scripts/backup-db.sh
+backups/

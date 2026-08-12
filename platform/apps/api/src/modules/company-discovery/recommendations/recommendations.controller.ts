@@ -1,8 +1,10 @@
 import type { RecommendationItemResponse, RecommendationRunResponse } from "@r2m/contracts";
 import type { ActorContext } from "@r2m/authz";
-import { Controller, Get, Param, Post, Req } from "@nestjs/common";
+import { Controller, Get, Param, Post, Req, UseGuards } from "@nestjs/common";
 import type { Request } from "express";
 import { CurrentActor } from "../../../common/decorators/current-actor.decorator";
+import { RateLimit } from "../../../common/decorators/rate-limit.decorator";
+import { RateLimitGuard } from "../../../common/guards/rate-limit.guard";
 import { RecommendationsService } from "./recommendations.service";
 
 function requestId(req: Request): string | null {
@@ -13,6 +15,8 @@ function requestId(req: Request): string | null {
 export class ResearchNeedRecommendationRunsController {
   constructor(private readonly service: RecommendationsService) {}
 
+  @UseGuards(RateLimitGuard)
+  @RateLimit({ keyPrefix: "recommendation-run", points: 5, durationSeconds: 60 })
   @Post()
   create(@CurrentActor() actor: ActorContext, @Param("id") id: string, @Req() req: Request): Promise<RecommendationRunResponse> {
     return this.service.createFocusedRun(actor, id, requestId(req));

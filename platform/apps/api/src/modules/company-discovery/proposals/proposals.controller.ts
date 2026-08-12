@@ -1,10 +1,14 @@
 import type { CreateResearchProposalRequest, RejectResearchProposalRequest, ResearchProposalResponse } from "@r2m/contracts";
 import { CreateResearchProposalRequestSchema, RejectResearchProposalRequestSchema } from "@r2m/contracts";
 import type { ActorContext } from "@r2m/authz";
-import { Body, Controller, Get, Param, Post, Req, UsePipes } from "@nestjs/common";
+import { Body, Controller, Get, Param, Post, Req, UseGuards, UsePipes } from "@nestjs/common";
 import type { Request } from "express";
 import { CurrentActor } from "../../../common/decorators/current-actor.decorator";
+import { RateLimit } from "../../../common/decorators/rate-limit.decorator";
+import { RateLimitGuard } from "../../../common/guards/rate-limit.guard";
+import { withIdempotencyKey } from "../../../common/idempotency/with-idempotency-key.util";
 import { ZodValidationPipe } from "../../../common/pipes/zod-validation.pipe";
+import { IdempotencyService } from "../../platform-operations/jobs/idempotency.service";
 import { ProposalsService } from "./proposals.service";
 
 function requestId(req: Request): string | null {
@@ -13,13 +17,18 @@ function requestId(req: Request): string | null {
 
 @Controller("research-needs/:id/proposals")
 export class ResearchNeedProposalsController {
-  constructor(private readonly service: ProposalsService) {}
+  constructor(
+    private readonly service: ProposalsService,
+    private readonly idempotencyService: IdempotencyService,
+  ) {}
 
   @Get()
   listForNeed(@CurrentActor() actor: ActorContext, @Param("id") id: string): Promise<ResearchProposalResponse[]> {
     return this.service.listForNeed(actor, id);
   }
 
+  @UseGuards(RateLimitGuard)
+  @RateLimit({ keyPrefix: "proposal-submit", points: 10, durationSeconds: 60 })
   @Post()
   @UsePipes(new ZodValidationPipe(CreateResearchProposalRequestSchema))
   create(
@@ -28,7 +37,9 @@ export class ResearchNeedProposalsController {
     @Body() body: CreateResearchProposalRequest,
     @Req() req: Request,
   ): Promise<ResearchProposalResponse> {
-    return this.service.create(actor, id, body, requestId(req));
+    return withIdempotencyKey(this.idempotencyService, actor.userId, req, body, 201, () =>
+      this.service.create(actor, id, body, requestId(req)),
+    );
   }
 }
 

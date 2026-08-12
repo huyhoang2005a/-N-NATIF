@@ -18,7 +18,9 @@ import type { ActorContext } from "@r2m/authz";
 import { Body, Controller, Get, Param, Post, Req, UsePipes } from "@nestjs/common";
 import type { Request } from "express";
 import { CurrentActor } from "../../../common/decorators/current-actor.decorator";
+import { withIdempotencyKey } from "../../../common/idempotency/with-idempotency-key.util";
 import { ZodValidationPipe } from "../../../common/pipes/zod-validation.pipe";
+import { IdempotencyService } from "../../platform-operations/jobs/idempotency.service";
 import { TransferManifestService } from "./transfer.service";
 
 function requestId(req: Request): string | null {
@@ -50,7 +52,10 @@ export class TransferManifestCaseController {
 
 @Controller("transfer-manifests")
 export class TransferManifestsController {
-  constructor(private readonly service: TransferManifestService) {}
+  constructor(
+    private readonly service: TransferManifestService,
+    private readonly idempotencyService: IdempotencyService,
+  ) {}
 
   @Get(":id")
   getById(@CurrentActor() actor: ActorContext, @Param("id") id: string): Promise<TransferManifestDetailResponse> {
@@ -85,7 +90,9 @@ export class TransferManifestsController {
     @Body() body: ShareTransferManifestRequest,
     @Req() req: Request,
   ): Promise<TransferManifestResponse> {
-    return this.service.share(actor, id, body, requestId(req));
+    return withIdempotencyKey(this.idempotencyService, actor.userId, req, body, 200, () =>
+      this.service.share(actor, id, body, requestId(req)),
+    );
   }
 
   @Post(":id/revoke")

@@ -3,8 +3,20 @@ import { z } from "zod";
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "staging", "production"]).default("development"),
   API_PORT: z.coerce.number().int().positive().default(3000),
+  // Phase 7 Sprint 7.3 — apps/worker has no HTTP server otherwise; this exists solely to
+  // serve GET /metrics for Prometheus to scrape.
+  WORKER_METRICS_PORT: z.coerce.number().int().positive().default(9200),
+  // Phase 7 Sprint 7.3 — OTLP collector endpoint (Jaeger's OTLP HTTP receiver locally).
+  // Optional: when unset, OpenTelemetry instrumentation is not initialized at all (no
+  // tracing overhead in environments that don't run the observability stack).
+  OTEL_EXPORTER_OTLP_ENDPOINT: z.string().min(1).optional(),
 
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
+  // Phase 7 Sprint 7.1 — apps/api and apps/worker's runtime connection, using the
+  // non-superuser `r2m_app` role (see manual-migrations/0012_phase7_app_role_grants.sql).
+  // Optional, falls back to DATABASE_URL so an unset value doesn't break existing local
+  // setups; `migrate`/`seed` always use DATABASE_URL (the `r2m` owner role) directly.
+  APP_DATABASE_URL: z.string().min(1).optional(),
 
   REDIS_URL: z.string().min(1, "REDIS_URL is required"),
 
@@ -15,6 +27,11 @@ const envSchema = z.object({
   S3_VERIFICATION_BUCKET: z.string().min(1),
   S3_RESOURCE_BUCKET: z.string().min(1),
   S3_SIGNED_URL_TTL_SECONDS: z.coerce.number().int().positive().default(300),
+
+  // Phase 7 Sprint 7.4 — malware scan (packages/file-safety talks to clamd's INSTREAM
+  // protocol directly over this host:port).
+  CLAMAV_HOST: z.string().min(1).default("localhost"),
+  CLAMAV_PORT: z.coerce.number().int().positive().default(3310),
 
   JWT_ACCESS_SECRET: z.string().min(16, "JWT_ACCESS_SECRET must be at least 16 chars"),
   JWT_ACCESS_TTL_SECONDS: z.coerce.number().int().positive().default(900),

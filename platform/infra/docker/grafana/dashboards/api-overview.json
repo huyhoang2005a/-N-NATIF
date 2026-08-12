@@ -1,0 +1,78 @@
+{
+  "title": "R2M API — Overview",
+  "uid": "r2m-api-overview",
+  "timezone": "browser",
+  "refresh": "10s",
+  "time": { "from": "now-30m", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Request rate by route",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        { "expr": "sum by (route) (rate(http_requests_total[1m]))", "legendFormat": "{{route}}" }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Error rate (4xx/5xx) by route",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum by (route) (rate(http_requests_total{status=~\"4..|5..\"}[1m]))",
+          "legendFormat": "{{route}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Latency p95 / p99 (NFR-02: p95<=400ms, p99<=1s)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket[5m])))",
+          "legendFormat": "p95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket[5m])))",
+          "legendFormat": "p99"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] }
+    },
+    {
+      "id": 4,
+      "title": "Rate limit rejections by route group",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        { "expr": "sum by (keyPrefix) (rate(rate_limit_rejected_total[1m]))", "legendFormat": "{{keyPrefix}}" }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Node process — heap used",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        { "expr": "nodejs_heap_size_used_bytes{job=\"r2m-api\"}", "legendFormat": "api" },
+        { "expr": "nodejs_heap_size_used_bytes{job=\"r2m-worker\"}", "legendFormat": "worker" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] }
+    },
+    {
+      "id": 6,
+      "title": "DB pool — total / idle / waiting",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "targets": [
+        { "expr": "db_pool_total_connections{job=\"r2m-api\"}", "legendFormat": "total" },
+        { "expr": "db_pool_idle_connections{job=\"r2m-api\"}", "legendFormat": "idle" },
+        { "expr": "db_pool_waiting_requests{job=\"r2m-api\"}", "legendFormat": "waiting" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "title": "R2M Worker — Outbox Queue",
+  "uid": "r2m-worker-outbox",
+  "timezone": "browser",
+  "refresh": "10s",
+  "time": { "from": "now-30m", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Outbox dispatch rate by outcome",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        { "expr": "sum by (outcome) (rate(outbox_dispatch_total[1m]))", "legendFormat": "{{outcome}}" }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Dead-letter count (cumulative)",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 0 },
+      "targets": [{ "expr": "sum(outbox_dispatch_total{outcome=\"dead_letter\"})" }],
+      "fieldConfig": { "defaults": { "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] } }, "overrides": [] }
+    },
+    {
+      "id": 3,
+      "title": "Outbox lag (NFR-05: p95<=30s)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 0 },
+      "targets": [{ "expr": "outbox_dispatch_lag_seconds", "legendFormat": "lag" }],
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] }
+    },
+    {
+      "id": 4,
+      "title": "DB pool (worker) — total / idle / waiting",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        { "expr": "db_pool_total_connections{job=\"r2m-worker\"}", "legendFormat": "total" },
+        { "expr": "db_pool_idle_connections{job=\"r2m-worker\"}", "legendFormat": "idle" },
+        { "expr": "db_pool_waiting_requests{job=\"r2m-worker\"}", "legendFormat": "waiting" }
+      ]
+    }
+  ]
+}

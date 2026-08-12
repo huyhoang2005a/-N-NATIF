@@ -1,11 +1,15 @@
+import "./tracing";
 import type { EmailSender } from "@r2m/domain";
 import { loadEnv } from "@r2m/env";
-import { closeDb, getDb } from "@r2m/database";
+import { closeDb, getAppDb, getAppPool } from "@r2m/database";
 import { sweepExpiredCaseInitiationRequests } from "./case-initiations/sweep-expired";
 import { ConsoleEmailSender } from "./email/console-email-sender";
 import { ResendEmailSender } from "./email/resend-email-sender";
-import { dispatchPendingEvents } from "./outbox-dispatcher";
+import { logger } from "./logger";
+import { outboxDispatchLagSeconds, outboxDispatchTotal, registerDbPoolMetrics, startMetricsServer } from "./metrics";
+import { computeOutboxLagSeconds, dispatchPendingEvents } from "./outbox-dispatcher";
 import { sweepExpiredTransferManifests } from "./transfer-manifests/sweep-expired";
+import { sweepExpiredVerificationDocuments } from "./verification-documents/sweep-expired";
 
 const POLL_INTERVAL_MS = 2000;
 // `case_initiation_request.expires_at` is a 14-day window — no need to check every
@@ -16,7 +20,7 @@ function buildEmailSender(env: ReturnType<typeof loadEnv>): EmailSender {
   if (env.RESEND_API_KEY && env.EMAIL_FROM_ADDRESS && env.EMAIL_FROM_NAME) {
     return new ResendEmailSender();
   }
-  console.log("[worker] RESEND_API_KEY not set — falling back to ConsoleEmailSender");
+  logger.warn("RESEND_API_KEY not set — falling back to ConsoleEmailSender");
   return new ConsoleEmailSender();
 }
 
@@ -28,7 +32,8 @@ function buildEmailSender(env: ReturnType<typeof loadEnv>): EmailSender {
  */
 async function main(): Promise<void> {
   const env = loadEnv();
-  const db = getDb();
+  // Phase 7 Sprint 7.1 — runs as `r2m_app` (non-superuser), via getAppDb().
+  const db = getAppDb();
   const emailSender = buildEmailSender(env);
   let stopping = false;
 
@@ -40,16 +45,26 @@ async function main(): Promise<void> {
   process.on("SIGINT", shutdown);
   process.on("SIGTERM", shutdown);
 
-  console.log("[worker] outbox dispatcher started");
+  registerDbPoolMetrics(getAppPool());
+  startMetricsServer(env.WORKER_METRICS_PORT);
+
+  logger.info("outbox dispatcher started");
   let msSinceLastSweep = EXPIRY_SWEEP_INTERVAL_MS; // sweep once on startup, then every interval
   while (!stopping) {
     try {
       const result = await dispatchPendingEvents(db, emailSender);
-      if (result.processed > 0 || result.failed > 0) {
-        console.log(`[worker] processed=${result.processed} failed=${result.failed}`);
+      if (result.processed > 0) outboxDispatchTotal.inc({ outcome: "published" }, result.processed);
+      if (result.failed > 0) outboxDispatchTotal.inc({ outcome: "failed" }, result.failed);
+      if (result.deadLetter > 0) outboxDispatchTotal.inc({ outcome: "dead_letter" }, result.deadLetter);
+      outboxDispatchLagSeconds.set(await computeOutboxLagSeconds(db));
+      if (result.processed > 0 || result.failed > 0 || result.deadLetter > 0) {
+        logger.info(
+          { processed: result.processed, failed: result.failed, deadLetter: result.deadLetter },
+          "dispatch cycle complete",
+        );
       }
     } catch (error) {
-      console.error("[worker] dispatch loop error", error);
+      logger.error({ err: error }, "dispatch loop error");
     }
 
     if (msSinceLastSweep >= EXPIRY_SWEEP_INTERVAL_MS) {
@@ -57,18 +72,26 @@ async function main(): Promise<void> {
       try {
         const expiredCount = await sweepExpiredCaseInitiationRequests(db);
         if (expiredCount > 0) {
-          console.log(`[worker] expired ${expiredCount} case initiation request(s)`);
+          logger.info({ expiredCount }, "expired case initiation request(s)");
         }
       } catch (error) {
-        console.error("[worker] expiry sweep error", error);
+        logger.error({ err: error }, "expiry sweep error");
       }
       try {
         const expiredCount = await sweepExpiredTransferManifests(db);
         if (expiredCount > 0) {
-          console.log(`[worker] expired ${expiredCount} transfer manifest(s)/grant(s)`);
+          logger.info({ expiredCount }, "expired transfer manifest(s)/grant(s)");
         }
       } catch (error) {
-        console.error("[worker] transfer manifest expiry sweep error", error);
+        logger.error({ err: error }, "transfer manifest expiry sweep error");
+      }
+      try {
+        const expiredCount = await sweepExpiredVerificationDocuments(db);
+        if (expiredCount > 0) {
+          logger.info({ expiredCount }, "expired verification document(s) — retention swept");
+        }
+      } catch (error) {
+        logger.error({ err: error }, "verification document retention sweep error");
       }
     }
 
@@ -78,6 +101,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((error) => {
-  console.error("[worker] fatal", error);
+  logger.fatal({ err: error }, "worker fatal error");
   process.exit(1);
 });

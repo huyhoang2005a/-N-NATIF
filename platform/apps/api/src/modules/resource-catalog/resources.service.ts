@@ -14,6 +14,7 @@ import { ConflictError, ErrorCode, ForbiddenError, NotFoundError, ResourceStatus
 import { Inject, Injectable } from "@nestjs/common";
 import { DATABASE } from "../../database/database.module";
 import { S3Service } from "../../common/storage/s3.service";
+import { getCurrentTraceparent } from "../../common/tracing/get-traceparent.util";
 import { SavesService } from "../community/saves/saves.service";
 import type { VoteInfo } from "../community/votes/votes.service";
 import { VotesService } from "../community/votes/votes.service";
@@ -216,6 +217,7 @@ export class ResourcesService {
         createdResource.id,
         { type: "ResourceIngestionQueued", resourceVersionId: version.id, ingestionJobId: ingestionJob.id },
         tx,
+        { requestId: requestIdHeader, traceparent: getCurrentTraceparent() },
       );
 
       return createdResource;
@@ -362,6 +364,20 @@ export class ResourcesService {
       version.status as ResourceVersionStatus,
       ResourceVersionStatus.PUBLISHED,
     );
+
+    // Phase 7 Sprint 7.4 — publish gate (spec: malware scan must finish before content
+    // goes live). A version with no storageObjectKey (pure sourceUrl link) still gets an
+    // ingestion job row (created unconditionally at register time) that the worker marks
+    // COMPLETED immediately since there's nothing to scan — so this check applies uniformly
+    // to both upload kinds, no special-casing needed here.
+    const ingestionJob = await this.resourcesRepository.findLatestIngestionJobByVersion(versionId);
+    if (!ingestionJob || ingestionJob.status !== "COMPLETED") {
+      throw new ConflictError(
+        ErrorCode.RESOURCE_VERSION_NOT_SCANNED,
+        "This version cannot be published until its content scan completes successfully.",
+        { ingestionStatus: ingestionJob?.status ?? "UNKNOWN", errorCode: ingestionJob?.errorCode ?? null },
+      );
+    }
 
     const currentlyPublished = await this.resourcesRepository.findPublishedVersionByResource(resource.id);
     if (currentlyPublished) {

@@ -6,6 +6,7 @@ import { StorageModule } from "../../common/storage/storage.module";
 import {
   OrganizationVerificationRequestController,
   PlatformOrganizationVerificationController,
+  PlatformVerificationDocumentController,
 } from "./verification.controller";
 import { VerificationRepository } from "./verification.repository";
 import { VerificationService } from "./verification.service";
@@ -21,6 +22,7 @@ import { AuthorVerificationService } from "./author-verification.service";
     OrganizationVerificationRequestController,
     AuthorVerificationController,
     PlatformAuthorVerificationController,
+    PlatformVerificationDocumentController,
   ],
   providers: [
     VerificationService,

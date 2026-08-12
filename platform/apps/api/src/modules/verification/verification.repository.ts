@@ -127,4 +127,20 @@ export class VerificationRepository {
       );
     return rows[0]?.value ?? 0;
   }
+
+  // Phase 7 Sprint 7.4 — `verification_document` is shared between org and author
+  // verification (exactly one of the 2 request FKs set), so these 2 methods aren't
+  // scoped to either — used by the platform-admin retention endpoint.
+  async findDocumentById(id: string) {
+    return this.db.query.verificationDocument.findFirst({ where: eq(schema.verificationDocument.id, id) });
+  }
+
+  async updateDocumentRetention(id: string, retentionUntil: Date) {
+    const rows = await this.db
+      .update(schema.verificationDocument)
+      .set({ retentionUntil })
+      .where(eq(schema.verificationDocument.id, id))
+      .returning();
+    return rows[0];
+  }
 }

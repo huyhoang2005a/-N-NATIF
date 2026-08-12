@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@opentelemetry/api": "1.9.1",
     "@r2m/database": "workspace:*",
     "drizzle-orm": "^0.38.3"
   },

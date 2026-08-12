@@ -146,6 +146,17 @@ export class ResourcesRepository {
     return firstOrThrow(rows, "createIngestionJob: insert returned no row");
   }
 
+  /** Phase 7 Sprint 7.4 — gates `publishVersion`: a version with a pending/failed scan
+   * must not go live. Most-recent-first since a version can only ever have one ingestion
+   * job in practice (created once, at register time) but `orderBy` keeps this correct even
+   * if that ever changes. */
+  async findLatestIngestionJobByVersion(resourceVersionId: string) {
+    return this.db.query.resourceIngestionJob.findFirst({
+      where: eq(schema.resourceIngestionJob.resourceVersionId, resourceVersionId),
+      orderBy: [desc(schema.resourceIngestionJob.createdAt)],
+    });
+  }
+
   async hasActiveGrantForActor(resourceId: string, actorUserId: string, actorOrgIds: string[]) {
     const grant = await this.db.query.resourceAccessGrant.findFirst({
       where: and(

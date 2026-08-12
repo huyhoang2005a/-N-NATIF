@@ -52,6 +52,48 @@ describe("dispatchPendingEvents", () => {
     expect(updateCalls).toContainEqual(expect.objectContaining({ status: "FAILED", attemptCount: 1 }));
   });
 
+  it("Phase 7 Sprint 7.2 — sets availableAt into the future with exponential backoff on FAILED (not retried on the very next poll)", async () => {
+    const { db, updateCalls } = buildFakeDb([
+      {
+        id: "evt-1",
+        eventType: "SomeUnknownEvent",
+        payload: { type: "SomeUnknownEvent" },
+        attemptCount: 2,
+      },
+    ]);
+
+    const before = Date.now();
+    await dispatchPendingEvents(db as never, fakeEmailSender, { maxAttempts: 5 });
+
+    const failedUpdate = updateCalls.find(
+      (call): call is { status: string; attemptCount: number; availableAt: Date } =>
+        typeof call === "object" && call !== null && (call as { status?: unknown }).status === "FAILED",
+    );
+    expect(failedUpdate).toBeDefined();
+    expect(failedUpdate!.availableAt).toBeInstanceOf(Date);
+    // attemptCount becomes 3 (2+1); backoff = 5000 * 2^(3-1) = 20000ms.
+    expect(failedUpdate!.availableAt.getTime()).toBeGreaterThanOrEqual(before + 20000);
+  });
+
+  it("does not set availableAt when an event moves to DEAD_LETTER (no more retries to schedule)", async () => {
+    const { db, updateCalls } = buildFakeDb([
+      {
+        id: "evt-1",
+        eventType: "SomeUnknownEvent",
+        payload: { type: "SomeUnknownEvent" },
+        attemptCount: 4,
+      },
+    ]);
+
+    await dispatchPendingEvents(db as never, fakeEmailSender, { maxAttempts: 5 });
+
+    const deadLetterUpdate = updateCalls.find(
+      (call) => typeof call === "object" && call !== null && (call as { status?: unknown }).status === "DEAD_LETTER",
+    );
+    expect(deadLetterUpdate).toBeDefined();
+    expect(deadLetterUpdate).not.toHaveProperty("availableAt");
+  });
+
   it("moves an event to DEAD_LETTER once attempt_count reaches maxAttempts", async () => {
     const { db, updateCalls } = buildFakeDb([
       {

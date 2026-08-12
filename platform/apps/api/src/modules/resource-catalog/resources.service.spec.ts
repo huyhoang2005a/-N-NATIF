@@ -43,6 +43,7 @@ function buildService() {
     updateVersionStatus: vi.fn(),
     createPaperMetadata: vi.fn(),
     createIngestionJob: vi.fn().mockResolvedValue({ id: "job-1" }),
+    findLatestIngestionJobByVersion: vi.fn().mockResolvedValue({ id: "job-1", status: "COMPLETED" }),
     hasActiveGrantForActor: vi.fn().mockResolvedValue(false),
   } as unknown as ResourcesRepository;
 
@@ -188,6 +189,32 @@ describe("ResourcesService.publishVersion (UC-RES-01 step 5)", () => {
       expect.objectContaining({ type: "ResourceVersionPublished" }),
       {},
     );
+  });
+
+  it("Phase 7 Sprint 7.4 — rejects publish when the ingestion job hasn't completed (scan still pending/failed)", async () => {
+    const { service, resourcesRepository } = buildService();
+    vi.mocked(resourcesRepository.findVersionById).mockResolvedValue({
+      id: "ver-1",
+      resourceId: "res-1",
+      versionNo: 1,
+      status: "DRAFT",
+    } as never);
+    vi.mocked(resourcesRepository.findById).mockResolvedValue({
+      id: "res-1",
+      ownerOrganizationId: "org-1",
+      status: "DRAFT",
+      version: 1,
+    } as never);
+    vi.mocked(resourcesRepository.findLatestIngestionJobByVersion).mockResolvedValue({
+      id: "job-1",
+      status: "FAILED",
+      errorCode: "MALWARE_DETECTED",
+    } as never);
+
+    await expect(service.publishVersion(orgOwner, "ver-1", null)).rejects.toMatchObject({
+      code: "RESOURCE_VERSION_NOT_SCANNED",
+    });
+    expect(resourcesRepository.updateVersionStatus).not.toHaveBeenCalled();
   });
 
   it("supersedes the previously published version when publishing a newer one", async () => {

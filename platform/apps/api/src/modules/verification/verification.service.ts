@@ -5,7 +5,7 @@ import type {
   OrganizationVerificationRequestResponse,
 } from "@r2m/contracts";
 import type { ActorContext } from "@r2m/authz";
-import { assertPlatformReviewerOrAdmin } from "@r2m/authz";
+import { assertPlatformAdmin, assertPlatformReviewerOrAdmin } from "@r2m/authz";
 import type { Database } from "@r2m/database";
 import {
   assertOrganizationTransition,
@@ -17,6 +17,7 @@ import {
 import { Inject, Injectable } from "@nestjs/common";
 import { OrganizationsRepository } from "../identity-organization/organizations/organizations.repository";
 import { DATABASE } from "../../database/database.module";
+import { FileSafetyService } from "../../common/file-safety/file-safety.service";
 import { S3Service } from "../../common/storage/s3.service";
 import { AuditService } from "../platform-operations/audit/audit.service";
 import { OutboxService } from "../platform-operations/jobs/outbox.service";
@@ -61,6 +62,7 @@ export class VerificationService {
     private readonly auditService: AuditService,
     private readonly outboxService: OutboxService,
     private readonly s3Service: S3Service,
+    private readonly fileSafetyService: FileSafetyService,
     @Inject(DATABASE) private readonly db: Database,
   ) {}
 
@@ -245,6 +247,11 @@ export class VerificationService {
     }
   }
 
+  /** Phase 7 Sprint 7.4 — scanned BEFORE upload (unlike the resource ingestion flow, which
+   * scans asynchronously after the file already landed in storage): this path already has
+   * the whole buffer in memory server-side, so rejecting here means a malicious/invalid
+   * document is never written to the verification bucket at all — no quarantine-delete
+   * step needed, cleanest of the 3 upload flows in this app to secure. */
   private async storeDocument(
     organizationId: string,
     document: OrganizationVerificationDocumentUpload,
@@ -252,6 +259,19 @@ export class VerificationService {
     storageObjectKey: string;
     checksumSha256: string;
   }> {
+    if (!this.fileSafetyService.sniffMimeType(document.buffer)) {
+      throw new ConflictError(
+        ErrorCode.VERIFICATION_DOCUMENT_REJECTED,
+        "Uploaded document does not match any accepted file type (PDF/JPEG/PNG).",
+      );
+    }
+    const scanResult = await this.fileSafetyService.scanForMalware(document.buffer);
+    if (!scanResult.clean) {
+      throw new ConflictError(ErrorCode.VERIFICATION_DOCUMENT_REJECTED, "Uploaded document failed malware scan.", {
+        signature: scanResult.signature,
+      });
+    }
+
     const safeFilename = document.originalFilename.replace(/[^a-zA-Z0-9._-]/g, "_");
     const storageObjectKey = `organization-verification/${organizationId}/${randomUUID()}_${safeFilename}`;
     await this.s3Service.uploadVerificationDocument(storageObjectKey, document.buffer, document.mimeType);
@@ -378,5 +398,34 @@ export class VerificationService {
     });
 
     return toResponse(openRequest);
+  }
+
+  /** Phase 7 Sprint 7.4 — platform-admin-only, always an explicit human decision (no
+   * default duration invented — see `docs/spec` disclosure: retention period needs
+   * legal/org sign-off, not something this app computes on its own). */
+  async setDocumentRetention(
+    actor: ActorContext,
+    documentId: string,
+    retentionUntil: Date,
+    requestIdHeader: string | null,
+  ): Promise<{ id: string; retentionUntil: Date }> {
+    assertPlatformAdmin(actor);
+    const document = await this.verificationRepository.findDocumentById(documentId);
+    if (!document) {
+      throw new NotFoundError(ErrorCode.VERIFICATION_DOCUMENT_NOT_FOUND, "Verification document not found.");
+    }
+    const updated = await this.verificationRepository.updateDocumentRetention(documentId, retentionUntil);
+    if (!updated) {
+      throw new NotFoundError(ErrorCode.VERIFICATION_DOCUMENT_NOT_FOUND, "Verification document not found.");
+    }
+    await this.auditService.write({
+      actorUserId: actor.userId,
+      requestId: requestIdHeader,
+      action: "verification_document.set_retention",
+      entityType: "verification_document",
+      entityId: documentId,
+      afterData: { retentionUntil: retentionUntil.toISOString() },
+    });
+    return { id: updated.id, retentionUntil: updated.retentionUntil! };
   }
 }

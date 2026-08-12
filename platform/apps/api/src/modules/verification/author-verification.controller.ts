@@ -9,9 +9,11 @@ import {
   SubmitAuthorVerificationRequestSchema,
 } from "@r2m/contracts";
 import type { ActorContext } from "@r2m/authz";
-import { Body, Controller, Post, Req, UsePipes } from "@nestjs/common";
+import { Body, Controller, Post, Req, UseGuards, UsePipes } from "@nestjs/common";
 import type { Request } from "express";
 import { CurrentActor } from "../../common/decorators/current-actor.decorator";
+import { RateLimit } from "../../common/decorators/rate-limit.decorator";
+import { RateLimitGuard } from "../../common/guards/rate-limit.guard";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
 import { AuthorVerificationService } from "./author-verification.service";
 
@@ -23,6 +25,8 @@ function requestId(req: Request): string | null {
 export class AuthorVerificationController {
   constructor(private readonly authorVerificationService: AuthorVerificationService) {}
 
+  @UseGuards(RateLimitGuard)
+  @RateLimit({ keyPrefix: "verification-upload", points: 20, durationSeconds: 60 })
   @Post("uploads")
   @UsePipes(new ZodValidationPipe(RequestAuthorVerificationUploadSchema))
   requestUpload(

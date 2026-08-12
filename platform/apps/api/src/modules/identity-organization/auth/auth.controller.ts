@@ -2,11 +2,13 @@ import type { LoginRequest, MeResponse, PendingMembershipResponse, RefreshReques
 import { LoginRequestSchema, RefreshRequestSchema } from "@r2m/contracts";
 import type { Database } from "@r2m/database";
 import { schema } from "@r2m/database";
-import { Body, Controller, Get, HttpCode, Inject, Post, UsePipes } from "@nestjs/common";
+import { Body, Controller, Get, HttpCode, Inject, Post, UseGuards, UsePipes } from "@nestjs/common";
 import { eq } from "drizzle-orm";
 import { DATABASE } from "../../../database/database.module";
 import { CurrentActor } from "../../../common/decorators/current-actor.decorator";
 import { Public } from "../../../common/decorators/public.decorator";
+import { RateLimit } from "../../../common/decorators/rate-limit.decorator";
+import { RateLimitGuard } from "../../../common/guards/rate-limit.guard";
 import { ZodValidationPipe } from "../../../common/pipes/zod-validation.pipe";
 import type { ActorContext } from "@r2m/authz";
 import { OrganizationsService } from "../organizations/organizations.service";
@@ -21,6 +23,8 @@ export class AuthController {
   ) {}
 
   @Public()
+  @UseGuards(RateLimitGuard)
+  @RateLimit({ keyPrefix: "login", points: 10, durationSeconds: 60 })
   @Post("auth/login")
   @UsePipes(new ZodValidationPipe(LoginRequestSchema))
   login(@Body() body: LoginRequest): Promise<TokenResponse> {
