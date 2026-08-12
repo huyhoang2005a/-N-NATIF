@@ -35,6 +35,7 @@ import {
 } from "../../../lib/labels";
 import { navForPersona, personaOf } from "../../../lib/nav";
 import { getAccessToken } from "../../../lib/session";
+import { fetchUserNames } from "../../../lib/user-lookup";
 import {
   toneOf,
   ASSESSMENT_STATUS_TONE,
@@ -43,7 +44,7 @@ import {
   TECHNOLOGY_CASE_STATUS_TONE,
   TRANSFER_MANIFEST_STATUS_TONE,
 } from "../../../lib/tone";
-import { BackLink, Card, GhostButton, PrimaryButton, SelectField, Shell, StatusDot, StatusPill, Tabs, TextField } from "../../../components/ui";
+import { BackLink, Card, GhostButton, PageLoader, PrimaryButton, SelectField, Shell, StatusDot, StatusPill, Tabs, TextField } from "../../../components/ui";
 
 const TABS = ["Tổng quan", "Bằng chứng", "Đánh giá", "Gap", "Lộ trình", "Chuyển giao"] as const;
 const ACCESS_PERMISSIONS = Object.keys(ACCESS_PERMISSION_LABELS);
@@ -61,6 +62,7 @@ export default function TechnologyCaseDetailPage() {
   const [technologyCase, setTechnologyCase] = useState<TechnologyCaseResponse | null>(null);
   const [owningOrg, setOwningOrg] = useState<OrganizationResponse | null>(null);
   const [members, setMembers] = useState<CaseMemberResponse[] | null>(null);
+  const [userNames, setUserNames] = useState<Record<string, string>>({});
   const [caseOrganizations, setCaseOrganizations] = useState<CaseOrganizationResponse[] | null>(null);
   const [evidence, setEvidence] = useState<EvidenceResponse[] | null>(null);
   const [assessments, setAssessments] = useState<ReadinessAssessmentResponse[] | null>(null);
@@ -126,6 +128,7 @@ export default function TechnologyCaseDetailPage() {
     setTechnologyCase(tc);
     setOwningOrg(org);
     setMembers(memberRows);
+    fetchUserNames(memberRows.map((m) => m.userId)).then(setUserNames);
     setCaseOrganizations(caseOrgRows);
     setEvidence(evidenceRows);
     setAssessments(assessmentRows);
@@ -212,6 +215,8 @@ export default function TechnologyCaseDetailPage() {
   async function loadManifestDetail(id: string) {
     const detail = await authFetch<TransferManifestDetailResponse>(`/transfer-manifests/${id}`);
     setManifestDetails((prev) => ({ ...prev, [id]: detail }));
+    const recipientUserIds = detail.recipients.map((r) => r.recipientUserId).filter((id): id is string => Boolean(id));
+    fetchUserNames(recipientUserIds).then((names) => setUserNames((prev) => ({ ...prev, ...names })));
   }
 
   function onToggleManifest(id: string) {
@@ -316,7 +321,7 @@ export default function TechnologyCaseDetailPage() {
         </div>
       );
     }
-    return null;
+    return <PageLoader />;
   }
 
   const roleLabel = PLATFORM_ROLE_LABELS[me.platformRole] ?? me.platformRole;
@@ -335,13 +340,13 @@ export default function TechnologyCaseDetailPage() {
   if (!technologyCase || !owningOrg || !members || !caseOrganizations || !evidence || !assessments || !gaps || !roadmaps || !transferManifests) {
     return (
       <Shell brandLabel="R2M" me={me} roleLabel={roleLabel} nav={nav}>
-        {null}
+        <PageLoader inline />
       </Shell>
     );
   }
 
   const owner = members.find((m) => m.role === "OWNER");
-  const ownerLabel = owner ? (owner.userId === me.userId ? me.displayName : owner.userId.slice(0, 8)) : "—";
+  const ownerLabel = owner ? (owner.userId === me.userId ? me.displayName : userNames[owner.userId] ?? owner.userId.slice(0, 8)) : "—";
   const isCaseOwner = owner?.userId === me.userId;
   const latestAssessment = assessments[0];
   const latestRoadmap = roadmaps[0];
@@ -372,7 +377,7 @@ export default function TechnologyCaseDetailPage() {
 
         {tab === "Tổng quan" && (
           <Card>
-            <dl style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)", fontSize: 14 }}>
+            <dl className="uikit-grid-2" style={{ fontSize: 14 }}>
               <div>
                 <dt style={{ fontSize: 12, color: "var(--uikit-slate-400)" }}>Chủ trì case</dt>
                 <dd style={{ margin: 0, color: "var(--uikit-slate-900)" }}>{ownerLabel}</dd>
@@ -693,8 +698,14 @@ export default function TechnologyCaseDetailPage() {
                                   <div className="uikit-row-list">
                                     {detail.recipients.map((r) => (
                                       <div key={r.id} className="uikit-row">
-                                        <span style={{ fontSize: 13, fontFamily: "var(--font-mono)" }}>
-                                          {r.recipientUserId ? `User ${r.recipientUserId.slice(0, 8)}` : `Tổ chức ${r.recipientOrganizationId?.slice(0, 8)}`}
+                                        <span style={{ fontSize: 13 }}>
+                                          {r.recipientUserId ? (
+                                            userNames[r.recipientUserId] ?? (
+                                              <span style={{ fontFamily: "var(--font-mono)" }}>User {r.recipientUserId.slice(0, 8)}</span>
+                                            )
+                                          ) : (
+                                            <span style={{ fontFamily: "var(--font-mono)" }}>Tổ chức {r.recipientOrganizationId?.slice(0, 8)}</span>
+                                          )}
                                         </span>
                                         <span style={{ fontSize: 12, color: "var(--uikit-slate-500)" }}>
                                           {ACCESS_PERMISSION_LABELS[r.permission] ?? r.permission}
@@ -823,7 +834,9 @@ export default function TechnologyCaseDetailPage() {
                 <div className="uikit-row-list">
                   {members.map((m) => (
                     <div key={m.id} className="uikit-row">
-                      <span style={{ fontFamily: "var(--font-mono)", fontSize: 13 }}>{m.userId.slice(0, 8)}</span>
+                      <span style={{ fontSize: 13 }}>
+                        {userNames[m.userId] ?? <span style={{ fontFamily: "var(--font-mono)" }}>{m.userId.slice(0, 8)}</span>}
+                      </span>
                       <span style={{ fontSize: 13, color: "var(--uikit-slate-500)" }}>{CASE_MEMBER_ROLE_LABELS[m.role] ?? m.role}</span>
                       <StatusPill tone={m.status === "ACTIVE" ? "green" : "gray"}>{m.status}</StatusPill>
                     </div>

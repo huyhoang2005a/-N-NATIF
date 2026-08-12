@@ -1,5 +1,6 @@
-import type { UpdateProfileRequest, UserProfileResponse } from "@r2m/contracts";
+import type { PlatformUserResponse, UpdateProfileRequest, UserProfileResponse, UserPublicInfoResponse } from "@r2m/contracts";
 import type { ActorContext } from "@r2m/authz";
+import { assertPlatformAdmin } from "@r2m/authz";
 import type { Database } from "@r2m/database";
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { DATABASE } from "../../../database/database.module";
@@ -80,5 +81,28 @@ export class UsersService {
     });
 
     return toResponse(updated);
+  }
+
+  async getPublicInfo(userIds: string[]): Promise<UserPublicInfoResponse[]> {
+    const rows = await this.usersRepository.findDisplayNames(userIds);
+    return rows.map((row) => ({ userId: row.userId, displayName: row.displayName }));
+  }
+
+  /** Not spec-mandated — explicit user-approved addition, see users.repository.ts.
+   * `/platform/users` nav item (admin-only) has been a permanent "Sắp ra mắt" placeholder
+   * until this existed. */
+  async listAllForPlatform(actor: ActorContext, limit: number, offset: number): Promise<PlatformUserResponse[]> {
+    assertPlatformAdmin(actor);
+    const rows = await this.usersRepository.listAll(limit, offset);
+    return rows.map((row) => ({
+      userId: row.id,
+      primaryEmail: row.primaryEmail,
+      displayName: row.profile?.displayName ?? null,
+      platformRole: row.platformRole,
+      status: row.status,
+      emailVerified: row.emailVerifiedAt !== null,
+      createdAt: row.createdAt.toISOString(),
+      lastLoginAt: row.lastLoginAt?.toISOString() ?? null,
+    }));
   }
 }

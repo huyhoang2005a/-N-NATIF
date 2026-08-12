@@ -1,7 +1,7 @@
 import type { Database } from "@r2m/database";
 import { schema } from "@r2m/database";
 import { Inject, Injectable } from "@nestjs/common";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { DATABASE } from "../../../database/database.module";
 
 function firstOrThrow<T>(rows: T[], message: string): T {
@@ -21,6 +21,17 @@ export class OrganizationsRepository {
 
   async findById(id: string) {
     return this.db.query.organization.findFirst({ where: eq(schema.organization.id, id) });
+  }
+
+  /** Not spec-mandated — explicit user-approved addition covering the frontend gap noted
+   * in [[r2m_frontend_status]] ("`GET /organizations` only returns orgs the actor is a
+   * member of, no platform-wide list"). Admin-only, gated in the service layer. */
+  async listAll(limit: number, offset: number) {
+    return this.db.query.organization.findMany({
+      orderBy: [desc(schema.organization.createdAt)],
+      limit,
+      offset,
+    });
   }
 
   /** Domain is globally unique (see `organization_domain` schema note) — used both to block

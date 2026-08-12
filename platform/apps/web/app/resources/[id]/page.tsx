@@ -18,7 +18,8 @@ import { describeErrorCode } from "../../../lib/error-messages";
 import { CONTENT_FLAG_REASON_OPTIONS, PLATFORM_ROLE_LABELS, RESOURCE_ACCESS_LEVEL_LABELS, RESOURCE_TYPE_LABELS } from "../../../lib/labels";
 import { navForPersona, personaOf } from "../../../lib/nav";
 import { getAccessToken } from "../../../lib/session";
-import { BackLink, Card, GhostButton, PrimaryButton, SaveButton, SectionHeader, SelectField, Shell, StatusPill, TextField, VoteButton } from "../../../components/ui";
+import { fetchUserNames } from "../../../lib/user-lookup";
+import { BackLink, Card, GhostButton, PageLoader, PrimaryButton, SaveButton, SectionHeader, SelectField, Shell, StatusPill, TextField, VoteButton } from "../../../components/ui";
 
 const PERMISSION_OPTIONS = [
   { value: "VIEW", label: "Xem" },
@@ -35,15 +36,22 @@ export default function ResourceDetailPage() {
   const [organizations, setOrganizations] = useState<OrganizationResponse[] | null>(null);
   const [resource, setResource] = useState<ResourceResponse | null>(null);
   const [grants, setGrants] = useState<ResourceAccessGrantResponse[] | null>(null);
+  const [grantUserNames, setGrantUserNames] = useState<Record<string, string>>({});
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  // Không có endpoint liệt kê version/annotation đã có — chỉ giữ lại những gì
-  // được tạo trong phiên làm việc hiện tại (ephemeral), không phải danh sách
-  // đầy đủ. Ghi rõ giới hạn này trong giao diện, không giả vờ đây là danh sách đủ.
-  const [sessionVersions, setSessionVersions] = useState<ResourceVersionResponse[]>([]);
-  const [sessionAnnotations, setSessionAnnotations] = useState<AnnotationResponse[]>([]);
+  const [versions, setVersions] = useState<ResourceVersionResponse[]>([]);
+  const [annotations, setAnnotations] = useState<AnnotationResponse[]>([]);
+
+  async function loadVersionsAndAnnotations() {
+    const versionRows = await authFetch<ResourceVersionResponse[]>(`/resources/${resourceId}/versions`);
+    setVersions(versionRows);
+    const annotationLists = await Promise.all(
+      versionRows.map((v) => authFetch<AnnotationResponse[]>(`/resource-versions/${v.id}/annotations`)),
+    );
+    setAnnotations(annotationLists.flat());
+  }
 
   async function load() {
     const [meResponse, myOrgs, r, grantRows] = await Promise.all([
@@ -56,6 +64,8 @@ export default function ResourceDetailPage() {
     setOrganizations(myOrgs);
     setResource(r);
     setGrants(grantRows);
+    fetchUserNames(grantRows.filter((g) => g.recipientUserId).map((g) => g.recipientUserId!)).then(setGrantUserNames);
+    await loadVersionsAndAnnotations();
   }
 
   useEffect(() => {
@@ -103,20 +113,20 @@ export default function ResourceDetailPage() {
       });
       const putResponse = await fetch(upload.uploadUrl, { method: "PUT", headers: { "Content-Type": versionFile.type }, body: versionFile });
       if (!putResponse.ok) throw new Error("upload failed");
-      const version = await authFetch<ResourceVersionResponse>(`/resources/${resourceId}/versions`, {
+      await authFetch<ResourceVersionResponse>(`/resources/${resourceId}/versions`, {
         method: "POST",
         body: JSON.stringify({ versionLabel: versionLabel || undefined, storageObjectKey: upload.storageObjectKey }),
       });
-      setSessionVersions((prev) => [version, ...prev]);
       setVersionLabel("");
       setVersionFile(null);
+      await loadVersionsAndAnnotations();
     });
   }
 
   function onPublishVersion(versionId: string) {
     return runAction(`publish-${versionId}`, async () => {
-      const published = await authFetch<ResourceVersionResponse>(`/resource-versions/${versionId}/publish`, { method: "POST" });
-      setSessionVersions((prev) => prev.map((v) => (v.id === versionId ? published : v)));
+      await authFetch<ResourceVersionResponse>(`/resource-versions/${versionId}/publish`, { method: "POST" });
+      await loadVersionsAndAnnotations();
     });
   }
 
@@ -125,19 +135,19 @@ export default function ResourceDetailPage() {
 
   function onAddAnnotation() {
     return runAction("add-annotation", async () => {
-      const annotation = await authFetch<AnnotationResponse>(`/resource-versions/${annotationForm.resourceVersionId}/annotations`, {
+      await authFetch<AnnotationResponse>(`/resource-versions/${annotationForm.resourceVersionId}/annotations`, {
         method: "POST",
         body: JSON.stringify({ targetSnippet: annotationForm.targetSnippet, content: annotationForm.content }),
       });
-      setSessionAnnotations((prev) => [annotation, ...prev]);
       setAnnotationForm({ resourceVersionId: annotationForm.resourceVersionId, targetSnippet: "", content: "" });
+      await loadVersionsAndAnnotations();
     });
   }
 
   function onRemoveAnnotation(annotationId: string) {
     return runAction(`remove-annotation-${annotationId}`, async () => {
       await authFetch(`/annotations/${annotationId}`, { method: "DELETE" });
-      setSessionAnnotations((prev) => prev.filter((a) => a.id !== annotationId));
+      await loadVersionsAndAnnotations();
     });
   }
 
@@ -197,7 +207,7 @@ export default function ResourceDetailPage() {
         </div>
       );
     }
-    return null;
+    return <PageLoader />;
   }
 
   const roleLabel = PLATFORM_ROLE_LABELS[me.platformRole] ?? me.platformRole;
@@ -216,7 +226,7 @@ export default function ResourceDetailPage() {
   if (!resource || !grants) {
     return (
       <Shell brandLabel="R2M" me={me} roleLabel={roleLabel} nav={nav}>
-        {null}
+        <PageLoader inline />
       </Shell>
     );
   }
@@ -302,14 +312,12 @@ export default function ResourceDetailPage() {
         )}
 
         <Card>
-          <SectionHeader title="Phiên bản" />
-          <p style={{ fontSize: 12, color: "var(--uikit-slate-400)" }}>
-            Chưa có API liệt kê toàn bộ phiên bản — chỉ hiện phiên bản bạn vừa tạo trong phiên
-            làm việc này.
-          </p>
-          {sessionVersions.length > 0 && (
+          <SectionHeader title={`Phiên bản (${versions.length})`} />
+          {versions.length === 0 ? (
+            <p className="uikit-empty">Chưa có phiên bản nào.</p>
+          ) : (
             <div className="uikit-row-list" style={{ marginTop: "var(--space-3)" }}>
-              {sessionVersions.map((v) => (
+              {versions.map((v) => (
                 <div key={v.id} className="uikit-row">
                   <span style={{ fontSize: 14 }}>v{v.versionNo}{v.versionLabel ? ` · ${v.versionLabel}` : ""}</span>
                   <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
@@ -337,14 +345,12 @@ export default function ResourceDetailPage() {
         </Card>
 
         <Card>
-          <SectionHeader title="Chú giải (annotation)" />
-          <p style={{ fontSize: 12, color: "var(--uikit-slate-400)" }}>
-            Chưa có API liệt kê toàn bộ chú giải — chỉ hiện chú giải bạn vừa tạo trong phiên làm
-            việc này.
-          </p>
-          {sessionAnnotations.length > 0 && (
+          <SectionHeader title={`Chú giải (annotation) (${annotations.length})`} />
+          {annotations.length === 0 ? (
+            <p className="uikit-empty">Chưa có chú giải nào.</p>
+          ) : (
             <div className="uikit-row-list" style={{ marginTop: "var(--space-3)" }}>
-              {sessionAnnotations.map((a) => (
+              {annotations.map((a) => (
                 <div key={a.id}>
                   <div className="uikit-row">
                     <span style={{ fontSize: 14 }}>{a.content}</span>
@@ -400,11 +406,14 @@ export default function ResourceDetailPage() {
             </div>
           )}
           <div className="uikit-stack" style={{ marginTop: "var(--space-4)" }}>
-            <TextField
-              label="Resource Version ID"
-              hint="Dán UUID phiên bản vừa tạo ở trên, hoặc phiên bản đã có sẵn."
+            <SelectField
+              label="Phiên bản"
               value={annotationForm.resourceVersionId}
               onChange={(e) => setAnnotationForm({ ...annotationForm, resourceVersionId: e.target.value })}
+              options={[
+                { value: "", label: "— Chọn phiên bản —" },
+                ...versions.map((v) => ({ value: v.id, label: `v${v.versionNo}${v.versionLabel ? ` · ${v.versionLabel}` : ""}` })),
+              ]}
             />
             <TextField
               label="Đoạn trích (target snippet)"
@@ -436,8 +445,15 @@ export default function ResourceDetailPage() {
             <div className="uikit-row-list">
               {grants.map((g) => (
                 <div key={g.id} className="uikit-row">
-                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 13 }}>
-                    {g.recipientUserId ? `User ${g.recipientUserId.slice(0, 8)}` : `Tổ chức ${g.recipientOrganizationId?.slice(0, 8)}`} · {g.permission}
+                  <span style={{ fontSize: 13 }}>
+                    {g.recipientUserId ? (
+                      grantUserNames[g.recipientUserId] ?? (
+                        <span style={{ fontFamily: "var(--font-mono)" }}>User {g.recipientUserId.slice(0, 8)}</span>
+                      )
+                    ) : (
+                      <span style={{ fontFamily: "var(--font-mono)" }}>Tổ chức {g.recipientOrganizationId?.slice(0, 8)}</span>
+                    )}{" "}
+                    · {g.permission}
                   </span>
                   <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
                     <StatusPill tone={g.status === "ACTIVE" ? "green" : "gray"}>{g.status}</StatusPill>

@@ -9,7 +9,8 @@ import { PLATFORM_ROLE_LABELS, VERIFICATION_REQUEST_STATUS_LABELS } from "../../
 import { navForPersona } from "../../../lib/nav";
 import { getAccessToken } from "../../../lib/session";
 import { toneOf, VERIFICATION_REQUEST_STATUS_TONE } from "../../../lib/tone";
-import { Card, GhostButton, PrimaryButton, Shell, StatusPill, TextField } from "../../../components/ui";
+import { fetchUserNames } from "../../../lib/user-lookup";
+import { Card, GhostButton, PageLoader, PrimaryButton, Shell, StatusPill, TextField } from "../../../components/ui";
 
 interface PresignedUrlResponse {
   url: string;
@@ -21,6 +22,7 @@ export default function AuthorVerificationsPage() {
   const [me, setMe] = useState<MeResponse | null>(null);
   const [requests, setRequests] = useState<AuthorVerificationRequestResponse[] | null>(null);
   const [orgNames, setOrgNames] = useState<Record<string, string>>({});
+  const [userNames, setUserNames] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
@@ -32,6 +34,7 @@ export default function AuthorVerificationsPage() {
     const uniqueOrgIds = Array.from(new Set(rows.map((r) => r.affiliationOrgId)));
     const orgs = await Promise.all(uniqueOrgIds.map((id) => authFetch<OrganizationResponse>(`/organizations/${id}`)));
     setOrgNames(Object.fromEntries(orgs.map((o) => [o.id, o.name])));
+    setUserNames(await fetchUserNames(rows.map((r) => r.authorUserId)));
   }
 
   useEffect(() => {
@@ -106,8 +109,7 @@ export default function AuthorVerificationsPage() {
     window.open(url, "_blank", "noopener,noreferrer");
   }
 
-  if (!me) return null;
-
+  if (!me) return <PageLoader />;
   const nav = navForPersona("platform-ops", me.platformRole === "PLATFORM_ADMIN");
 
   return (
@@ -140,8 +142,10 @@ export default function AuthorVerificationsPage() {
                   >
                     <div style={{ display: "flex", justifyContent: "space-between", gap: "var(--space-4)", flexWrap: "wrap" }}>
                       <div>
-                        <p style={{ fontWeight: 600, fontSize: 14, fontFamily: "var(--font-mono)" }}>
-                          Tác giả {request.authorUserId.slice(0, 8)}
+                        <p style={{ fontWeight: 600, fontSize: 14 }}>
+                          {userNames[request.authorUserId] ?? (
+                            <span style={{ fontFamily: "var(--font-mono)" }}>Tác giả {request.authorUserId.slice(0, 8)}</span>
+                          )}
                         </p>
                         <p style={{ marginTop: 4, fontSize: 13, color: "var(--uikit-slate-500)" }}>
                           {orgNames[request.affiliationOrgId] ?? "—"} · Nộp lúc{" "}

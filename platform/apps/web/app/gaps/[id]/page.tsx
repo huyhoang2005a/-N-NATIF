@@ -10,7 +10,7 @@ import { GAP_SEVERITY_LABELS, GAP_STATUS_LABELS, PLATFORM_ROLE_LABELS } from "..
 import { navForPersona, personaOf } from "../../../lib/nav";
 import { getAccessToken } from "../../../lib/session";
 import { toneOf, GAP_SEVERITY_TONE, GAP_STATUS_TONE } from "../../../lib/tone";
-import { BackLink, Card, PrimaryButton, SelectField, Shell, StatusPill, TextField } from "../../../components/ui";
+import { BackLink, Card, PageLoader, PrimaryButton, SelectField, Shell, StatusPill, TextField } from "../../../components/ui";
 
 const GAP_STATUSES = Object.keys(GAP_STATUS_LABELS);
 const RESOLUTION_STATUSES = ["RESOLVED", "ACCEPTED_RISK", "CLOSED"];
@@ -121,7 +121,7 @@ export default function GapDetailPage() {
         </div>
       );
     }
-    return null;
+    return <PageLoader />;
   }
 
   const roleLabel = PLATFORM_ROLE_LABELS[me.platformRole] ?? me.platformRole;
@@ -140,7 +140,7 @@ export default function GapDetailPage() {
   if (!gap) {
     return (
       <Shell brandLabel="R2M" me={me} roleLabel={roleLabel} nav={nav}>
-        {null}
+        <PageLoader inline />
       </Shell>
     );
   }

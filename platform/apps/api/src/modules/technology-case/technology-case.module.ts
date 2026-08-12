@@ -2,7 +2,7 @@ import { Module } from "@nestjs/common";
 import { ResourceCatalogModule } from "../resource-catalog/resource-catalog.module";
 import { AuditModule } from "../platform-operations/audit/audit.module";
 import { JobsModule } from "../platform-operations/jobs/jobs.module";
-import { TechnologyCasesController } from "./technology-case.controller";
+import { PlatformTechnologyCasesController, TechnologyCasesController } from "./technology-case.controller";
 import { TechnologyCaseRepository } from "./technology-case.repository";
 import { TechnologyCaseService } from "./technology-case.service";
 import { EvidenceRepository } from "./evidence.repository";
@@ -15,7 +15,7 @@ import { EvidenceService } from "./evidence.service";
  * `assertVisible` for UC-EVD-01's "actor có quyền đọc resource" check. */
 @Module({
   imports: [AuditModule, JobsModule, ResourceCatalogModule],
-  controllers: [TechnologyCasesController],
+  controllers: [TechnologyCasesController, PlatformTechnologyCasesController],
   providers: [TechnologyCaseRepository, TechnologyCaseService, EvidenceRepository, EvidenceService],
   // Exported for `modules/assessment-gap` and `modules/roadmap-transfer` (Phase 4) —
   // both reuse `TechnologyCaseService.applyTransition` for the case lifecycle cascades

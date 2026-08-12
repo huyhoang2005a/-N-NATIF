@@ -136,6 +136,15 @@ export class ResourcesController {
   ): Promise<ResourceAccessGrantResponse[]> {
     return this.accessGrantsService.listByResource(actor, id);
   }
+
+  /** Not spec-mandated — explicit user-approved addition, see resources.service.ts. */
+  @Get(":id/versions")
+  listVersions(
+    @CurrentActor() actor: ActorContext,
+    @Param("id") id: string,
+  ): Promise<ResourceVersionResponse[]> {
+    return this.resourcesService.listVersions(actor, id);
+  }
 }
 
 @Controller("access-grants")
@@ -180,5 +189,11 @@ export class ResourceVersionsController {
     @Req() req: Request,
   ): Promise<AnnotationResponse> {
     return this.annotationsService.create(actor, id, body, requestId(req));
+  }
+
+  /** Not spec-mandated — explicit user-approved addition, see annotations.service.ts. */
+  @Get(":id/annotations")
+  listAnnotations(@CurrentActor() actor: ActorContext, @Param("id") id: string): Promise<AnnotationResponse[]> {
+    return this.annotationsService.listByVersion(actor, id);
   }
 }

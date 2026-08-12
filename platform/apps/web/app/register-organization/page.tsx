@@ -8,7 +8,7 @@ import { ApiError, apiFetch } from "../../lib/api-client";
 import { describeErrorCode } from "../../lib/error-messages";
 import { ORG_TYPE_LABELS, ORG_VERIFICATION_DOCUMENT_TYPE_LABELS } from "../../lib/labels";
 import { toneOf, ORGANIZATION_STATUS_TONE } from "../../lib/tone";
-import { BrandMark, FileField, PrimaryButton, SelectField, StatusPill, TextField } from "../../components/ui";
+import { BackLink, BrandMark, FileField, PrimaryButton, SelectField, StatusPill, TextField } from "../../components/ui";
 
 const ORG_TYPE_HINT: Record<RegisterOrganizationRequest["organizationType"], string> = {
   RESEARCH_UNIT: "Viện nghiên cứu, trường đại học, trung tâm R&D.",
@@ -180,6 +180,7 @@ export default function RegisterOrganizationPage() {
   return (
     <div className="uikit-shell" style={{ alignItems: "center", justifyContent: "center" }}>
       <div style={{ width: "100%", maxWidth: 440, padding: "var(--space-6) var(--space-5)" }}>
+        <BackLink href="/">Về trang chủ</BackLink>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: "var(--space-6)" }}>
           <BrandMark size="lg" />
           <h1 style={{ fontSize: 22, marginTop: "var(--space-4)" }}>Đăng ký tổ chức</h1>

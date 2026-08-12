@@ -13,7 +13,6 @@ import {
   ShieldCheck,
   Sparkles,
   Target,
-  type LucideIcon,
 } from "lucide-react";
 import type {
   AuthorVerificationRequestResponse,
@@ -21,7 +20,11 @@ import type {
   MeResponse,
   OrganizationResponse,
   OrganizationVerificationRequestResponse,
+  PlatformCaseSummaryResponse,
   ReadinessAssessmentResponse,
+  RecommendationItemResponse,
+  ResearchNeedResponse,
+  ResearchProposalResponse,
   ResourceResponse,
   RoadmapResponse,
   TechnologyCaseResponse,
@@ -31,7 +34,7 @@ import { PLATFORM_ROLE_LABELS, TECHNOLOGY_CASE_STATUS_LABELS } from "../../lib/l
 import { navForPersona, personaOf } from "../../lib/nav";
 import { getAccessToken } from "../../lib/session";
 import { toneOf, ORGANIZATION_STATUS_TONE, TECHNOLOGY_CASE_STATUS_TONE } from "../../lib/tone";
-import { Card, SectionHeader, Shell, StatCard, StatusDot, StatusPill } from "../../components/ui";
+import { Card, MatchScoreBadge, PageLoader, SectionHeader, Shell, StatCard, StatusDot, StatusPill } from "../../components/ui";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -68,8 +71,7 @@ export default function DashboardPage() {
     );
   }
 
-  if (!me || !organizations) return null;
-
+  if (!me || !organizations) return <PageLoader />;
   const persona = personaOf(me, organizations);
   const isAdmin = me.platformRole === "PLATFORM_ADMIN";
   const nav = navForPersona(persona, isAdmin);
@@ -87,22 +89,25 @@ export default function DashboardPage() {
 function AuthorDashboardBody({ me, organizations }: { me: MeResponse; organizations: OrganizationResponse[] }) {
   const [cases, setCases] = useState<TechnologyCaseResponse[] | null>(null);
   const [resources, setResources] = useState<ResourceResponse[] | null>(null);
+  const [proposals, setProposals] = useState<ResearchProposalResponse[] | null>(null);
 
   useEffect(() => {
     Promise.all([
       authFetch<TechnologyCaseResponse[]>("/technology-cases"),
       authFetch<ResourceResponse[]>("/resources"),
-    ]).then(([caseRows, resourceRows]) => {
+      authFetch<ResearchProposalResponse[]>("/proposals"),
+    ]).then(([caseRows, resourceRows, proposalRows]) => {
       setCases(caseRows);
       setResources(resourceRows.filter((r) => r.createdByUserId === me.userId));
+      setProposals(proposalRows);
     });
   }, [me.userId]);
 
-  if (!cases || !resources) return null;
-
+  if (!cases || !resources || !proposals) return <PageLoader />;
   const primaryOrg = organizations[0];
   const recentCases = cases.slice(0, 5);
   const recentResources = resources.slice(0, 3);
+  const pendingProposalsCount = proposals.filter((p) => p.status === "SUBMITTED" || p.status === "UNDER_REVIEW").length;
 
   return (
     <div className="uikit-stack">
@@ -118,10 +123,10 @@ function AuthorDashboardBody({ me, organizations }: { me: MeResponse; organizati
         )}
       </div>
 
-      <div className="uikit-card-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
+      <div className="uikit-card-grid uikit-card-grid--3">
         <StatCard label="Case đang theo dõi" value={cases.length} icon={FolderOpen} tone="indigo" />
         <StatCard label="Tài nguyên đã đăng" value={resources.length} icon={Database} tone="slate" />
-        <SoonStatTile label="Đề xuất chờ phản hồi" icon={Send} />
+        <StatCard href="/proposals" label="Đề xuất chờ phản hồi" value={pendingProposalsCount} icon={Send} tone="amber" />
       </div>
 
       <Card>
@@ -154,7 +159,7 @@ function AuthorDashboardBody({ me, organizations }: { me: MeResponse; organizati
             để làm cơ sở bằng chứng cho các case sau này.
           </p>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "var(--space-3)" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: "var(--space-3)" }}>
             {recentResources.map((r) => (
               <div key={r.id} style={{ border: "1px solid var(--uikit-slate-200)", borderRadius: "var(--radius-sm)", padding: "var(--space-3)" }}>
                 <p style={{ fontSize: 13, fontWeight: 500, color: "var(--uikit-slate-900)" }}>{r.title}</p>
@@ -178,14 +183,34 @@ function AuthorDashboardBody({ me, organizations }: { me: MeResponse; organizati
 
 function CompanyDashboardBody({ me, organizations }: { me: MeResponse; organizations: OrganizationResponse[] }) {
   const [cases, setCases] = useState<TechnologyCaseResponse[] | null>(null);
+  const [needs, setNeeds] = useState<ResearchNeedResponse[] | null>(null);
+  const [recommendationItems, setRecommendationItems] = useState<RecommendationItemResponse[] | null>(null);
 
   useEffect(() => {
     authFetch<TechnologyCaseResponse[]>("/technology-cases").then(setCases);
+    const primaryOrg = organizations[0];
+    if (!primaryOrg) {
+      setNeeds([]);
+      setRecommendationItems([]);
+      return;
+    }
+    authFetch<ResearchNeedResponse[]>(`/organizations/${primaryOrg.id}/research-needs`)
+      .then(setNeeds)
+      .catch(() => setNeeds([]));
+    if (primaryOrg.type === "ENTERPRISE" && primaryOrg.status === "ACTIVE") {
+      authFetch<RecommendationItemResponse[]>(`/organizations/${primaryOrg.id}/company-profile/feed`)
+        .then(setRecommendationItems)
+        .catch(() => setRecommendationItems([]));
+    } else {
+      setRecommendationItems([]);
+    }
+    // Intentionally runs once on mount — `organizations` is a stable prop from the parent.
   }, []);
 
-  if (!cases) return null;
-
+  if (!cases || !needs || !recommendationItems) return <PageLoader />;
   const primaryOrg = organizations[0];
+  const openNeedsCount = needs.filter((n) => n.status === "OPEN").length;
+  const activeRecommendations = recommendationItems.filter((i) => i.status === "ACTIVE");
 
   return (
     <div className="uikit-stack">
@@ -198,18 +223,30 @@ function CompanyDashboardBody({ me, organizations }: { me: MeResponse; organizat
         </div>
       </div>
 
-      <div className="uikit-card-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
-        <SoonStatTile label="Nhu cầu đang mở" icon={Target} />
-        <SoonStatTile label="Gợi ý công nghệ mới" icon={Sparkles} />
+      <div className="uikit-card-grid uikit-card-grid--3">
+        <StatCard href="/needs" label="Nhu cầu đang mở" value={openNeedsCount} icon={Target} tone="indigo" />
+        <StatCard href="/recommendations" label="Gợi ý công nghệ mới" value={activeRecommendations.length} icon={Sparkles} tone="slate" />
         <StatCard label="Case đang hợp tác" value={cases.length} icon={FolderOpen} tone="slate" />
       </div>
 
       <Card>
-        <SectionHeader title="Gợi ý công nghệ mới nhất" />
-        <div className="uikit-soon">
-          <p className="uikit-soon__title">Sắp ra mắt</p>
-          <p>Gợi ý công nghệ theo nhu cầu doanh nghiệp đang được phát triển (Phase 5).</p>
-        </div>
+        <SectionHeader title="Gợi ý công nghệ mới nhất" action="Xem tất cả" href="/recommendations" />
+        {activeRecommendations.length === 0 ? (
+          <p className="uikit-empty">
+            {primaryOrg?.type === "ENTERPRISE" && primaryOrg.status === "ACTIVE"
+              ? "Chưa có gợi ý nào — bấm \"Làm mới gợi ý\" trên trang Gợi ý công nghệ để chạy lần đầu."
+              : "Cần hồ sơ công ty đang hoạt động (tổ chức ENTERPRISE đã kích hoạt) để nhận gợi ý công nghệ."}
+          </p>
+        ) : (
+          <div className="uikit-row-list">
+            {activeRecommendations.slice(0, 3).map((item) => (
+              <Link key={item.id} href="/recommendations" className="uikit-row-link">
+                <span style={{ fontSize: 14, fontWeight: 500 }}>{item.resourceTitle}</span>
+                <MatchScoreBadge score={item.matchScore} />
+              </Link>
+            ))}
+          </div>
+        )}
       </Card>
 
       <Card>
@@ -250,8 +287,18 @@ function PlatformOpsDashboardBody({ isAdmin }: { isAdmin: boolean }) {
   const [authorVerifications, setAuthorVerifications] = useState<AuthorVerificationRequestResponse[] | null>(null);
   const [reviewQueue, setReviewQueue] = useState<ReviewQueueItem[] | null>(null);
   const [contentFlags, setContentFlags] = useState<ContentFlagResponse[] | null>(null);
+  const [activeOrgCount, setActiveOrgCount] = useState<number | null>(null);
+  const [caseSummary, setCaseSummary] = useState<PlatformCaseSummaryResponse | null>(null);
 
   useEffect(() => {
+    if (isAdmin) {
+      authFetch<OrganizationResponse[]>("/platform/organizations?limit=100")
+        .then((rows) => setActiveOrgCount(rows.filter((o) => o.status === "ACTIVE").length))
+        .catch(() => setActiveOrgCount(0));
+      authFetch<PlatformCaseSummaryResponse>("/platform/technology-cases/summary")
+        .then(setCaseSummary)
+        .catch(() => setCaseSummary({ total: 0, active: 0 }));
+    }
     Promise.all([
       authFetch<OrganizationVerificationRequestResponse[]>("/platform/organization-verifications"),
       authFetch<AuthorVerificationRequestResponse[]>("/platform/author-verifications"),
@@ -285,8 +332,7 @@ function PlatformOpsDashboardBody({ isAdmin }: { isAdmin: boolean }) {
     });
   }, []);
 
-  if (!orgVerifications || !authorVerifications || !reviewQueue || !contentFlags) return null;
-
+  if (!orgVerifications || !authorVerifications || !reviewQueue || !contentFlags) return <PageLoader />;
   const pendingOrg = orgVerifications.filter((r) => r.status === "PENDING");
   const pendingAuthor = authorVerifications.filter((r) => r.status === "PENDING");
   const recentOrg = orgVerifications.slice(0, 3);
@@ -301,14 +347,12 @@ function PlatformOpsDashboardBody({ isAdmin }: { isAdmin: boolean }) {
         </p>
       </div>
 
-      <div className="uikit-card-grid" style={{ gridTemplateColumns: `repeat(${isAdmin ? 4 : 3}, 1fr)` }}>
-        {isAdmin && <SoonStatTile label="Tổ chức hoạt động" icon={Building2} />}
-        {isAdmin && <SoonStatTile label="Case đang xử lý" icon={FolderOpen} />}
+      <div className={`uikit-card-grid ${isAdmin ? "uikit-card-grid--4" : "uikit-card-grid--3"}`}>
+        {isAdmin && <StatCard href="/platform/organizations" label="Tổ chức hoạt động" value={activeOrgCount ?? "—"} icon={Building2} tone="indigo" />}
+        {isAdmin && <StatCard label="Case đang xử lý" value={caseSummary?.active ?? "—"} icon={FolderOpen} tone="slate" hint={caseSummary ? `${caseSummary.total} tổng` : undefined} />}
         <StatCard label="Chờ xác minh" value={pendingOrg.length + pendingAuthor.length} icon={ShieldCheck} tone="amber" />
         <StatCard label="Đánh giá & lộ trình chờ duyệt" value={reviewQueue.length} icon={ClipboardCheck} tone="indigo" />
-        <Link href="/platform/flags" style={{ textDecoration: "none", color: "inherit" }}>
-          <StatCard label="Nội dung bị gắn cờ" value={openFlags.length} icon={Flag} tone="rose" />
-        </Link>
+        <StatCard href="/platform/flags" label="Nội dung bị gắn cờ" value={openFlags.length} icon={Flag} tone="rose" />
       </div>
 
       <Card>
@@ -349,21 +393,6 @@ function PlatformOpsDashboardBody({ isAdmin }: { isAdmin: boolean }) {
           </div>
         )}
       </Card>
-    </div>
-  );
-}
-
-function SoonStatTile({ label, icon: Icon }: { label: string; icon: LucideIcon }) {
-  return (
-    <div className="uikit-card uikit-statcard" style={{ opacity: 0.6 }}>
-      <div className="uikit-statcard__icon uikit-statcard__icon--amber">
-        <Icon aria-hidden="true" />
-      </div>
-      <div>
-        <p className="uikit-statcard__value">—</p>
-        <p className="uikit-statcard__label">{label}</p>
-        <p className="uikit-statcard__hint">Sắp ra mắt</p>
-      </div>
     </div>
   );
 }

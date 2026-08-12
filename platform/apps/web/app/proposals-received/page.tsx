@@ -9,7 +9,7 @@ import { PLATFORM_ROLE_LABELS, PROPOSAL_STATUS_LABELS } from "../../lib/labels";
 import { navForPersona, personaOf } from "../../lib/nav";
 import { getAccessToken } from "../../lib/session";
 import { PROPOSAL_STATUS_TONE, toneOf } from "../../lib/tone";
-import { Card, SectionHeader, Shell, StatusDot } from "../../components/ui";
+import { Card, PageLoader, SectionHeader, Shell, StatusDot } from "../../components/ui";
 
 interface NeedWithProposals {
   need: ResearchNeedResponse;
@@ -64,8 +64,7 @@ export default function ProposalsReceivedPage() {
     );
   }
 
-  if (!me || !organizations || !groups) return null;
-
+  if (!me || !organizations || !groups) return <PageLoader />;
   const nav = navForPersona(personaOf(me, organizations), me.platformRole === "PLATFORM_ADMIN");
 
   return (

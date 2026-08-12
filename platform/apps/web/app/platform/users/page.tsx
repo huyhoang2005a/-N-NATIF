@@ -2,17 +2,30 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Users } from "lucide-react";
-import type { MeResponse } from "@r2m/contracts";
-import { authFetch, SessionExpiredError } from "../../../lib/api-client";
-import { PLATFORM_ROLE_LABELS } from "../../../lib/labels";
+import type { MeResponse, PlatformUserResponse } from "@r2m/contracts";
+import { ApiError, authFetch, SessionExpiredError } from "../../../lib/api-client";
+import { describeErrorCode } from "../../../lib/error-messages";
+import { PLATFORM_ROLE_LABELS, USER_STATUS_LABELS } from "../../../lib/labels";
 import { navForPersona } from "../../../lib/nav";
 import { getAccessToken } from "../../../lib/session";
-import { SoonPage } from "../../../components/ui";
+import { toneOf, USER_STATUS_TONE } from "../../../lib/tone";
+import { Card, GhostButton, PageLoader, Shell, StatusDot, StatusPill } from "../../../components/ui";
+
+const PAGE_SIZE = 50;
 
 export default function AdminUsersPage() {
   const router = useRouter();
   const [me, setMe] = useState<MeResponse | null>(null);
+  const [users, setUsers] = useState<PlatformUserResponse[] | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function loadPage(offset: number) {
+    const rows = await authFetch<PlatformUserResponse[]>(`/platform/users?limit=${PAGE_SIZE}&offset=${offset}`);
+    setUsers((prev) => (offset === 0 ? rows : [...(prev ?? []), ...rows]));
+    setHasMore(rows.length === PAGE_SIZE);
+  }
 
   useEffect(() => {
     if (!getAccessToken()) {
@@ -20,28 +33,78 @@ export default function AdminUsersPage() {
       return;
     }
     authFetch<MeResponse>("/me")
-      .then((meResponse) => {
+      .then(async (meResponse) => {
         if (meResponse.platformRole !== "PLATFORM_ADMIN") {
           router.push("/dashboard");
           return;
         }
         setMe(meResponse);
+        await loadPage(0);
       })
       .catch((err) => {
-        if (err instanceof SessionExpiredError) router.push("/login");
+        if (err instanceof SessionExpiredError) {
+          router.push("/login");
+          return;
+        }
+        setError(err instanceof ApiError ? describeErrorCode(err.code) : "Không tải được danh sách người dùng.");
       });
-  }, [router]);
+    // Intentionally runs once on mount — router/getAccessToken don't change across renders.
+  }, []);
 
-  if (!me) return null;
+  function onLoadMore() {
+    setLoadingMore(true);
+    loadPage(users?.length ?? 0)
+      .catch((err) => {
+        setError(err instanceof ApiError ? describeErrorCode(err.code) : "Không tải thêm được.");
+      })
+      .finally(() => setLoadingMore(false));
+  }
+
+  if (!me) return <PageLoader />;
+  const nav = navForPersona("platform-ops", true);
 
   return (
-    <SoonPage
-      title="Người dùng"
-      description="Danh mục toàn bộ người dùng trên nền tảng đang được phát triển — hiện chưa có endpoint tra cứu người dùng khác ngoài chính bạn."
-      icon={Users}
-      me={me}
-      roleLabel={PLATFORM_ROLE_LABELS[me.platformRole] ?? me.platformRole}
-      nav={navForPersona("platform-ops", true)}
-    />
+    <Shell brandLabel="R2M" me={me} roleLabel={PLATFORM_ROLE_LABELS[me.platformRole] ?? me.platformRole} nav={nav}>
+      <div className="uikit-stack">
+        <h1 style={{ fontSize: 22 }}>Người dùng</h1>
+        <p style={{ fontSize: 14, color: "var(--uikit-slate-500)" }}>Toàn bộ tài khoản trên nền tảng, mới nhất trước.</p>
+
+        {error && (
+          <p className="uikit-alert-error" role="alert">
+            {error}
+          </p>
+        )}
+
+        <Card>
+          {users === null ? null : users.length === 0 ? (
+            <p className="uikit-empty">Chưa có người dùng nào trên nền tảng.</p>
+          ) : (
+            <div className="uikit-row-list">
+              {users.map((user) => (
+                <div key={user.userId} className="uikit-row">
+                  <div>
+                    <p style={{ fontWeight: 500, fontSize: 14 }}>{user.displayName ?? user.primaryEmail}</p>
+                    <p style={{ marginTop: 2, fontSize: 12, color: "var(--uikit-slate-500)" }}>
+                      {user.primaryEmail} · {PLATFORM_ROLE_LABELS[user.platformRole] ?? user.platformRole} ·{" "}
+                      {new Date(user.createdAt).toLocaleDateString("vi-VN")}
+                    </p>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+                    {!user.emailVerified && <StatusPill tone="amber">Email chưa xác thực</StatusPill>}
+                    <StatusDot tone={toneOf(USER_STATUS_TONE, user.status)} label={USER_STATUS_LABELS[user.status] ?? user.status} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+
+        {hasMore && (
+          <GhostButton disabled={loadingMore} onClick={onLoadMore}>
+            {loadingMore ? "Đang tải…" : "Tải thêm"}
+          </GhostButton>
+        )}
+      </div>
+    </Shell>
   );
 }

@@ -30,6 +30,17 @@ export class AuthRepository {
     });
   }
 
+  async findLocalIdentityByUserId(userId: string) {
+    return this.db.query.userIdentity.findFirst({
+      where: and(eq(schema.userIdentity.provider, "LOCAL"), eq(schema.userIdentity.userId, userId)),
+    });
+  }
+
+  async updatePasswordHash(identityId: string, passwordHash: string, tx?: Database): Promise<void> {
+    const client = tx ?? this.db;
+    await client.update(schema.userIdentity).set({ passwordHash }).where(eq(schema.userIdentity.id, identityId));
+  }
+
   async touchLastLogin(userId: string): Promise<void> {
     await this.db
       .update(schema.userAccount)

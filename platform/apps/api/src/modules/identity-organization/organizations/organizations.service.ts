@@ -9,7 +9,7 @@ import type {
   UpdateMemberRequest,
 } from "@r2m/contracts";
 import type { ActorContext } from "@r2m/authz";
-import { assertOrgOwnerOrAdmin } from "@r2m/authz";
+import { assertOrgOwnerOrAdmin, assertPlatformAdmin } from "@r2m/authz";
 import type { Database } from "@r2m/database";
 import { ConflictError, ErrorCode, ForbiddenError, NotFoundError } from "@r2m/domain";
 import { Inject, Injectable } from "@nestjs/common";
@@ -291,6 +291,15 @@ export class OrganizationsService {
   async listMine(actor: ActorContext): Promise<OrganizationResponse[]> {
     const memberships = await this.organizationsRepository.listMembersForActiveOrganizations(actor.userId);
     return memberships.map((membership) => toOrganizationResponse(membership.organization));
+  }
+
+  /** Not spec-mandated — explicit user-approved addition, see organizations.repository.ts.
+   * `/platform/organizations` nav item (admin-only) has been a permanent "Sắp ra mắt"
+   * placeholder until this existed. */
+  async listAllForPlatform(actor: ActorContext, limit: number, offset: number): Promise<OrganizationResponse[]> {
+    assertPlatformAdmin(actor);
+    const rows = await this.organizationsRepository.listAll(limit, offset);
+    return rows.map(toOrganizationResponse);
   }
 
   async inviteMember(

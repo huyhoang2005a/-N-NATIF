@@ -12,6 +12,8 @@ export { SelectField } from "./SelectField";
 export { FileField } from "./FileField";
 export { Tabs } from "./Tabs";
 export { BackLink } from "./BackLink";
+export { BackButton } from "./BackButton";
+export { PageLoader } from "./PageLoader";
 export { Shell } from "./Shell";
 export type { ShellNavItem } from "./Shell";
 export { SoonPage } from "./SoonPage";

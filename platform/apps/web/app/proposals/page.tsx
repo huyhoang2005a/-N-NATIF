@@ -8,7 +8,7 @@ import { PLATFORM_ROLE_LABELS, PROPOSAL_STATUS_LABELS } from "../../lib/labels";
 import { navForPersona, personaOf } from "../../lib/nav";
 import { getAccessToken } from "../../lib/session";
 import { PROPOSAL_STATUS_TONE, toneOf } from "../../lib/tone";
-import { Card, Shell, StatusDot } from "../../components/ui";
+import { Card, PageLoader, Shell, StatusDot } from "../../components/ui";
 
 export default function ProposalsPage() {
   const router = useRouter();
@@ -51,8 +51,7 @@ export default function ProposalsPage() {
     );
   }
 
-  if (!me || !organizations || !proposals) return null;
-
+  if (!me || !organizations || !proposals) return <PageLoader />;
   const nav = navForPersona(personaOf(me, organizations), me.platformRole === "PLATFORM_ADMIN");
 
   return (

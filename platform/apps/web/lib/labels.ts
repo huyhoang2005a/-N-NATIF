@@ -21,6 +21,14 @@ export const PLATFORM_ROLE_LABELS: Record<string, string> = {
   PLATFORM_ADMIN: "Quản trị nền tảng",
 };
 
+/** `user_status` enum (packages/database/src/schema/enums.ts) — used by `/platform/users`. */
+export const USER_STATUS_LABELS: Record<string, string> = {
+  INVITED: "Đã mời",
+  ACTIVE: "Đang hoạt động",
+  SUSPENDED: "Tạm khoá",
+  DEACTIVATED: "Ngừng hoạt động",
+};
+
 export function orgStatusBadgeClass(status: string): string {
   if (status === "ACTIVE") return "badge badge-active";
   if (status === "REJECTED" || status === "SUSPENDED") return "badge badge-negative";

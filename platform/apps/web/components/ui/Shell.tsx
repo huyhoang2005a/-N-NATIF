@@ -3,7 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, LogOut, Search } from "lucide-react";
+import { Bell, LogOut, Menu, Search, X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { MeResponse, NotificationResponse } from "@r2m/contracts";
 import { apiFetch, authFetch } from "../../lib/api-client";
@@ -37,6 +37,7 @@ export function Shell({
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
   const [unreadCount, setUnreadCount] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     authFetch<NotificationResponse[]>("/notifications?status=UNREAD")
@@ -45,6 +46,11 @@ export function Shell({
         // Badge chuông là tiện ích phụ, không chặn render Shell nếu request lỗi
         // (vd session sắp hết hạn) — trang gọi Shell đã tự xử lý session riêng.
       });
+  }, [pathname]);
+
+  // Đóng menu di động mỗi khi chuyển trang, tránh sidebar che màn hình ở trang mới.
+  useEffect(() => {
+    setMenuOpen(false);
   }, [pathname]);
 
   async function onLogout() {
@@ -73,11 +79,22 @@ export function Shell({
 
   return (
     <div className="uikit-shell">
-      <aside className="uikit-sidebar">
-        <Link href="/dashboard" className="uikit-sidebar__brand">
-          <BrandMark />
-          <span>{brandLabel}</span>
-        </Link>
+      {menuOpen && <div className="uikit-sidebar-backdrop" onClick={() => setMenuOpen(false)} aria-hidden="true" />}
+      <aside className={`uikit-sidebar ${menuOpen ? "uikit-sidebar--open" : ""}`}>
+        <div className="uikit-sidebar__header">
+          <Link href="/dashboard" className="uikit-sidebar__brand">
+            <BrandMark />
+            <span>{brandLabel}</span>
+          </Link>
+          <button
+            type="button"
+            className="uikit-sidebar__close"
+            onClick={() => setMenuOpen(false)}
+            aria-label="Đóng menu"
+          >
+            <X aria-hidden="true" />
+          </button>
+        </div>
         <nav className="uikit-sidebar__nav">
           {nav.map((item) => {
             const active = pathname === item.href || pathname?.startsWith(`${item.href}/`);
@@ -97,6 +114,14 @@ export function Shell({
       </aside>
       <div className="uikit-shell__main">
         <div className="uikit-topbar">
+          <button
+            type="button"
+            className="uikit-topbar__menu-btn"
+            onClick={() => setMenuOpen(true)}
+            aria-label="Mở menu điều hướng"
+          >
+            <Menu aria-hidden="true" />
+          </button>
           <form onSubmit={onSearchSubmit} className="uikit-search">
             <Search className="uikit-search__icon" aria-hidden="true" />
             <input

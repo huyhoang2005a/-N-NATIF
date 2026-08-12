@@ -29,7 +29,7 @@ import {
 import { navForPersona, personaOf } from "../../lib/nav";
 import { getAccessToken } from "../../lib/session";
 import { toneOf, ORGANIZATION_STATUS_TONE, VERIFICATION_REQUEST_STATUS_TONE } from "../../lib/tone";
-import { Card, FileField, GhostButton, PrimaryButton, SectionHeader, SelectField, Shell, StatusPill, TextField } from "../../components/ui";
+import { Card, FileField, GhostButton, PageLoader, PrimaryButton, SectionHeader, SelectField, Shell, StatusPill, TextField } from "../../components/ui";
 
 const DOCUMENT_TYPE_OPTIONS = [
   { value: "IDENTITY_DOCUMENT", label: "Giấy tờ tuỳ thân" },
@@ -63,6 +63,12 @@ export default function ProfilePage() {
   const [editForm, setEditForm] = useState<UpdateProfileRequest>({});
   const [editStatus, setEditStatus] = useState<"idle" | "loading" | "error">("idle");
   const [editError, setEditError] = useState<string | null>(null);
+
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({ currentPassword: "", newPassword: "", confirmNewPassword: "" });
+  const [passwordStatus, setPasswordStatus] = useState<"idle" | "loading">("idle");
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
 
   const [showVerifyForm, setShowVerifyForm] = useState(false);
   const [verifyForm, setVerifyForm] = useState({ affiliationOrgId: "", documentType: "IDENTITY_DOCUMENT", submittedNote: "" });
@@ -104,6 +110,36 @@ export default function ProfilePage() {
         setLoadError("Không tải được hồ sơ.");
       });
   }, [router]);
+
+  async function onChangePassword(event: React.FormEvent) {
+    event.preventDefault();
+    setPasswordError(null);
+    if (passwordForm.newPassword !== passwordForm.confirmNewPassword) {
+      setPasswordError("Mật khẩu mới nhập lại không khớp.");
+      return;
+    }
+    setPasswordStatus("loading");
+    try {
+      await authFetch("/me/password", {
+        method: "PATCH",
+        body: JSON.stringify({
+          currentPassword: passwordForm.currentPassword,
+          newPassword: passwordForm.newPassword,
+        }),
+      });
+      setPasswordForm({ currentPassword: "", newPassword: "", confirmNewPassword: "" });
+      setPasswordSuccess(true);
+      setShowPasswordForm(false);
+    } catch (err) {
+      if (err instanceof SessionExpiredError) {
+        router.push("/login");
+        return;
+      }
+      setPasswordError(err instanceof ApiError ? describeErrorCode(err.code) : "Đổi mật khẩu thất bại.");
+    } finally {
+      setPasswordStatus("idle");
+    }
+  }
 
   async function onSaveProfile(event: React.FormEvent) {
     event.preventDefault();
@@ -371,7 +407,7 @@ export default function ProfilePage() {
         </div>
       );
     }
-    return null;
+    return <PageLoader />;
   }
 
   const roleLabel = PLATFORM_ROLE_LABELS[me.platformRole] ?? me.platformRole;
@@ -379,7 +415,7 @@ export default function ProfilePage() {
   if (!profile || !organizations) {
     return (
       <Shell brandLabel="R2M" me={me} roleLabel={roleLabel} nav={navForPersona(personaOf(me, []), false)}>
-        {null}
+        <PageLoader inline />
       </Shell>
     );
   }
@@ -477,6 +513,58 @@ export default function ProfilePage() {
               )}
               <PrimaryButton type="submit" disabled={editStatus === "loading"}>
                 {editStatus === "loading" ? "Đang lưu…" : "Lưu thay đổi"}
+              </PrimaryButton>
+            </form>
+          )}
+        </Card>
+
+        <Card>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <SectionHeader title="Đổi mật khẩu" />
+            <GhostButton
+              onClick={() => {
+                setShowPasswordForm((v) => !v);
+                setPasswordError(null);
+                setPasswordSuccess(false);
+              }}
+            >
+              {showPasswordForm ? "Đóng" : "Đổi mật khẩu"}
+            </GhostButton>
+          </div>
+          {passwordSuccess && !showPasswordForm && (
+            <p style={{ fontSize: 13, color: "var(--uikit-emerald-700)" }}>Đổi mật khẩu thành công.</p>
+          )}
+          {showPasswordForm && (
+            <form onSubmit={onChangePassword} className="uikit-stack" style={{ marginTop: "var(--space-4)", paddingTop: "var(--space-4)", borderTop: "1px solid var(--uikit-slate-100)" }}>
+              <TextField
+                label="Mật khẩu hiện tại"
+                type="password"
+                required
+                value={passwordForm.currentPassword}
+                onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+              />
+              <TextField
+                label="Mật khẩu mới"
+                type="password"
+                required
+                hint="Tối thiểu 8 ký tự."
+                value={passwordForm.newPassword}
+                onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+              />
+              <TextField
+                label="Nhập lại mật khẩu mới"
+                type="password"
+                required
+                value={passwordForm.confirmNewPassword}
+                onChange={(e) => setPasswordForm({ ...passwordForm, confirmNewPassword: e.target.value })}
+              />
+              {passwordError && (
+                <p className="uikit-alert-error" role="alert">
+                  {passwordError}
+                </p>
+              )}
+              <PrimaryButton type="submit" disabled={passwordStatus === "loading"}>
+                {passwordStatus === "loading" ? "Đang lưu…" : "Lưu mật khẩu mới"}
               </PrimaryButton>
             </form>
           )}

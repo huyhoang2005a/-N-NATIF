@@ -3,12 +3,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthService } from "./auth.service";
 import type { AuthRepository } from "./auth.repository";
 import type { TokenService } from "./token.service";
+import type { AuditService } from "../../platform-operations/audit/audit.service";
+import type { Database } from "@r2m/database";
 
 function buildDeps() {
   const authRepository = {
     findLocalIdentityByEmail: vi.fn(),
+    findLocalIdentityByUserId: vi.fn(),
     findUserById: vi.fn(),
     touchLastLogin: vi.fn(),
+    updatePasswordHash: vi.fn(),
   } as unknown as AuthRepository;
 
   const tokenService = {
@@ -17,7 +21,10 @@ function buildDeps() {
     verifyRefreshToken: vi.fn(),
   } as unknown as TokenService;
 
-  return { authRepository, tokenService };
+  const auditService = { write: vi.fn() } as unknown as AuditService;
+  const db = { transaction: vi.fn((fn: (tx: Database) => unknown) => fn({} as Database)) } as unknown as Database;
+
+  return { authRepository, tokenService, auditService, db };
 }
 
 describe("AuthService.login", () => {
@@ -26,7 +33,7 @@ describe("AuthService.login", () => {
 
   beforeEach(() => {
     deps = buildDeps();
-    service = new AuthService(deps.authRepository, deps.tokenService);
+    service = new AuthService(deps.authRepository, deps.tokenService, deps.auditService, deps.db);
   });
 
   it("issues tokens for a correct email/password against an ACTIVE account", async () => {
@@ -79,7 +86,7 @@ describe("AuthService.refresh", () => {
   it("rejects an invalid refresh token", async () => {
     const deps = buildDeps();
     vi.mocked(deps.tokenService.verifyRefreshToken).mockReturnValue(null);
-    const service = new AuthService(deps.authRepository, deps.tokenService);
+    const service = new AuthService(deps.authRepository, deps.tokenService, deps.auditService, deps.db);
 
     await expect(service.refresh("garbage")).rejects.toMatchObject({
       code: "AUTH_INVALID_REFRESH_TOKEN",
@@ -97,7 +104,7 @@ describe("AuthService.refresh", () => {
       id: "user-1",
       status: "ACTIVE",
     } as never);
-    const service = new AuthService(deps.authRepository, deps.tokenService);
+    const service = new AuthService(deps.authRepository, deps.tokenService, deps.auditService, deps.db);
 
     const result = await service.refresh("valid-refresh-token");
     expect(result.accessToken).toBe("access-token");

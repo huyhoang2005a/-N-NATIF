@@ -9,7 +9,7 @@ import { PLATFORM_ROLE_LABELS, TECHNOLOGY_CASE_STATUS_LABELS } from "../../lib/l
 import { navForPersona, personaOf } from "../../lib/nav";
 import { getAccessToken } from "../../lib/session";
 import { toneOf, TECHNOLOGY_CASE_STATUS_TONE } from "../../lib/tone";
-import { Card, PrimaryButtonLink, Shell, StatusDot } from "../../components/ui";
+import { Card, PageLoader, PrimaryButtonLink, Shell, StatusDot } from "../../components/ui";
 
 export default function TechnologyCasesPage() {
   const router = useRouter();
@@ -52,8 +52,7 @@ export default function TechnologyCasesPage() {
     );
   }
 
-  if (!me || !organizations || !cases) return null;
-
+  if (!me || !organizations || !cases) return <PageLoader />;
   const nav = navForPersona(personaOf(me, organizations), me.platformRole === "PLATFORM_ADMIN");
 
   return (

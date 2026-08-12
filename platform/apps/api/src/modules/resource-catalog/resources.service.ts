@@ -454,6 +454,19 @@ export class ResourcesService {
     return toVersionResponse(publishedVersion);
   }
 
+  /** Not spec-mandated — explicit user-approved addition covering the frontend gap noted
+   * in [[r2m_frontend_status]] ("versions list shows only what you create this session").
+   * Same visibility rule as `getById`: PUBLIC, owning-org member, or explicit grant. */
+  async listVersions(actor: ActorContext, resourceId: string): Promise<ResourceVersionResponse[]> {
+    const resource = await this.resourcesRepository.findById(resourceId);
+    if (!resource) {
+      throw new NotFoundError(ErrorCode.RESOURCE_NOT_FOUND, "Resource not found.");
+    }
+    await this.assertVisible(actor, resource);
+    const versions = await this.resourcesRepository.listVersionsByResource(resourceId);
+    return versions.map(toVersionResponse);
+  }
+
   /** Public so other bounded contexts (e.g. `technology-case/evidence.service.ts`, which
    * must confirm the actor can read a resource version before linking it as evidence —
    * UC-EVD-01) can reuse the exact same 3-way visibility check instead of duplicating

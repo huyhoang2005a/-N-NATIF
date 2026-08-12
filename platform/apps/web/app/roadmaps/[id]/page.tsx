@@ -34,7 +34,7 @@ import {
   ROADMAP_STATUS_TONE,
   TASK_STATUS_TONE,
 } from "../../../lib/tone";
-import { Card, GhostButton, PrimaryButton, SelectField, Shell, StatusPill, TextField } from "../../../components/ui";
+import { BackLink, Card, GhostButton, PageLoader, PrimaryButton, SelectField, Shell, StatusPill, TextField } from "../../../components/ui";
 
 const PRIORITY_LEVELS = Object.keys(PRIORITY_LEVEL_LABELS);
 const DEPENDENCY_TYPES = Object.keys(DEPENDENCY_TYPE_LABELS);
@@ -260,7 +260,7 @@ export default function RoadmapDetailPage() {
         </div>
       );
     }
-    return null;
+    return <PageLoader />;
   }
 
   const roleLabel = PLATFORM_ROLE_LABELS[me.platformRole] ?? me.platformRole;
@@ -279,7 +279,7 @@ export default function RoadmapDetailPage() {
   if (!roadmap || !milestones || !dependencies || !reviews || !caseGaps) {
     return (
       <Shell brandLabel="R2M" me={me} roleLabel={roleLabel} nav={nav}>
-        {null}
+        <PageLoader inline />
       </Shell>
     );
   }
@@ -287,6 +287,7 @@ export default function RoadmapDetailPage() {
   return (
     <Shell brandLabel="R2M" me={me} roleLabel={roleLabel} nav={nav}>
       <div className="uikit-stack" style={{ maxWidth: 800 }}>
+        <BackLink href={`/technology-cases/${roadmap.technologyCaseId}`}>Quay lại case</BackLink>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-4)" }}>
           <h1 style={{ fontSize: 22 }}>
             {roadmap.title} · v{roadmap.versionNo}

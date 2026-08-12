@@ -10,7 +10,7 @@ import { NEED_STATUS_LABELS, PLATFORM_ROLE_LABELS } from "../../lib/labels";
 import { navForPersona, personaOf } from "../../lib/nav";
 import { getAccessToken } from "../../lib/session";
 import { NEED_STATUS_TONE, toneOf } from "../../lib/tone";
-import { Card, PrimaryButtonLink, SaveButton, Shell, StatusDot, Tabs, VoteButton } from "../../components/ui";
+import { Card, PageLoader, PrimaryButtonLink, SaveButton, Shell, StatusDot, Tabs, VoteButton } from "../../components/ui";
 
 const SORT_TABS = ["Mới nhất", "Điểm cao nhất", "Thịnh hành"] as const;
 const SORT_TAB_TO_VALUE: Record<(typeof SORT_TABS)[number], "new" | "top" | "hot"> = {
@@ -89,8 +89,7 @@ function NeedsPageInner() {
     );
   }
 
-  if (!me || !organizations || !needs || !publicNeeds) return null;
-
+  if (!me || !organizations || !needs || !publicNeeds) return <PageLoader />;
   const nav = navForPersona(personaOf(me, organizations), me.platformRole === "PLATFORM_ADMIN");
   const primaryOrg = organizations[0];
   const canCreate = primaryOrg?.type === "ENTERPRISE" && primaryOrg.status === "ACTIVE";

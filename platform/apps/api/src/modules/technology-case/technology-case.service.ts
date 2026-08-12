@@ -4,11 +4,12 @@ import type {
   AddCaseOrganizationRequest,
   CaseMemberResponse,
   CaseOrganizationResponse,
+  PlatformCaseSummaryResponse,
   RegisterTechnologyCaseRequest,
   TechnologyCaseResponse,
 } from "@r2m/contracts";
 import type { ActorContext } from "@r2m/authz";
-import { assertActiveMember, isOrgOwnerOrAdmin } from "@r2m/authz";
+import { assertActiveMember, assertPlatformAdmin, isOrgOwnerOrAdmin } from "@r2m/authz";
 import type { Database } from "@r2m/database";
 import {
   AuthorVerificationStatus,
@@ -301,6 +302,12 @@ export class TechnologyCaseService {
       .map((membership) => membership.organizationId);
     const rows = await this.repository.listVisible({ actorUserId: actor.userId, actorOrgIds });
     return rows.map(toCaseResponse);
+  }
+
+  /** Not spec-mandated — explicit user-approved addition, see technology-case.repository.ts. */
+  async countAllForPlatform(actor: ActorContext): Promise<PlatformCaseSummaryResponse> {
+    assertPlatformAdmin(actor);
+    return this.repository.countAllForPlatform();
   }
 
   async listMembers(actor: ActorContext, technologyCaseId: string): Promise<CaseMemberResponse[]> {

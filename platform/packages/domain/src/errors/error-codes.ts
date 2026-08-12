@@ -14,6 +14,11 @@ export const ErrorCode = {
   AUTH_EMAIL_VERIFICATION_TOKEN_INVALID: "AUTH_EMAIL_VERIFICATION_TOKEN_INVALID",
   AUTH_EMAIL_VERIFICATION_TOKEN_EXPIRED: "AUTH_EMAIL_VERIFICATION_TOKEN_EXPIRED",
   AUTH_EMAIL_VERIFICATION_RATE_LIMITED: "AUTH_EMAIL_VERIFICATION_RATE_LIMITED",
+  // Not spec-mandated (change-password is outside docs/spec/, explicit user-approved
+  // addition like the join-org flow) — same AUTH_* naming convention as the rest of the
+  // group. 403, not 401: distinct from AUTH_UNAUTHENTICATED so apps/web's authFetch
+  // refresh-and-retry interceptor (keyed on that exact code) never fires for this.
+  AUTH_CURRENT_PASSWORD_INVALID: "AUTH_CURRENT_PASSWORD_INVALID",
 
   // ORG_*
   ORG_ALREADY_EXISTS: "ORG_ALREADY_EXISTS",

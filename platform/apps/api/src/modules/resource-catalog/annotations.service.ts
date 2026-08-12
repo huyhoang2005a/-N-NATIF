@@ -13,6 +13,7 @@ import { AuditService } from "../platform-operations/audit/audit.service";
 import { OutboxService } from "../platform-operations/jobs/outbox.service";
 import { AnnotationsRepository } from "./annotations.repository";
 import { ResourcesRepository } from "./resources.repository";
+import { ResourcesService } from "./resources.service";
 
 interface AnnotationRow {
   id: string;
@@ -57,6 +58,7 @@ export class AnnotationsService {
   constructor(
     private readonly annotationsRepository: AnnotationsRepository,
     private readonly resourcesRepository: ResourcesRepository,
+    private readonly resourcesService: ResourcesService,
     private readonly auditService: AuditService,
     private readonly outboxService: OutboxService,
     @Inject(DATABASE) private readonly db: Database,
@@ -79,6 +81,32 @@ export class AnnotationsService {
     }
     assertCanManageResource(actor, resource.ownerOrganizationId);
     return { version, resource };
+  }
+
+  /** Not spec-mandated — explicit user-approved addition, see annotations.repository.ts.
+   * Read access follows resource *visibility* (`assertVisible`), not `assertCanManageResource`
+   * — any actor who can see the resource can read its annotations, matching how the create
+   * form itself is presented in the UI to any resource viewer, not just managers. */
+  async listByVersion(actor: ActorContext, resourceVersionId: string): Promise<AnnotationResponse[]> {
+    const version = await this.resourcesRepository.findVersionById(resourceVersionId);
+    if (!version) {
+      throw new NotFoundError(ErrorCode.RESOURCE_VERSION_NOT_FOUND, "Resource version not found.");
+    }
+    const resource = await this.resourcesRepository.findById(version.resourceId);
+    if (!resource) {
+      throw new NotFoundError(ErrorCode.RESOURCE_NOT_FOUND, "Resource not found.");
+    }
+    await this.resourcesService.assertVisible(actor, resource);
+
+    const annotations = await this.annotationsRepository.listByVersion(resourceVersionId);
+    const revisions = await Promise.all(
+      annotations.map((annotation) => this.annotationsRepository.findRevision(annotation.id, annotation.latestRevisionNo)),
+    );
+    return annotations.map((annotation, index) => {
+      const revision = revisions[index];
+      if (!revision) throw new Error(`listByVersion: annotation ${annotation.id} has no latest revision row`);
+      return toResponse(annotation, revision);
+    });
   }
 
   async create(

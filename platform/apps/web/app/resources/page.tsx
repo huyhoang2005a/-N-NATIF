@@ -9,7 +9,7 @@ import { authFetch, SessionExpiredError } from "../../lib/api-client";
 import { PLATFORM_ROLE_LABELS, RESOURCE_ACCESS_LEVEL_LABELS, RESOURCE_TYPE_LABELS } from "../../lib/labels";
 import { navForPersona, personaOf } from "../../lib/nav";
 import { getAccessToken } from "../../lib/session";
-import { Card, PrimaryButtonLink, SaveButton, Shell, Tabs, VoteButton } from "../../components/ui";
+import { Card, PageLoader, PrimaryButtonLink, SaveButton, Shell, Tabs, VoteButton } from "../../components/ui";
 
 const SORT_TABS = ["Mới nhất", "Điểm cao nhất", "Thịnh hành"] as const;
 const SORT_TAB_TO_VALUE: Record<(typeof SORT_TABS)[number], "new" | "top" | "hot"> = {
@@ -83,8 +83,7 @@ function ResourcesPageInner() {
     );
   }
 
-  if (!me || !organizations || !resources) return null;
-
+  if (!me || !organizations || !resources) return <PageLoader />;
   const nav = navForPersona(personaOf(me, organizations), me.platformRole === "PLATFORM_ADMIN");
 
   return (
@@ -107,49 +106,51 @@ function ResourcesPageInner() {
                 : "Chưa có tài nguyên nào. Đăng bài báo, bộ dữ liệu, mô hình hay kết quả thực nghiệm đầu tiên để làm bằng chứng cho các technology case sau này."}
             </p>
           ) : (
-            <table className="uikit-table">
-              <thead>
-                <tr>
-                  <th>Tên tài nguyên</th>
-                  <th>Loại</th>
-                  <th>Quyền truy cập</th>
-                  <th>Bình chọn</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {resources.map((r) => (
-                  <tr key={r.id}>
-                    <td>
-                      <Link href={`/resources/${r.id}`} style={{ color: "var(--uikit-indigo-700)", fontWeight: 500, textDecoration: "none" }}>
-                        {r.title}
-                      </Link>
-                    </td>
-                    <td style={{ color: "var(--uikit-slate-500)" }}>{RESOURCE_TYPE_LABELS[r.type] ?? r.type}</td>
-                    <td style={{ color: "var(--uikit-slate-500)" }}>
-                      {RESOURCE_ACCESS_LEVEL_LABELS[r.accessLevel] ?? r.accessLevel}
-                    </td>
-                    <td>
-                      <VoteButton
-                        path={`/resources/${r.id}/votes`}
-                        votedByMe={r.votedByMe}
-                        voteCount={r.voteCount}
-                        onChange={(next) => onVoteChange(r.id, next)}
-                        onSessionExpired={() => router.push("/login")}
-                      />
-                    </td>
-                    <td>
-                      <SaveButton
-                        path={`/resources/${r.id}/saves`}
-                        savedByMe={r.savedByMe}
-                        onChange={(next) => onSaveChange(r.id, next)}
-                        onSessionExpired={() => router.push("/login")}
-                      />
-                    </td>
+            <div className="uikit-table-scroll">
+              <table className="uikit-table">
+                <thead>
+                  <tr>
+                    <th>Tên tài nguyên</th>
+                    <th>Loại</th>
+                    <th>Quyền truy cập</th>
+                    <th>Bình chọn</th>
+                    <th />
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {resources.map((r) => (
+                    <tr key={r.id}>
+                      <td>
+                        <Link href={`/resources/${r.id}`} style={{ color: "var(--uikit-indigo-700)", fontWeight: 500, textDecoration: "none" }}>
+                          {r.title}
+                        </Link>
+                      </td>
+                      <td style={{ color: "var(--uikit-slate-500)" }}>{RESOURCE_TYPE_LABELS[r.type] ?? r.type}</td>
+                      <td style={{ color: "var(--uikit-slate-500)" }}>
+                        {RESOURCE_ACCESS_LEVEL_LABELS[r.accessLevel] ?? r.accessLevel}
+                      </td>
+                      <td>
+                        <VoteButton
+                          path={`/resources/${r.id}/votes`}
+                          votedByMe={r.votedByMe}
+                          voteCount={r.voteCount}
+                          onChange={(next) => onVoteChange(r.id, next)}
+                          onSessionExpired={() => router.push("/login")}
+                        />
+                      </td>
+                      <td>
+                        <SaveButton
+                          path={`/resources/${r.id}/saves`}
+                          savedByMe={r.savedByMe}
+                          onChange={(next) => onSaveChange(r.id, next)}
+                          onSessionExpired={() => router.push("/login")}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </Card>
       </div>

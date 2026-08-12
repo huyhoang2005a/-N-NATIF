@@ -5,6 +5,7 @@ import type {
   CaseOrganizationResponse,
   CreateEvidenceRequest,
   EvidenceResponse,
+  PlatformCaseSummaryResponse,
   RegisterTechnologyCaseRequest,
   TechnologyCaseResponse,
   TransitionCaseRequest,
@@ -120,5 +121,16 @@ export class TechnologyCasesController {
   @Get(":id/evidence")
   listEvidence(@CurrentActor() actor: ActorContext, @Param("id") id: string): Promise<EvidenceResponse[]> {
     return this.evidenceService.listByCase(actor, id);
+  }
+}
+
+/** Not spec-mandated — explicit user-approved addition, see technology-case.service.ts. */
+@Controller("platform/technology-cases")
+export class PlatformTechnologyCasesController {
+  constructor(private readonly technologyCaseService: TechnologyCaseService) {}
+
+  @Get("summary")
+  summary(@CurrentActor() actor: ActorContext): Promise<PlatformCaseSummaryResponse> {
+    return this.technologyCaseService.countAllForPlatform(actor);
   }
 }

@@ -14,7 +14,7 @@ import { authFetch, SessionExpiredError } from "../../../lib/api-client";
 import { PLATFORM_ROLE_LABELS } from "../../../lib/labels";
 import { navForPersona } from "../../../lib/nav";
 import { getAccessToken } from "../../../lib/session";
-import { Card, Shell, StatusPill } from "../../../components/ui";
+import { Card, PageLoader, Shell, StatusPill } from "../../../components/ui";
 
 interface ReviewItem {
   caseId: string;
@@ -104,8 +104,7 @@ export default function ReviewsPage() {
     );
   }
 
-  if (!me) return null;
-
+  if (!me) return <PageLoader />;
   const nav = navForPersona("platform-ops", me.platformRole === "PLATFORM_ADMIN");
 
   return (

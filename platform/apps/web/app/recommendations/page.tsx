@@ -15,7 +15,7 @@ import { describeErrorCode } from "../../lib/error-messages";
 import { PLATFORM_ROLE_LABELS } from "../../lib/labels";
 import { navForPersona, personaOf } from "../../lib/nav";
 import { getAccessToken } from "../../lib/session";
-import { AbstractText, Card, GhostButton, MatchScoreBadge, PrimaryButton, SectionHeader, Shell, TextField } from "../../components/ui";
+import { AbstractText, Card, GhostButton, MatchScoreBadge, PageLoader, PrimaryButton, SectionHeader, Shell, TextField } from "../../components/ui";
 
 export default function RecommendationsPage() {
   const router = useRouter();
@@ -137,8 +137,7 @@ export default function RecommendationsPage() {
     );
   }
 
-  if (!me || !organizations || !items) return null;
-
+  if (!me || !organizations || !items) return <PageLoader />;
   const nav = navForPersona(personaOf(me, organizations), me.platformRole === "PLATFORM_ADMIN");
   const canUseFeed = primaryOrg?.type === "ENTERPRISE" && primaryOrg.status === "ACTIVE";
 

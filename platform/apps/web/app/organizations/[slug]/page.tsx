@@ -6,7 +6,7 @@ import { useParams } from "next/navigation";
 import type { PublicOrganizationProfileResponse } from "@r2m/contracts";
 import { ApiError, apiFetch } from "../../../lib/api-client";
 import { describeErrorCode } from "../../../lib/error-messages";
-import { AbstractText, AuthorOrgByline, BrandMark, Card, FollowButton } from "../../../components/ui";
+import { AbstractText, AuthorOrgByline, BackButton, BrandMark, Card, FollowButton } from "../../../components/ui";
 
 /** Public, unauthenticated — same scope rules as `/authors/[slug]`: `PUBLIC` resources
  * only, `VERIFIED` authors only, no case/evidence/assessment data. */
@@ -23,10 +23,13 @@ export default function PublicOrganizationProfilePage() {
 
   return (
     <div style={{ maxWidth: 720, margin: "0 auto", padding: "var(--space-6) var(--space-4)" }}>
-      <Link href="/" style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-2)", marginBottom: "var(--space-5)" }}>
-        <BrandMark />
-        <span style={{ fontWeight: 600 }}>R2M</span>
-      </Link>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--space-3)", marginBottom: "var(--space-5)", flexWrap: "wrap" }}>
+        <Link href="/" style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-2)" }}>
+          <BrandMark />
+          <span style={{ fontWeight: 600 }}>R2M</span>
+        </Link>
+        <BackButton fallbackHref="/explore" />
+      </div>
 
       {error && (
         <p className="uikit-alert-error" role="alert">

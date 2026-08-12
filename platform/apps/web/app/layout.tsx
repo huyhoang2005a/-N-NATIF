@@ -28,6 +28,11 @@ export const metadata = {
   description: "Sổ đăng ký cho các tổ chức nghiên cứu, doanh nghiệp và cơ quan nhà nước trên R2M.",
 };
 
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+};
+
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="vi" className={`${beVietnamPro.variable} ${plexSans.variable} ${plexMono.variable}`}>

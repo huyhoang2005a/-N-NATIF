@@ -9,7 +9,7 @@ import { describeErrorCode } from "../../lib/error-messages";
 import { PLATFORM_ROLE_LABELS } from "../../lib/labels";
 import { navForPersona, personaOf } from "../../lib/nav";
 import { getAccessToken } from "../../lib/session";
-import { Card, GhostButton, PrimaryButton, Shell, StatusDot } from "../../components/ui";
+import { Card, GhostButton, PageLoader, PrimaryButton, Shell, StatusDot } from "../../components/ui";
 
 export default function NotificationsPage() {
   const router = useRouter();
@@ -89,8 +89,7 @@ export default function NotificationsPage() {
     }
   }
 
-  if (!me || !organizations) return null;
-
+  if (!me || !organizations) return <PageLoader />;
   const nav = navForPersona(personaOf(me, organizations), me.platformRole === "PLATFORM_ADMIN");
   const visible = (notifications ?? []).filter((n) => n.status !== "ARCHIVED");
   const unreadCount = visible.filter((n) => n.status === "UNREAD").length;

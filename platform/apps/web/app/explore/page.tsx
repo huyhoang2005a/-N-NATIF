@@ -8,7 +8,7 @@ import { authFetch, SessionExpiredError } from "../../lib/api-client";
 import { PLATFORM_ROLE_LABELS } from "../../lib/labels";
 import { navForPersona, personaOf } from "../../lib/nav";
 import { getAccessToken } from "../../lib/session";
-import { Card, Shell } from "../../components/ui";
+import { Card, PageLoader, Shell } from "../../components/ui";
 
 /** Cộng đồng đợt 7 — duyệt nhu cầu nghiên cứu theo lĩnh vực kỹ thuật, kiểu "subreddit"
  * của Reddit. Chỉ áp dụng cho research_need — resource không có field tương đương (xem
@@ -54,8 +54,7 @@ export default function ExplorePage() {
     );
   }
 
-  if (!me || !organizations || !fields) return null;
-
+  if (!me || !organizations || !fields) return <PageLoader />;
   const nav = navForPersona(personaOf(me, organizations), me.platformRole === "PLATFORM_ADMIN");
 
   return (

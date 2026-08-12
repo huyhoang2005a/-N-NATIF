@@ -7,7 +7,7 @@ import type { LoginRequest, TokenResponse } from "@r2m/contracts";
 import { ApiError, apiFetch } from "../../lib/api-client";
 import { describeErrorCode } from "../../lib/error-messages";
 import { saveTokens } from "../../lib/session";
-import { BrandMark, PrimaryButton, TextField } from "../../components/ui";
+import { BackLink, BrandMark, PrimaryButton, TextField } from "../../components/ui";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -35,6 +35,7 @@ export default function LoginPage() {
   return (
     <div className="uikit-shell" style={{ alignItems: "center", justifyContent: "center" }}>
       <div style={{ width: "100%", maxWidth: 400, padding: "var(--space-6) var(--space-5)" }}>
+        <BackLink href="/">Về trang chủ</BackLink>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: "var(--space-6)" }}>
           <BrandMark size="lg" />
           <h1 style={{ fontSize: 22, marginTop: "var(--space-4)" }}>Đăng nhập R2M</h1>

@@ -9,7 +9,7 @@ import { NEED_STATUS_LABELS, PLATFORM_ROLE_LABELS, RESOURCE_TYPE_LABELS } from "
 import { navForPersona, personaOf } from "../../lib/nav";
 import { getAccessToken } from "../../lib/session";
 import { NEED_STATUS_TONE, toneOf } from "../../lib/tone";
-import { Card, SaveButton, Shell, StatusDot, VoteButton } from "../../components/ui";
+import { Card, PageLoader, SaveButton, Shell, StatusDot, VoteButton } from "../../components/ui";
 
 export default function SavedPage() {
   const router = useRouter();
@@ -72,8 +72,7 @@ export default function SavedPage() {
     );
   }
 
-  if (!me || !organizations || !items) return null;
-
+  if (!me || !organizations || !items) return <PageLoader />;
   const nav = navForPersona(personaOf(me, organizations), me.platformRole === "PLATFORM_ADMIN");
 
   return (

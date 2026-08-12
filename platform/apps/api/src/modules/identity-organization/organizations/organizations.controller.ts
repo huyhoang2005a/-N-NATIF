@@ -21,6 +21,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Req,
   UploadedFile,
   UseInterceptors,
@@ -31,6 +32,7 @@ import type { Request } from "express";
 import { CurrentActor } from "../../../common/decorators/current-actor.decorator";
 import { toDocumentUpload } from "../../../common/multipart/document-upload.util";
 import { Public } from "../../../common/decorators/public.decorator";
+import { parsePageLimit, parsePageOffset } from "../../../common/pagination/parse-page-params.util";
 import { ZodValidationPipe } from "../../../common/pipes/zod-validation.pipe";
 import { OrganizationsService } from "./organizations.service";
 
@@ -111,5 +113,20 @@ export class OrganizationsController {
     @Req() req: Request,
   ): Promise<OrganizationMemberResponse> {
     return this.organizationsService.updateMember(actor, id, memberId, body, requestId(req));
+  }
+}
+
+/** Not spec-mandated — explicit user-approved addition, see organizations.service.ts. */
+@Controller("platform/organizations")
+export class PlatformOrganizationsController {
+  constructor(private readonly organizationsService: OrganizationsService) {}
+
+  @Get()
+  listAll(
+    @CurrentActor() actor: ActorContext,
+    @Query("limit") limit?: string,
+    @Query("offset") offset?: string,
+  ): Promise<OrganizationResponse[]> {
+    return this.organizationsService.listAllForPlatform(actor, parsePageLimit(limit), parsePageOffset(offset));
   }
 }

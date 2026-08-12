@@ -1,8 +1,16 @@
-import type { LoginRequest, MeResponse, PendingMembershipResponse, RefreshRequest, TokenResponse } from "@r2m/contracts";
-import { LoginRequestSchema, RefreshRequestSchema } from "@r2m/contracts";
+import type {
+  ChangePasswordRequest,
+  LoginRequest,
+  MeResponse,
+  PendingMembershipResponse,
+  RefreshRequest,
+  TokenResponse,
+} from "@r2m/contracts";
+import { ChangePasswordRequestSchema, LoginRequestSchema, RefreshRequestSchema } from "@r2m/contracts";
 import type { Database } from "@r2m/database";
 import { schema } from "@r2m/database";
-import { Body, Controller, Get, HttpCode, Inject, Post, UseGuards, UsePipes } from "@nestjs/common";
+import { Body, Controller, Get, HttpCode, Inject, Patch, Post, Req, UseGuards, UsePipes } from "@nestjs/common";
+import type { Request } from "express";
 import { eq } from "drizzle-orm";
 import { DATABASE } from "../../../database/database.module";
 import { CurrentActor } from "../../../common/decorators/current-actor.decorator";
@@ -71,5 +79,17 @@ export class AuthController {
   @Get("me/pending-memberships")
   listPendingMemberships(@CurrentActor() actor: ActorContext): Promise<PendingMembershipResponse[]> {
     return this.organizationsService.listPendingMemberships(actor);
+  }
+
+  @Patch("me/password")
+  @HttpCode(204)
+  @UsePipes(new ZodValidationPipe(ChangePasswordRequestSchema))
+  async changePassword(
+    @CurrentActor() actor: ActorContext,
+    @Body() body: ChangePasswordRequest,
+    @Req() req: Request,
+  ): Promise<void> {
+    const requestId = (req.headers["x-request-id"] as string) ?? null;
+    await this.authService.changePassword(actor, body, requestId);
   }
 }

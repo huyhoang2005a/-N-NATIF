@@ -22,21 +22,7 @@ import { NEED_STATUS_LABELS, PLATFORM_ROLE_LABELS, PROPOSAL_STATUS_LABELS, VISIB
 import { navForPersona, personaOf } from "../../../lib/nav";
 import { getAccessToken } from "../../../lib/session";
 import { NEED_STATUS_TONE, PROPOSAL_STATUS_TONE, toneOf } from "../../../lib/tone";
-import {
-  AbstractText,
-  BackLink,
-  Card,
-  GhostButton,
-  MatchScoreBadge,
-  PrimaryButton,
-  SaveButton,
-  SectionHeader,
-  SelectField,
-  Shell,
-  StatusPill,
-  TextField,
-  VoteButton,
-} from "../../../components/ui";
+import { AbstractText, BackLink, Card, GhostButton, MatchScoreBadge, PageLoader, PrimaryButton, SaveButton, SectionHeader, SelectField, Shell, StatusPill, TextField, VoteButton } from "../../../components/ui";
 
 export default function ResearchNeedDetailPage() {
   const router = useRouter();
@@ -307,8 +293,7 @@ export default function ResearchNeedDetailPage() {
     );
   }
 
-  if (!me || !organizations || !need || !versions) return null;
-
+  if (!me || !organizations || !need || !versions) return <PageLoader />;
   const nav = navForPersona(personaOf(me, organizations), me.platformRole === "PLATFORM_ADMIN");
   const isMember = organizations.some((o) => o.id === need.companyOrganizationId);
 

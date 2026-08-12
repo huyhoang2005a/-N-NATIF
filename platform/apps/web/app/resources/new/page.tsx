@@ -14,7 +14,7 @@ import { describeErrorCode } from "../../../lib/error-messages";
 import { PLATFORM_ROLE_LABELS, RESOURCE_ACCESS_LEVEL_LABELS, RESOURCE_TYPE_LABELS } from "../../../lib/labels";
 import { navForPersona, personaOf } from "../../../lib/nav";
 import { getAccessToken } from "../../../lib/session";
-import { BackLink, PrimaryButton, SelectField, Shell, TextField } from "../../../components/ui";
+import { BackLink, PageLoader, PrimaryButton, SelectField, Shell, TextField } from "../../../components/ui";
 
 export default function ResourceNewPage() {
   const router = useRouter();
@@ -98,8 +98,7 @@ export default function ResourceNewPage() {
     }
   }
 
-  if (!me || !organizations) return null;
-
+  if (!me || !organizations) return <PageLoader />;
   const nav = navForPersona(personaOf(me, organizations), me.platformRole === "PLATFORM_ADMIN");
 
   if (loadError) {

@@ -151,6 +151,14 @@ export const CONTENT_FLAG_STATUS_TONE: Record<string, Tone> = {
   DISMISSED: "gray",
 };
 
+/** `user_status` enum — used by `/platform/users`. */
+export const USER_STATUS_TONE: Record<string, Tone> = {
+  INVITED: "amber",
+  ACTIVE: "green",
+  SUSPENDED: "red",
+  DEACTIVATED: "gray",
+};
+
 export function toneOf(map: Record<string, Tone>, value: string): Tone {
   return map[value] ?? "gray";
 }

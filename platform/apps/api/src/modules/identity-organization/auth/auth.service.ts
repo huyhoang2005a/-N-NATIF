@@ -1,8 +1,12 @@
-import type { LoginRequest, TokenResponse } from "@r2m/contracts";
-import { ErrorCode, UnauthenticatedError } from "@r2m/domain";
-import { Injectable } from "@nestjs/common";
+import type { ChangePasswordRequest, LoginRequest, TokenResponse } from "@r2m/contracts";
+import { ErrorCode, ForbiddenError, UnauthenticatedError } from "@r2m/domain";
+import type { ActorContext } from "@r2m/authz";
+import type { Database } from "@r2m/database";
+import { Inject, Injectable } from "@nestjs/common";
 import * as bcrypt from "bcryptjs";
 import { v4 as uuidv4 } from "uuid";
+import { DATABASE } from "../../../database/database.module";
+import { AuditService } from "../../platform-operations/audit/audit.service";
 import { AuthRepository } from "./auth.repository";
 import { TokenService } from "./token.service";
 
@@ -11,6 +15,8 @@ export class AuthService {
   constructor(
     private readonly authRepository: AuthRepository,
     private readonly tokenService: TokenService,
+    private readonly auditService: AuditService,
+    @Inject(DATABASE) private readonly db: Database,
   ) {}
 
   async login(request: LoginRequest): Promise<TokenResponse> {
@@ -44,6 +50,36 @@ export class AuthService {
     }
 
     return this.issueTokens(user.id);
+  }
+
+  /** Not spec-mandated (docs/spec/ has no change-password UC) — explicit user-approved
+   * addition, same footing as the join-org flow. Requires the current password (defense
+   * against a stolen access token being enough to lock the real owner out). */
+  async changePassword(actor: ActorContext, request: ChangePasswordRequest, requestId: string | null): Promise<void> {
+    const identity = await this.authRepository.findLocalIdentityByUserId(actor.userId);
+    if (!identity || !identity.passwordHash) {
+      throw new UnauthenticatedError(ErrorCode.AUTH_INVALID_CREDENTIALS, "No local password credential for this account.");
+    }
+
+    const currentMatches = await bcrypt.compare(request.currentPassword, identity.passwordHash);
+    if (!currentMatches) {
+      throw new ForbiddenError(ErrorCode.AUTH_CURRENT_PASSWORD_INVALID, "Current password is incorrect.");
+    }
+
+    const newHash = await bcrypt.hash(request.newPassword, 10);
+    await this.db.transaction(async (tx) => {
+      await this.authRepository.updatePasswordHash(identity.id, newHash, tx);
+      await this.auditService.write(
+        {
+          actorUserId: actor.userId,
+          requestId,
+          action: "user_identity.change_password",
+          entityType: "user_identity",
+          entityId: identity.id,
+        },
+        tx,
+      );
+    });
   }
 
   private issueTokens(userId: string): TokenResponse {

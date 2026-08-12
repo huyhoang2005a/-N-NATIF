@@ -14,7 +14,7 @@ import {
 import { navForPersona } from "../../../lib/nav";
 import { getAccessToken } from "../../../lib/session";
 import { CONTENT_FLAG_STATUS_TONE, toneOf } from "../../../lib/tone";
-import { Card, GhostButton, PrimaryButton, SelectField, Shell, StatusPill, TextField } from "../../../components/ui";
+import { Card, GhostButton, PageLoader, PrimaryButton, SelectField, Shell, StatusPill, TextField } from "../../../components/ui";
 
 const DECISION_ACTIONS = ["HIDE", "REMOVE", "RESTRICT_AUTHOR", "RESTORE", "KEEP"] as const;
 
@@ -90,8 +90,7 @@ export default function FlagsPage() {
     });
   }
 
-  if (!me) return null;
-
+  if (!me) return <PageLoader />;
   const nav = navForPersona("platform-ops", me.platformRole === "PLATFORM_ADMIN");
   const openFlags = (flags ?? []).filter((f) => f.status === "PENDING" || f.status === "IN_REVIEW");
 

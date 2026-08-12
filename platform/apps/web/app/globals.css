@@ -52,6 +52,9 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  /* Chốt chặn cuối: trang không bao giờ cuộn ngang dù 1 thành phần con nào đó lỡ
+     tràn — mọi khu vực có khả năng tràn (bảng, tab, ...) đã tự cuộn ngang riêng. */
+  overflow-x: hidden;
 }
 
 h1,
@@ -93,6 +96,32 @@ select {
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* ---------- page loader (spinning brand mark) ---------- */
+
+@keyframes r2m-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+.uikit-page-loader {
+  min-height: 100dvh;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--uikit-slate-50);
+}
+.uikit-page-loader--inline {
+  min-height: 280px;
+  background: transparent;
+}
+.uikit-page-loader__mark {
+  animation: r2m-spin 1s linear infinite;
 }
 
 /* ---------- layout ---------- */
@@ -853,21 +882,19 @@ select {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-sm);
-  background: var(--uikit-indigo-700);
-  color: #fff;
-  font-family: var(--font-mono);
-  font-weight: 700;
+  flex-shrink: 0;
+}
+.uikit-brand svg {
+  width: 100%;
+  height: 100%;
 }
 .uikit-brand--md {
   width: 28px;
   height: 28px;
-  font-size: 12px;
 }
 .uikit-brand--lg {
   width: 40px;
   height: 40px;
-  font-size: 15px;
 }
 
 /* ---------- tone (dot/pill) ---------- */
@@ -972,8 +999,49 @@ select {
   grid-template-columns: 1fr 1fr;
   gap: var(--space-5);
 }
+/* Khi 1 ô là <StatCard> bọc trong <Link> (thẻ <a>) để bấm được (vd "Nội dung bị
+   gắn cờ" trên dashboard), chốt cho nó co giãn full-width như 1 grid item bình
+   thường — không dựa vào default browser behavior, đã có lần lệch cột vì thiếu
+   quy tắc này. */
+.uikit-card-grid > a {
+  display: block;
+  width: 100%;
+}
 @media (max-width: 760px) {
   .uikit-card-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 2 cột dùng cho <dl>/key-value list (khác .uikit-card-grid — không phải hàng Card). */
+.uikit-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+@media (max-width: 620px) {
+  .uikit-grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Biến thể 3/4 cột — dùng cho hàng StatCard, thay vì set gridTemplateColumns
+   bằng inline style (đè mất breakpoint ở trên, không co giãn trên mobile). */
+.uikit-card-grid--3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+.uikit-card-grid--4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+@media (max-width: 860px) {
+  .uikit-card-grid--3,
+  .uikit-card-grid--4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 560px) {
+  .uikit-card-grid--3,
+  .uikit-card-grid--4 {
     grid-template-columns: 1fr;
   }
 }
@@ -982,6 +1050,13 @@ select {
   display: flex;
   align-items: center;
   gap: var(--space-4);
+}
+.uikit-statcard--link {
+  text-decoration: none;
+  color: inherit;
+}
+.uikit-statcard--link:hover {
+  border-color: var(--uikit-indigo-700);
 }
 .uikit-statcard__icon {
   width: 40px;
@@ -1216,6 +1291,10 @@ select {
   gap: 4px;
   border-bottom: 1px solid var(--uikit-slate-200);
   margin-bottom: var(--space-5);
+  /* Nhiều tab (vd 6 tab ở case detail) không vừa màn hình hẹp — cuộn ngang trong
+     chính thanh tab thay vì đẩy tràn cả trang (page body không bao giờ cuộn ngang). */
+  overflow-x: auto;
+  scrollbar-width: thin;
 }
 .uikit-tab {
   appearance: none;
@@ -1228,6 +1307,8 @@ select {
   font-size: 14px;
   font-weight: 500;
   color: var(--uikit-slate-500);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .uikit-tab:hover {
   color: var(--uikit-slate-700);
@@ -1268,16 +1349,47 @@ select {
   background: #fff;
   padding: var(--space-5) var(--space-3);
 }
+.uikit-sidebar__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-6);
+}
 .uikit-sidebar__brand {
   display: flex;
   align-items: center;
   gap: var(--space-2);
   padding: 0 var(--space-2);
-  margin-bottom: var(--space-6);
   text-decoration: none;
   color: var(--uikit-slate-900);
   font-size: 14px;
   font-weight: 600;
+}
+/* Chỉ hiện trên mobile (xem @media dưới) — sidebar là drawer che toàn màn hình
+   nên cần nút đóng riêng, không dựa vào click-ra-ngoài như desktop. */
+.uikit-sidebar__close {
+  display: none;
+  appearance: none;
+  border: none;
+  background: transparent;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  color: var(--uikit-slate-400);
+  cursor: pointer;
+}
+.uikit-sidebar__close:hover {
+  background: var(--uikit-slate-50);
+  color: var(--uikit-slate-700);
+}
+.uikit-sidebar__close svg {
+  width: 18px;
+  height: 18px;
+}
+.uikit-sidebar-backdrop {
+  display: none;
 }
 .uikit-sidebar__nav {
   display: flex;
@@ -1325,6 +1437,28 @@ select {
   border-bottom: 1px solid var(--uikit-slate-200);
   background: #fff;
   padding: var(--space-3) var(--space-6);
+}
+/* Chỉ hiện trên mobile (xem @media dưới) — mở sidebar dạng drawer. */
+.uikit-topbar__menu-btn {
+  display: none;
+  appearance: none;
+  border: none;
+  background: transparent;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  color: var(--uikit-slate-700);
+  cursor: pointer;
+}
+.uikit-topbar__menu-btn:hover {
+  background: var(--uikit-slate-50);
+}
+.uikit-topbar__menu-btn svg {
+  width: 20px;
+  height: 20px;
 }
 .uikit-search {
   display: flex;
@@ -1444,6 +1578,58 @@ select {
   max-width: 1040px;
 }
 
+/* ---------- shell responsive: sidebar trở thành drawer trượt ra dưới 900px ---------- */
+@media (max-width: 900px) {
+  .uikit-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100dvh;
+    z-index: 50;
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+    box-shadow: 0 0 0 1px var(--uikit-slate-200);
+    overflow-y: auto;
+  }
+  .uikit-sidebar--open {
+    transform: translateX(0);
+  }
+  .uikit-sidebar__close {
+    display: inline-flex;
+  }
+  .uikit-sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    background: rgba(15, 23, 42, 0.4);
+  }
+  .uikit-topbar__menu-btn {
+    display: inline-flex;
+  }
+  .uikit-topbar {
+    padding: var(--space-3) var(--space-4);
+    gap: var(--space-3);
+  }
+  .uikit-topbar__role,
+  .uikit-topbar__user {
+    display: none;
+  }
+  .uikit-search {
+    max-width: none;
+    flex: 1;
+    min-width: 0;
+  }
+  .uikit-main {
+    padding: var(--space-4);
+  }
+}
+@media (max-width: 480px) {
+  .uikit-topbar__right {
+    gap: var(--space-2);
+  }
+}
+
 .uikit-mt-4 {
   margin-top: var(--space-4);
 }
@@ -1453,6 +1639,69 @@ select {
   max-width: 1080px;
   margin: 0 auto;
   padding: 0 var(--space-5);
+}
+
+/* ---------- landing page: nav link, step timeline ---------- */
+
+.uikit-navlink {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--uikit-slate-700);
+  text-decoration: none;
+}
+.uikit-navlink:hover {
+  color: var(--uikit-indigo-700);
+}
+
+.uikit-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  max-width: 640px;
+}
+.uikit-steps__item {
+  position: relative;
+  display: flex;
+  gap: var(--space-4);
+}
+.uikit-steps__item:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: 21px;
+  top: 44px;
+  bottom: -32px;
+  width: 2px;
+  background: var(--uikit-slate-200);
+}
+.uikit-steps__marker {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--uikit-indigo-50);
+  color: var(--uikit-indigo-700);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.uikit-steps__marker svg {
+  width: 20px;
+  height: 20px;
+}
+.uikit-steps__body {
+  flex: 1;
+  min-width: 0;
+  padding-top: 4px;
+}
+.uikit-steps__index {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--uikit-indigo-700);
 }
 
 /* ---------- disclosure (form phụ ẩn/hiện, tránh chiếm chỗ mặc định) ---------- */
@@ -1499,15 +1748,17 @@ select {
 .uikit-row {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   justify-content: space-between;
-  gap: var(--space-4);
+  gap: var(--space-2) var(--space-4);
   padding: var(--space-3) 0;
 }
 .uikit-row-link {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   justify-content: space-between;
-  gap: var(--space-4);
+  gap: var(--space-2) var(--space-4);
   width: 100%;
   padding: var(--space-3) 0;
   background: transparent;
@@ -1518,6 +1769,17 @@ select {
   text-decoration: none;
   font: inherit;
 }
+/* Cho phép nội dung bên trái (thường là tiêu đề dài) co lại và xuống dòng thay
+   vì đẩy tràn ngang hàng, badge/pill bên phải giữ nguyên kích thước. */
+.uikit-row > *:first-child,
+.uikit-row-link > *:first-child {
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+.uikit-row > *:last-child,
+.uikit-row-link > *:last-child {
+  flex-shrink: 0;
+}
 .uikit-row-link:hover {
   background: var(--uikit-slate-50);
 }
@@ -1526,8 +1788,14 @@ select {
   font-size: 14px;
   color: var(--uikit-slate-500);
 }
+/* Bọc <table class="uikit-table"> trong div này để cuộn ngang trên màn hình hẹp
+   thay vì tràn ra ngoài container (page body không bao giờ cuộn ngang). */
+.uikit-table-scroll {
+  overflow-x: auto;
+}
 .uikit-table {
   width: 100%;
+  min-width: 480px;
   border-collapse: collapse;
   font-size: 14px;
 }

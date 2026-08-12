@@ -111,6 +111,15 @@ export class ResourcesRepository {
     });
   }
 
+  /** Not spec-mandated (no `GET` list in the OpenAPI catalogue — the frontend gap noted
+   * in [[r2m_frontend_status]]) — explicit user-approved addition. */
+  async listVersionsByResource(resourceId: string) {
+    return this.db.query.resourceVersion.findMany({
+      where: eq(schema.resourceVersion.resourceId, resourceId),
+      orderBy: [desc(schema.resourceVersion.versionNo)],
+    });
+  }
+
   async findPublishedVersionByResource(resourceId: string) {
     return this.db.query.resourceVersion.findFirst({
       where: and(

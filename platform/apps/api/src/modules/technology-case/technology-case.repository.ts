@@ -1,7 +1,7 @@
 import type { Database } from "@r2m/database";
 import { schema } from "@r2m/database";
 import { Inject, Injectable } from "@nestjs/common";
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { DATABASE } from "../../database/database.module";
 
 function firstOrThrow<T>(rows: T[], message: string): T {
@@ -61,6 +61,20 @@ export class TechnologyCaseRepository {
         eq(schema.technologyCase.slug, slug),
       ),
     });
+  }
+
+  /** Not spec-mandated — explicit user-approved addition for the admin dashboard's
+   * "Case đang xử lý" stat tile (was a `SoonStatTile` left over from before any
+   * platform-wide read existed). Counts only, no row fetch — matches CLAUDE.md rule 5's
+   * "dashboard is a read model, query it directly" guidance rather than fetching+mapping
+   * every case just to `.length` them. `active` = not ARCHIVED (the only terminal status). */
+  async countAllForPlatform() {
+    const [totalRow] = await this.db.select({ count: sql<number>`count(*)::int` }).from(schema.technologyCase);
+    const [activeRow] = await this.db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(schema.technologyCase)
+      .where(ne(schema.technologyCase.lifecycleStatus, "ARCHIVED"));
+    return { total: totalRow?.count ?? 0, active: activeRow?.count ?? 0 };
   }
 
   /** Actor sees a case if they are an active `case_member`, or belong (as an active org

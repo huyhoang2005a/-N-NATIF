@@ -9,7 +9,7 @@ import { CASE_INITIATION_STATUS_LABELS, PLATFORM_ROLE_LABELS } from "../../lib/l
 import { navForPersona, personaOf } from "../../lib/nav";
 import { getAccessToken } from "../../lib/session";
 import { CASE_INITIATION_STATUS_TONE, toneOf } from "../../lib/tone";
-import { Card, GhostButton, PrimaryButton, Shell, StatusPill, TextField } from "../../components/ui";
+import { Card, GhostButton, PageLoader, PrimaryButton, Shell, StatusPill, TextField } from "../../components/ui";
 
 export default function CaseInitiationRequestsPage() {
   const router = useRouter();
@@ -96,8 +96,7 @@ export default function CaseInitiationRequestsPage() {
     );
   }
 
-  if (!me || !organizations || !requests) return null;
-
+  if (!me || !organizations || !requests) return <PageLoader />;
   const nav = navForPersona(personaOf(me, organizations), me.platformRole === "PLATFORM_ADMIN");
 
   return (

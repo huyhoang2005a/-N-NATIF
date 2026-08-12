@@ -123,3 +123,10 @@ export interface EvidenceResponse {
   createdAt: string;
   updatedAt: string;
 }
+
+/** `GET /platform/technology-cases/summary` (admin-only) — not spec-mandated, powers the
+ * admin dashboard's case-count stat tile without a full platform-wide case list. */
+export interface PlatformCaseSummaryResponse {
+  total: number;
+  active: number;
+}

@@ -17,7 +17,7 @@ import { ASSESSMENT_STATUS_LABELS, PLATFORM_ROLE_LABELS } from "../../../lib/lab
 import { navForPersona, personaOf } from "../../../lib/nav";
 import { getAccessToken } from "../../../lib/session";
 import { toneOf, ASSESSMENT_STATUS_TONE } from "../../../lib/tone";
-import { Card, GhostButton, PrimaryButton, Shell, StatusPill, TextField } from "../../../components/ui";
+import { BackLink, Card, GhostButton, PageLoader, PrimaryButton, Shell, StatusPill, TextField } from "../../../components/ui";
 
 interface ScoreFormState {
   score: string;
@@ -181,7 +181,7 @@ export default function AssessmentDetailPage() {
         </div>
       );
     }
-    return null;
+    return <PageLoader />;
   }
 
   const roleLabel = PLATFORM_ROLE_LABELS[me.platformRole] ?? me.platformRole;
@@ -200,7 +200,7 @@ export default function AssessmentDetailPage() {
   if (!assessment || !framework || !criteria || !scores) {
     return (
       <Shell brandLabel="R2M" me={me} roleLabel={roleLabel} nav={nav}>
-        {null}
+        <PageLoader inline />
       </Shell>
     );
   }
@@ -208,6 +208,7 @@ export default function AssessmentDetailPage() {
   return (
     <Shell brandLabel="R2M" me={me} roleLabel={roleLabel} nav={nav}>
       <div className="uikit-stack" style={{ maxWidth: 720 }}>
+        <BackLink href={`/technology-cases/${assessment.technologyCaseId}`}>Quay lại case</BackLink>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-4)" }}>
           <div>
             <h1 style={{ fontSize: 22 }}>{framework.name}</h1>

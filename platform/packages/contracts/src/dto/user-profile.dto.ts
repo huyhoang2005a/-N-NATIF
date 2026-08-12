@@ -21,3 +21,24 @@ export interface UserProfileResponse {
   locale: string;
   timezone: string;
 }
+
+/** Not spec-mandated — explicit user-approved addition so UUIDs referenced elsewhere
+ * (case members, verification applicants) can be resolved to a display name without
+ * leaking anything else about the account (no email/phone/etc). */
+export interface UserPublicInfoResponse {
+  userId: string;
+  displayName: string;
+}
+
+/** `GET /platform/users` (admin-only) — deliberately broader than `UserPublicInfoResponse`
+ * since the caller is already a platform admin, but still no password/identity data. */
+export interface PlatformUserResponse {
+  userId: string;
+  primaryEmail: string;
+  displayName: string | null;
+  platformRole: string;
+  status: string;
+  emailVerified: boolean;
+  createdAt: string;
+  lastLoginAt: string | null;
+}

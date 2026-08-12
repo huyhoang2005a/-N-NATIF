@@ -3,6 +3,7 @@ import type { ActorContext } from "@r2m/authz";
 import { AnnotationsService } from "./annotations.service";
 import type { AnnotationsRepository } from "./annotations.repository";
 import type { ResourcesRepository } from "./resources.repository";
+import type { ResourcesService } from "./resources.service";
 import type { AuditService } from "../platform-operations/audit/audit.service";
 import type { OutboxService } from "../platform-operations/jobs/outbox.service";
 
@@ -36,6 +37,7 @@ function buildService() {
     findById: vi.fn(),
   } as unknown as ResourcesRepository;
 
+  const resourcesService = { assertVisible: vi.fn().mockResolvedValue(undefined) } as unknown as ResourcesService;
   const auditService = { write: vi.fn().mockResolvedValue(undefined) } as unknown as AuditService;
   const outboxService = { append: vi.fn().mockResolvedValue(undefined) } as unknown as OutboxService;
   const db = { transaction: vi.fn((cb: (tx: unknown) => Promise<unknown>) => cb({})) };
@@ -43,6 +45,7 @@ function buildService() {
   const service = new AnnotationsService(
     annotationsRepository,
     resourcesRepository,
+    resourcesService,
     auditService,
     outboxService,
     db as never,

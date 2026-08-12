@@ -20,7 +20,7 @@ import {
 import { navForPersona } from "../../../lib/nav";
 import { getAccessToken } from "../../../lib/session";
 import { toneOf, VERIFICATION_REQUEST_STATUS_TONE } from "../../../lib/tone";
-import { Card, GhostButton, PrimaryButton, Shell, StatusPill, TextField } from "../../../components/ui";
+import { Card, GhostButton, PageLoader, PrimaryButton, Shell, StatusPill, TextField } from "../../../components/ui";
 
 interface Row {
   request: OrganizationVerificationRequestResponse;
@@ -152,8 +152,7 @@ export default function OrganizationVerificationsPage() {
     });
   }
 
-  if (!me) return null;
-
+  if (!me) return <PageLoader />;
   const nav = navForPersona("platform-ops", me.platformRole === "PLATFORM_ADMIN");
 
   return (
