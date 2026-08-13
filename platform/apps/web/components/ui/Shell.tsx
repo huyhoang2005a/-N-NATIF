@@ -7,6 +7,7 @@ import { Bell, LogOut, Menu, Search, X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { MeResponse, NotificationResponse } from "@r2m/contracts";
 import { apiFetch, authFetch } from "../../lib/api-client";
+import { REFRESH_ACTIVE_NAV_EVENT } from "../../lib/refresh-event";
 import { clearTokens } from "../../lib/session";
 import { BrandMark } from "./BrandMark";
 
@@ -104,6 +105,12 @@ export function Shell({
                 key={item.href}
                 href={item.href}
                 className={`uikit-sidebar__link ${active ? "uikit-sidebar__link--active" : ""}`}
+                onClick={() => {
+                  // Bấm lại mục đang active không điều hướng đi đâu (Next.js Link tự no-op) —
+                  // phát sự kiện để trang hiện tại tự làm mới nếu nó có lắng nghe (vd bảng
+                  // tin), giống hành vi bấm lại icon Home trên Facebook/Instagram/Reddit.
+                  if (active) window.dispatchEvent(new CustomEvent(REFRESH_ACTIVE_NAV_EVENT));
+                }}
               >
                 <Icon className="uikit-sidebar__icon" aria-hidden="true" />
                 {item.label}
@@ -140,9 +147,13 @@ export function Shell({
               )}
             </Link>
             <span className="uikit-topbar__user">{me.displayName}</span>
-            <div className="uikit-avatar" aria-hidden="true">
-              {initials || "?"}
-            </div>
+            <Link href="/profile" className="uikit-avatar" title="Hồ sơ của tôi">
+              {me.avatarUrl ? (
+                <img src={me.avatarUrl} alt="" className="uikit-avatar__img" />
+              ) : (
+                <span aria-hidden="true">{initials || "?"}</span>
+              )}
+            </Link>
             <button type="button" className="uikit-topbar__logout" onClick={onLogout} title="Đăng xuất">
               <LogOut aria-hidden="true" />
             </button>

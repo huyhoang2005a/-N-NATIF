@@ -20,7 +20,36 @@ export interface UserProfileResponse {
   jobTitle: string | null;
   locale: string;
   timezone: string;
+  /** Freshly presigned GET URL resolved server-side on every read (never stored durably —
+   * presigned URLs expire) — `null` when no avatar has been set. */
+  avatarUrl: string | null;
 }
+
+/** Not spec-mandated — explicit user-approved addition. Same upload-then-confirm shape as
+ * `RequestResourceUploadSchema`/`ResourceUploadResponse`. Only JPEG/PNG — matches exactly
+ * what `@r2m/file-safety`'s `sniffMimeType` recognizes (no WEBP signature there); a WEBP
+ * upload would pass this client-side check but always fail the server-side magic-byte
+ * sniff, so it's excluded here rather than producing a confusing guaranteed-rejection. */
+export const ALLOWED_AVATAR_MIME_TYPES = ["image/jpeg", "image/png"] as const;
+export const MAX_AVATAR_SIZE_BYTES = 5 * 1024 * 1024;
+
+export const RequestAvatarUploadSchema = z.object({
+  originalFilename: z.string().trim().min(1).max(255),
+  mimeType: z.enum(ALLOWED_AVATAR_MIME_TYPES),
+  sizeBytes: z.number().int().positive().max(MAX_AVATAR_SIZE_BYTES),
+});
+export type RequestAvatarUploadRequest = z.infer<typeof RequestAvatarUploadSchema>;
+
+export interface AvatarUploadResponse {
+  uploadUrl: string;
+  storageObjectKey: string;
+  expiresIn: number;
+}
+
+export const UpdateAvatarRequestSchema = z.object({
+  storageObjectKey: z.string().min(1),
+});
+export type UpdateAvatarRequest = z.infer<typeof UpdateAvatarRequestSchema>;
 
 /** Not spec-mandated — explicit user-approved addition so UUIDs referenced elsewhere
  * (case members, verification applicants) can be resolved to a display name without

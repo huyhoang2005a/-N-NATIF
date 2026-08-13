@@ -30,6 +30,7 @@ export interface MeResponse {
   platformRole: string;
   displayName: string;
   emailVerified: boolean;
+  avatarUrl: string | null;
 }
 
 export const ConfirmEmailVerificationRequestSchema = z.object({

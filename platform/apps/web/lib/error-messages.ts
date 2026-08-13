@@ -9,6 +9,7 @@ const ERROR_MESSAGES_VI: Record<string, string> = {
   AUTH_FORBIDDEN: "Bạn không có quyền thực hiện thao tác này.",
   AUTH_INVALID_REFRESH_TOKEN: "Phiên đăng nhập không hợp lệ, vui lòng đăng nhập lại.",
   AUTH_CURRENT_PASSWORD_INVALID: "Mật khẩu hiện tại không đúng.",
+  AVATAR_REJECTED: "Ảnh không hợp lệ hoặc không vượt qua được kiểm tra an toàn — thử ảnh JPEG/PNG khác.",
   ORG_ALREADY_EXISTS: "Tên tổ chức hoặc domain email này đã được đăng ký cho một tổ chức khác.",
   ORG_NOT_FOUND: "Không tìm thấy tổ chức này.",
   ORG_NOT_ACTIVE: "Tổ chức chưa được kích hoạt.",

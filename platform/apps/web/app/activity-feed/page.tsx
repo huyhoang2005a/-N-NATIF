@@ -1,15 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { RefreshCw } from "lucide-react";
 import type { ActivityFeedItemResponse, MeResponse, OrganizationResponse } from "@r2m/contracts";
 import { authFetch, SessionExpiredError } from "../../lib/api-client";
 import { NEED_STATUS_LABELS, PLATFORM_ROLE_LABELS, RESOURCE_TYPE_LABELS } from "../../lib/labels";
 import { navForPersona, personaOf } from "../../lib/nav";
+import { REFRESH_ACTIVE_NAV_EVENT } from "../../lib/refresh-event";
 import { getAccessToken } from "../../lib/session";
 import { NEED_STATUS_TONE, toneOf } from "../../lib/tone";
-import { Card, PageLoader, SaveButton, Shell, StatusDot, VoteButton } from "../../components/ui";
+import { Card, GhostButton, PageLoader, SaveButton, Shell, StatusDot, VoteButton } from "../../components/ui";
 
 export default function ActivityFeedPage() {
   const router = useRouter();
@@ -17,30 +19,52 @@ export default function ActivityFeedPage() {
   const [organizations, setOrganizations] = useState<OrganizationResponse[] | null>(null);
   const [items, setItems] = useState<ActivityFeedItemResponse[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const loadedOnceRef = useRef(false);
 
+  const load = useCallback(
+    (opts?: { silent?: boolean }) => {
+      if (!getAccessToken()) {
+        router.push("/login");
+        return;
+      }
+      if (opts?.silent) setRefreshing(true);
+      Promise.all([
+        authFetch<MeResponse>("/me"),
+        authFetch<OrganizationResponse[]>("/organizations"),
+        authFetch<ActivityFeedItemResponse[]>("/activity-feed"),
+      ])
+        .then(([meResponse, orgs, feed]) => {
+          setMe(meResponse);
+          setOrganizations(orgs);
+          setItems(feed);
+          setError(null);
+          loadedOnceRef.current = true;
+        })
+        .catch((err) => {
+          if (err instanceof SessionExpiredError) {
+            router.push("/login");
+            return;
+          }
+          setError("Không tải được bảng tin.");
+        })
+        .finally(() => setRefreshing(false));
+    },
+    [router],
+  );
+
+  // Làm mới khi: (1) vào trang lần đầu, (2) bấm lại mục "Bảng tin" trên sidebar khi đang
+  // đứng sẵn ở trang này (Shell phát sự kiện này — không có điều hướng nào xảy ra vì cùng
+  // route, nên phải tự bắt sự kiện để refetch, giống hành vi bấm lại icon Home của
+  // Facebook/Instagram/Reddit).
   useEffect(() => {
-    if (!getAccessToken()) {
-      router.push("/login");
-      return;
+    load();
+    function onActiveNavClick() {
+      load({ silent: true });
     }
-    Promise.all([
-      authFetch<MeResponse>("/me"),
-      authFetch<OrganizationResponse[]>("/organizations"),
-      authFetch<ActivityFeedItemResponse[]>("/activity-feed"),
-    ])
-      .then(([meResponse, orgs, feed]) => {
-        setMe(meResponse);
-        setOrganizations(orgs);
-        setItems(feed);
-      })
-      .catch((err) => {
-        if (err instanceof SessionExpiredError) {
-          router.push("/login");
-          return;
-        }
-        setError("Không tải được bảng tin.");
-      });
-  }, [router]);
+    window.addEventListener(REFRESH_ACTIVE_NAV_EVENT, onActiveNavClick);
+    return () => window.removeEventListener(REFRESH_ACTIVE_NAV_EVENT, onActiveNavClick);
+  }, []);
 
   function onVoteChange(itemId: string, next: { voteCount: number; votedByMe: boolean }) {
     setItems((prev) =>
@@ -90,7 +114,16 @@ export default function ActivityFeedPage() {
   return (
     <Shell brandLabel="R2M" me={me} roleLabel={PLATFORM_ROLE_LABELS[me.platformRole] ?? me.platformRole} nav={nav}>
       <div className="uikit-stack">
-        <h1 style={{ fontSize: 22 }}>Bảng tin</h1>
+        <div
+          style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--space-3)" }}
+          onDoubleClick={() => load({ silent: true })}
+          title="Bấm đúp để làm mới bảng tin"
+        >
+          <h1 style={{ fontSize: 22 }}>Bảng tin</h1>
+          <GhostButton icon={RefreshCw} disabled={refreshing} onClick={() => load({ silent: true })}>
+            {refreshing ? "Đang làm mới…" : "Làm mới"}
+          </GhostButton>
+        </div>
 
         <Card>
           {items.length === 0 ? (

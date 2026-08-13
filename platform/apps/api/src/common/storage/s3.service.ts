@@ -149,4 +149,18 @@ export class S3Service {
   computeResourceContentSha256(key: string): Promise<string> {
     return this.computeObjectSha256(this.resourceBucket, key);
   }
+
+  /** Avatars reuse the resource bucket under an `avatars/` key prefix — not worth a
+   * dedicated bucket/env var for one small image per user. */
+  createResourceDownloadUrl(key: string): Promise<PresignedUrlResult> {
+    return this.createPresignedDownloadUrl(this.resourceBucket, key);
+  }
+
+  getResourceObjectBuffer(key: string): Promise<Buffer> {
+    return this.getObjectBuffer(this.resourceBucket, key);
+  }
+
+  deleteResourceObject(key: string): Promise<void> {
+    return this.deleteObject(this.resourceBucket, key);
+  }
 }

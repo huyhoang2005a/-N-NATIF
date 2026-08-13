@@ -4,6 +4,8 @@ import { UsersService } from "./users.service";
 import type { UsersRepository } from "./users.repository";
 import type { AuditService } from "../../platform-operations/audit/audit.service";
 import type { OutboxService } from "../../platform-operations/jobs/outbox.service";
+import type { S3Service } from "../../../common/storage/s3.service";
+import type { FileSafetyService } from "../../../common/file-safety/file-safety.service";
 
 const actor: ActorContext = {
   userId: "user-1",
@@ -25,11 +27,13 @@ describe("UsersService.updateMyProfile", () => {
 
     const auditService = { write: vi.fn().mockResolvedValue(undefined) } as unknown as AuditService;
     const outboxService = { append: vi.fn().mockResolvedValue(undefined) } as unknown as OutboxService;
+    const s3Service = { createResourceDownloadUrl: vi.fn() } as unknown as S3Service;
+    const fileSafetyService = {} as unknown as FileSafetyService;
 
     const fakeTx = { marker: "tx" };
     const db = { transaction: vi.fn((cb: (tx: unknown) => Promise<unknown>) => cb(fakeTx)) };
 
-    const service = new UsersService(usersRepository, auditService, outboxService, db as never);
+    const service = new UsersService(usersRepository, auditService, outboxService, s3Service, fileSafetyService, db as never);
 
     const result = await service.updateMyProfile(actor, { displayName: "New Name" }, "req-1");
 

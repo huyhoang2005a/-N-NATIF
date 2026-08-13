@@ -38,10 +38,26 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(16, "JWT_REFRESH_SECRET must be at least 16 chars"),
   JWT_REFRESH_TTL_SECONDS: z.coerce.number().int().positive().default(2592000),
 
-  // --- Email (Resend) — optional so the worker can fall back to a console-logging
-  // EmailSender until RESEND_API_KEY is filled in (see apps/worker/src/main.ts). ---
+  // --- Email — all optional so the worker can fall back to a console-logging EmailSender
+  // until one transport is fully configured (see apps/worker/src/main.ts::buildEmailSender,
+  // which prefers SMTP over Resend when both are set). SMTP added 2026-08 so the sender
+  // domain never needs to be verified with a 3rd party (Resend requires a verified sending
+  // domain; SMTP via an existing mailbox — e.g. Gmail with an App Password — does not). ---
+  // No `.min(1)` on these 3 — unlike every other optional field in this schema, they're
+  // meant to ship in `.env` as present-but-blank placeholders (`SMTP_USER=`) for the user
+  // to fill in, not fully absent keys. `source .env` exports a blank line as `""`, which
+  // `.optional()` alone does NOT catch (it only allows `undefined`, not an empty string) —
+  // `.min(1)` would reject that `""` at boot instead of leaving it for `buildEmailSender`'s
+  // plain truthy check (`""` is falsy in JS, so "unset" is handled correctly either way).
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().int().positive().default(587),
+  // 587 = STARTTLS (upgrade after connecting, `secure: false` for nodemailer); 465 = implicit
+  // TLS (`secure: true`) — Gmail supports both, most other providers document one or the other.
+  SMTP_SECURE: z.coerce.boolean().default(false),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASSWORD: z.string().optional(),
   RESEND_API_KEY: z.string().min(1).optional(),
-  EMAIL_FROM_ADDRESS: z.string().email().optional(),
+  EMAIL_FROM_ADDRESS: z.string().optional(),
   EMAIL_FROM_NAME: z.string().min(1).optional(),
   WEB_APP_URL: z.string().min(1).default("http://localhost:3001"),
 });

@@ -5,6 +5,7 @@ import { closeDb, getAppDb, getAppPool } from "@r2m/database";
 import { sweepExpiredCaseInitiationRequests } from "./case-initiations/sweep-expired";
 import { ConsoleEmailSender } from "./email/console-email-sender";
 import { ResendEmailSender } from "./email/resend-email-sender";
+import { SmtpEmailSender } from "./email/smtp-email-sender";
 import { logger } from "./logger";
 import { outboxDispatchLagSeconds, outboxDispatchTotal, registerDbPoolMetrics, startMetricsServer } from "./metrics";
 import { computeOutboxLagSeconds, dispatchPendingEvents } from "./outbox-dispatcher";
@@ -16,11 +17,17 @@ const POLL_INTERVAL_MS = 2000;
 // 2s tick like the outbox loop; every 5 minutes is more than tight enough.
 const EXPIRY_SWEEP_INTERVAL_MS = 5 * 60 * 1000;
 
+/** SMTP takes priority over Resend — added 2026-08 because the sending domain isn't
+ * verified with Resend yet, SMTP has no such requirement (works through an existing
+ * mailbox). Falls back to Resend if only that's configured, then to console logging. */
 function buildEmailSender(env: ReturnType<typeof loadEnv>): EmailSender {
+  if (env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASSWORD && env.EMAIL_FROM_ADDRESS) {
+    return new SmtpEmailSender();
+  }
   if (env.RESEND_API_KEY && env.EMAIL_FROM_ADDRESS && env.EMAIL_FROM_NAME) {
     return new ResendEmailSender();
   }
-  logger.warn("RESEND_API_KEY not set — falling back to ConsoleEmailSender");
+  logger.warn("Neither SMTP_HOST nor RESEND_API_KEY set — falling back to ConsoleEmailSender");
   return new ConsoleEmailSender();
 }
 

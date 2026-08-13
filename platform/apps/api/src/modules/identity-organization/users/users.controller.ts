@@ -1,12 +1,24 @@
-import type { PlatformUserResponse, UpdateProfileRequest, UserProfileResponse, UserPublicInfoResponse } from "@r2m/contracts";
-import { UpdateProfileRequestSchema } from "@r2m/contracts";
+import type {
+  AvatarUploadResponse,
+  PlatformUserResponse,
+  RequestAvatarUploadRequest,
+  UpdateAvatarRequest,
+  UpdateProfileRequest,
+  UserProfileResponse,
+  UserPublicInfoResponse,
+} from "@r2m/contracts";
+import { RequestAvatarUploadSchema, UpdateAvatarRequestSchema, UpdateProfileRequestSchema } from "@r2m/contracts";
 import type { ActorContext } from "@r2m/authz";
-import { BadRequestException, Body, Controller, Get, Patch, Query, Req, UsePipes } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Delete, Get, Patch, Post, Put, Query, Req, UsePipes } from "@nestjs/common";
 import type { Request } from "express";
 import { CurrentActor } from "../../../common/decorators/current-actor.decorator";
 import { parsePageLimit, parsePageOffset } from "../../../common/pagination/parse-page-params.util";
 import { ZodValidationPipe } from "../../../common/pipes/zod-validation.pipe";
 import { UsersService } from "./users.service";
+
+function requestId(req: Request): string | null {
+  return (req.headers["x-request-id"] as string) ?? null;
+}
 
 @Controller("me/profile")
 export class UsersController {
@@ -24,8 +36,32 @@ export class UsersController {
     @Body() body: UpdateProfileRequest,
     @Req() req: Request,
   ): Promise<UserProfileResponse> {
-    const requestId = (req.headers["x-request-id"] as string) ?? null;
-    return this.usersService.updateMyProfile(actor, body, requestId);
+    return this.usersService.updateMyProfile(actor, body, requestId(req));
+  }
+}
+
+/** Not spec-mandated — explicit user-approved addition. Separate controller (own path
+ * prefix `me/avatar`) rather than folding into `UsersController` — keeps the upload/
+ * MIME-sniff/malware-scan concern isolated from the plain-field profile PATCH above. */
+@Controller("me/avatar")
+export class UserAvatarController {
+  constructor(private readonly usersService: UsersService) {}
+
+  @Post("uploads")
+  @UsePipes(new ZodValidationPipe(RequestAvatarUploadSchema))
+  requestUpload(@CurrentActor() actor: ActorContext, @Body() body: RequestAvatarUploadRequest): Promise<AvatarUploadResponse> {
+    return this.usersService.requestAvatarUpload(actor, body);
+  }
+
+  @Put()
+  @UsePipes(new ZodValidationPipe(UpdateAvatarRequestSchema))
+  update(@CurrentActor() actor: ActorContext, @Body() body: UpdateAvatarRequest, @Req() req: Request): Promise<UserProfileResponse> {
+    return this.usersService.updateMyAvatar(actor, body.storageObjectKey, requestId(req));
+  }
+
+  @Delete()
+  remove(@CurrentActor() actor: ActorContext, @Req() req: Request): Promise<UserProfileResponse> {
+    return this.usersService.removeMyAvatar(actor, requestId(req));
   }
 }
 

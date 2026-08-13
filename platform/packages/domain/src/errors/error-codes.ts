@@ -19,6 +19,9 @@ export const ErrorCode = {
   // group. 403, not 401: distinct from AUTH_UNAUTHENTICATED so apps/web's authFetch
   // refresh-and-retry interceptor (keyed on that exact code) never fires for this.
   AUTH_CURRENT_PASSWORD_INVALID: "AUTH_CURRENT_PASSWORD_INVALID",
+  // Not spec-mandated (avatar upload is outside docs/spec/, explicit user-approved
+  // addition) — same MIME-sniff/malware-scan guard as VERIFICATION_DOCUMENT_REJECTED.
+  AVATAR_REJECTED: "AVATAR_REJECTED",
 
   // ORG_*
   ORG_ALREADY_EXISTS: "ORG_ALREADY_EXISTS",

@@ -17,6 +17,7 @@ import { CurrentActor } from "../../../common/decorators/current-actor.decorator
 import { Public } from "../../../common/decorators/public.decorator";
 import { RateLimit } from "../../../common/decorators/rate-limit.decorator";
 import { RateLimitGuard } from "../../../common/guards/rate-limit.guard";
+import { S3Service } from "../../../common/storage/s3.service";
 import { ZodValidationPipe } from "../../../common/pipes/zod-validation.pipe";
 import type { ActorContext } from "@r2m/authz";
 import { OrganizationsService } from "../organizations/organizations.service";
@@ -27,6 +28,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly organizationsService: OrganizationsService,
+    private readonly s3Service: S3Service,
     @Inject(DATABASE) private readonly db: Database,
   ) {}
 
@@ -67,12 +69,14 @@ export class AuthController {
     const profile = await this.db.query.userProfile.findFirst({
       where: eq(schema.userProfile.userId, actor.userId),
     });
+    const avatarUrl = profile?.avatarUrl ? (await this.s3Service.createResourceDownloadUrl(profile.avatarUrl)).url : null;
     return {
       userId: actor.userId,
       primaryEmail: user?.primaryEmail ?? "",
       platformRole: actor.platformRole,
       displayName: profile?.displayName ?? "",
       emailVerified: user?.emailVerifiedAt !== null && user?.emailVerifiedAt !== undefined,
+      avatarUrl,
     };
   }
 

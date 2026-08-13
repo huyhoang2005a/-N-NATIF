@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { RefreshCw, UserPlus } from "lucide-react";
+import { Camera, RefreshCw, Trash2, UserPlus } from "lucide-react";
 import type {
   AuthorVerificationRequestResponse,
   AuthorVerificationUploadResponse,
+  AvatarUploadResponse,
   CompanyProfileResponse,
   CreateCompanyProfileRequest,
   MeResponse,
@@ -16,7 +17,7 @@ import type {
   UpdateProfileRequest,
   UserProfileResponse,
 } from "@r2m/contracts";
-import { ALLOWED_DOCUMENT_MIME_TYPES, MAX_DOCUMENT_SIZE_BYTES } from "@r2m/contracts";
+import { ALLOWED_AVATAR_MIME_TYPES, ALLOWED_DOCUMENT_MIME_TYPES, MAX_AVATAR_SIZE_BYTES, MAX_DOCUMENT_SIZE_BYTES } from "@r2m/contracts";
 import { ApiError, authFetch, SessionExpiredError } from "../../lib/api-client";
 import { describeErrorCode } from "../../lib/error-messages";
 import {
@@ -110,6 +111,67 @@ export default function ProfilePage() {
         setLoadError("Không tải được hồ sơ.");
       });
   }, [router]);
+
+  const [avatarStatus, setAvatarStatus] = useState<"idle" | "loading">("idle");
+  const [avatarError, setAvatarError] = useState<string | null>(null);
+
+  function onAvatarFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = ""; // cho phép chọn lại đúng file đó lần sau
+    if (!file) return;
+    setAvatarError(null);
+
+    if (!(ALLOWED_AVATAR_MIME_TYPES as readonly string[]).includes(file.type)) {
+      setAvatarError("Chỉ nhận ảnh JPEG hoặc PNG.");
+      return;
+    }
+    if (file.size > MAX_AVATAR_SIZE_BYTES) {
+      setAvatarError("Ảnh vượt quá 5MB.");
+      return;
+    }
+
+    setAvatarStatus("loading");
+    (async () => {
+      const upload = await authFetch<AvatarUploadResponse>("/me/avatar/uploads", {
+        method: "POST",
+        body: JSON.stringify({ originalFilename: file.name, mimeType: file.type, sizeBytes: file.size }),
+      });
+      const putResponse = await fetch(upload.uploadUrl, { method: "PUT", headers: { "Content-Type": file.type }, body: file });
+      if (!putResponse.ok) throw new Error("upload failed");
+      const updated = await authFetch<UserProfileResponse>("/me/avatar", {
+        method: "PUT",
+        body: JSON.stringify({ storageObjectKey: upload.storageObjectKey }),
+      });
+      setProfile(updated);
+      setMe((prev) => (prev ? { ...prev, avatarUrl: updated.avatarUrl } : prev));
+    })()
+      .catch((err) => {
+        if (err instanceof SessionExpiredError) {
+          router.push("/login");
+          return;
+        }
+        setAvatarError(err instanceof ApiError ? describeErrorCode(err.code) : "Tải ảnh đại diện thất bại.");
+      })
+      .finally(() => setAvatarStatus("idle"));
+  }
+
+  function onRemoveAvatar() {
+    setAvatarStatus("loading");
+    setAvatarError(null);
+    authFetch<UserProfileResponse>("/me/avatar", { method: "DELETE" })
+      .then((updated) => {
+        setProfile(updated);
+        setMe((prev) => (prev ? { ...prev, avatarUrl: updated.avatarUrl } : prev));
+      })
+      .catch((err) => {
+        if (err instanceof SessionExpiredError) {
+          router.push("/login");
+          return;
+        }
+        setAvatarError(err instanceof ApiError ? describeErrorCode(err.code) : "Xoá ảnh đại diện thất bại.");
+      })
+      .finally(() => setAvatarStatus("idle"));
+  }
 
   async function onChangePassword(event: React.FormEvent) {
     event.preventDefault();
@@ -470,29 +532,46 @@ export default function ProfilePage() {
         <Card>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "var(--space-4)" }}>
-              <div
-                style={{
-                  width: 56,
-                  height: 56,
-                  borderRadius: "50%",
-                  background: "var(--uikit-indigo-50)",
-                  color: "var(--uikit-indigo-700)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 18,
-                  fontWeight: 600,
-                }}
-              >
-                {initials || "?"}
+              <div style={{ position: "relative" }}>
+                <div className="uikit-avatar uikit-avatar--lg">
+                  {profile.avatarUrl ? (
+                    <img src={profile.avatarUrl} alt="" className="uikit-avatar__img" />
+                  ) : (
+                    <span aria-hidden="true">{initials || "?"}</span>
+                  )}
+                </div>
+                <label
+                  className="uikit-avatar__edit-btn"
+                  title="Đổi ảnh đại diện"
+                  style={avatarStatus === "loading" ? { pointerEvents: "none", opacity: 0.6 } : undefined}
+                >
+                  <Camera aria-hidden="true" />
+                  <input type="file" accept="image/jpeg,image/png" onChange={onAvatarFileChange} style={{ display: "none" }} />
+                </label>
               </div>
               <div>
                 <p style={{ fontWeight: 600, fontSize: 14 }}>{profile.displayName}</p>
                 <p style={{ marginTop: 2, fontSize: 13, color: "var(--uikit-slate-500)" }}>{me.primaryEmail}</p>
+                {profile.avatarUrl && (
+                  <GhostButton
+                    tone="red"
+                    icon={Trash2}
+                    disabled={avatarStatus === "loading"}
+                    onClick={onRemoveAvatar}
+                    style={{ marginTop: "var(--space-2)" }}
+                  >
+                    Xoá ảnh đại diện
+                  </GhostButton>
+                )}
               </div>
             </div>
             <GhostButton onClick={() => setEditing((v) => !v)}>{editing ? "Đóng" : "Chỉnh sửa"}</GhostButton>
           </div>
+          {avatarError && (
+            <p className="uikit-alert-error" role="alert" style={{ marginTop: "var(--space-3)" }}>
+              {avatarError}
+            </p>
+          )}
 
           {editing && (
             <form onSubmit={onSaveProfile} className="uikit-stack" style={{ marginTop: "var(--space-4)", paddingTop: "var(--space-4)", borderTop: "1px solid var(--uikit-slate-100)" }}>

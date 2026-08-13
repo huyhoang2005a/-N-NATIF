@@ -999,13 +999,16 @@ select {
   grid-template-columns: 1fr 1fr;
   gap: var(--space-5);
 }
-/* Khi 1 ô là <StatCard> bọc trong <Link> (thẻ <a>) để bấm được (vd "Nội dung bị
-   gắn cờ" trên dashboard), chốt cho nó co giãn full-width như 1 grid item bình
-   thường — không dựa vào default browser behavior, đã có lần lệch cột vì thiếu
-   quy tắc này. */
-.uikit-card-grid > a {
-  display: block;
-  width: 100%;
+/* TÌM RA NGUYÊN NHÂN THẬT (2026-08-12, ảnh chụp màn hình dashboard): quy tắc cũ ở
+   đây từng ép `display:block` lên item là <a> (StatCard bấm được, vd "Đề xuất chờ
+   phản hồi") — nhưng `.uikit-card-grid > a` (1 class + 1 type = specificity 0,1,1)
+   có độ ưu tiên CAO HƠN `.uikit-statcard`'s `display:flex` (chỉ 1 class = 0,1,0),
+   nên nó THẮNG và phá mất flex row bên trong, khiến thẻ đó thấp/lệch hẳn so với 2
+   thẻ div thường bên cạnh dù cùng nằm 1 hàng grid. StatCard giờ tự gắn đúng class
+   `uikit-card uikit-statcard` (kèm `uikit-statcard--link` khi là <a>) nên đã tự có
+   `display:flex` đúng — không cần và không được ép display ở đây nữa. */
+.uikit-card-grid > * {
+  min-width: 0;
 }
 @media (max-width: 760px) {
   .uikit-card-grid {
@@ -1550,6 +1553,40 @@ select {
   font-size: 11px;
   font-weight: 600;
   flex-shrink: 0;
+  overflow: hidden;
+  text-decoration: none;
+}
+.uikit-avatar__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.uikit-avatar--lg {
+  width: 56px;
+  height: 56px;
+  font-size: 18px;
+}
+.uikit-avatar__edit-btn {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--uikit-indigo-700);
+  color: #fff;
+  border: 2px solid #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.uikit-avatar__edit-btn:hover {
+  background: var(--uikit-indigo-800);
+}
+.uikit-avatar__edit-btn svg {
+  width: 12px;
+  height: 12px;
 }
 .uikit-topbar__logout {
   appearance: none;
