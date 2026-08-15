@@ -9,3 +9,6 @@ coverage/
 .DS_Store
 # Phase 7 Sprint 7.4 — database dumps produced by infra/scripts/backup-db.sh
 backups/
+
+# Local Vercel CLI project link (projectId/orgId) — machine/account-specific, not shared state.
+.vercel/

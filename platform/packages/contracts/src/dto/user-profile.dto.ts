@@ -71,3 +71,32 @@ export interface PlatformUserResponse {
   createdAt: string;
   lastLoginAt: string | null;
 }
+
+/** `GET /platform/users/:id` (admin-only) — the admin user-detail page, added alongside
+ * the flat `/platform/users` list (2026-08-16) since that list had no row drill-in.
+ * `organizationMemberships` is every row regardless of status (PENDING/ACTIVE/REVOKED),
+ * not just active ones — an admin investigating a user needs the full picture. */
+export interface PlatformUserDetailResponse extends PlatformUserResponse {
+  organizationMemberships: {
+    organizationId: string;
+    organizationName: string;
+    role: string;
+    status: string;
+  }[];
+}
+
+/** `POST /platform/users/:id/suspend` (admin-only, 2026-08-16). */
+export const SuspendUserRequestSchema = z.object({
+  reason: z.string().trim().min(1).max(2000),
+});
+export type SuspendUserRequest = z.infer<typeof SuspendUserRequestSchema>;
+
+/** `GET /platform/users/stats` (admin-only) — powers the admin dashboard's growth chart
+ * and role breakdown. `weeklySignups` is always exactly 12 entries (oldest→newest,
+ * `weekStart` = Monday 00:00 UTC), zero-filled for weeks with no signups so the chart
+ * never has to gap-fill itself. `byRole` always has one entry per `platform_role` enum
+ * value, including 0-counts, so the chart's category axis is stable across reloads. */
+export interface PlatformUserStatsResponse {
+  weeklySignups: { weekStart: string; count: number }[];
+  byRole: Record<string, number>;
+}

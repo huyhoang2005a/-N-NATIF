@@ -30,5 +30,9 @@ import { AuthorVerificationService } from "./author-verification.service";
     AuthorVerificationService,
     AuthorVerificationRepository,
   ],
+  // AuthorVerificationRepository exported for ModerationService (2026-08-16) — RESTRICT_AUTHOR
+  // transitions the flagged content's author to author_profile.SUSPENDED, reusing this
+  // module's existing read/update methods rather than duplicating them.
+  exports: [AuthorVerificationRepository],
 })
 export class VerificationModule {}

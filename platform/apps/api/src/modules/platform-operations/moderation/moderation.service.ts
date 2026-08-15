@@ -2,9 +2,11 @@ import type { ContentFlagResponse, CreateContentFlagRequest, CreateModerationDec
 import type { ActorContext } from "@r2m/authz";
 import { assertPlatformReviewerOrAdmin } from "@r2m/authz";
 import type { Database } from "@r2m/database";
-import { ConflictError, ErrorCode, ForbiddenError, ModerationAction, NotFoundError } from "@r2m/domain";
+import { AuthorVerificationStatus, ConflictError, ErrorCode, ForbiddenError, ModerationAction, NotFoundError } from "@r2m/domain";
 import { Inject, Injectable } from "@nestjs/common";
 import { DATABASE } from "../../../database/database.module";
+import { AuthorVerificationRepository } from "../../verification/author-verification.repository";
+import { assertAuthorProfileTransition } from "../../verification/domain/author-profile.state-machine";
 import { AuditService } from "../audit/audit.service";
 import { OutboxService } from "../jobs/outbox.service";
 import { ModerationRepository } from "./moderation.repository";
@@ -64,9 +66,11 @@ function toDecisionResponse(row: {
 /** `action` → target `moderation_status` + `content_flag.status` mapping đã chốt (xem
  * comment ở `packages/domain/src/enums/platform-ops.enum.ts` `ModerationAction` — đối
  * chiếu UC-MOD-01/activity diagram/dbml enum, "DISMISS" trong 2 nguồn đầu là nói tắt cho
- * content_flag.status=DISMISSED, không phải action value). `RESTRICT_AUTHOR` không có cơ
- * chế khoá tài khoản thật (không có bảng nào trong dbml hỗ trợ) — chỉ ghi nhận qua
- * moderation_decision + audit, cố ý không suy diễn thêm (rule 1 CLAUDE.md). */
+ * content_flag.status=DISMISSED, không phải action value). `RESTRICT_AUTHOR` không map
+ * sang `content_moderation_status` (không có target moderation status nào cho nó — vẫn
+ * `return null` ở đây) — việc khoá tác giả thật sự nằm ở `restrictAuthorIfApplicable()`
+ * bên dưới (2026-08-16), transition `author_profile.verification_status` sang SUSPENDED
+ * (đã spec ở §8, chỉ chưa từng có caller nào gọi tới trước đây). */
 function targetModerationStatusFor(action: string): string | null {
   switch (action) {
     case ModerationAction.HIDE:
@@ -93,8 +97,40 @@ export class ModerationService {
     private readonly repository: ModerationRepository,
     private readonly auditService: AuditService,
     private readonly outboxService: OutboxService,
+    private readonly authorVerificationRepository: AuthorVerificationRepository,
     @Inject(DATABASE) private readonly db: Database,
   ) {}
+
+  /** RESTRICT_AUTHOR wiring (2026-08-16) — `author_profile.verification_status` already
+   * declares a spec-mandated `VERIFIED → SUSPENDED` transition
+   * (`author-profile.state-machine.ts` quotes §8 of the spec directly), it just had no
+   * caller until now. Only RESOURCE/ANNOTATION flags have a single identifiable author
+   * (`created_by_user_id`) — TECHNOLOGY_PROFILE is case/org-owned, no individual author to
+   * restrict, so this deliberately no-ops for that target type rather than guessing who
+   * to restrict. Likewise no-ops (doesn't throw) when the author has no `author_profile`
+   * row or isn't currently VERIFIED — restricting someone who already can't register
+   * resources isn't a business-rule violation worth blocking the flag-closing workflow
+   * over, it's simply nothing left to do. */
+  private async restrictAuthorIfApplicable(
+    flag: { targetType: string; targetResourceId: string | null; targetAnnotationId: string | null },
+    tx: Database,
+  ): Promise<void> {
+    const authorUserId =
+      flag.targetType === "RESOURCE" && flag.targetResourceId
+        ? (await this.repository.findResourceById(flag.targetResourceId))?.createdByUserId
+        : flag.targetType === "ANNOTATION" && flag.targetAnnotationId
+          ? (await this.repository.findAnnotationById(flag.targetAnnotationId))?.createdByUserId
+          : undefined;
+    if (!authorUserId) return;
+
+    const profile = await this.authorVerificationRepository.findAuthorProfile(authorUserId);
+    if (!profile || profile.verificationStatus !== AuthorVerificationStatus.VERIFIED) return;
+
+    assertAuthorProfileTransition(AuthorVerificationStatus.VERIFIED, AuthorVerificationStatus.SUSPENDED);
+    await this.authorVerificationRepository.updateAuthorProfileStatus(authorUserId, AuthorVerificationStatus.SUSPENDED, tx, {
+      suspendedAt: new Date(),
+    });
+  }
 
   private async assertTargetExists(targetType: string, targetId: string): Promise<void> {
     const exists =
@@ -218,6 +254,10 @@ export class ModerationService {
         } else if (flag.targetType === "TECHNOLOGY_PROFILE" && flag.targetTechnologyProfileId) {
           await this.repository.updateTechnologyProfileModerationStatus(flag.targetTechnologyProfileId, targetModerationStatus, tx);
         }
+      }
+
+      if (input.action === ModerationAction.RESTRICT_AUTHOR) {
+        await this.restrictAuthorIfApplicable(flag, tx);
       }
 
       await this.auditService.write(

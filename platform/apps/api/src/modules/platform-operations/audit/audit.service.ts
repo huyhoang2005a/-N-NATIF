@@ -1,6 +1,7 @@
 import type { Database } from "@r2m/database";
 import { schema } from "@r2m/database";
 import { Inject, Injectable } from "@nestjs/common";
+import { and, desc, eq } from "drizzle-orm";
 import { DATABASE } from "../../../database/database.module";
 
 export interface WriteAuditLogInput {
@@ -34,6 +35,23 @@ export class AuditService {
       entityId: input.entityId,
       beforeData: input.beforeData ?? null,
       afterData: input.afterData ?? null,
+    });
+  }
+
+  /** Not spec-mandated — explicit user-approved addition, the admin audit-log viewer
+   * (2026-08-16). Read-only, newest first; `entityType`/`actorUserId` filters are optional
+   * narrowing, not required — an admin browsing the trail usually starts unfiltered. */
+  async list(params: { limit: number; offset: number; entityType?: string; actorUserId?: string }) {
+    const conditions = [
+      params.entityType ? eq(schema.auditLog.entityType, params.entityType) : undefined,
+      params.actorUserId ? eq(schema.auditLog.actorUserId, params.actorUserId) : undefined,
+    ].filter((c): c is NonNullable<typeof c> => c !== undefined);
+
+    return this.db.query.auditLog.findMany({
+      where: conditions.length > 0 ? and(...conditions) : undefined,
+      orderBy: [desc(schema.auditLog.createdAt)],
+      limit: params.limit,
+      offset: params.offset,
     });
   }
 }

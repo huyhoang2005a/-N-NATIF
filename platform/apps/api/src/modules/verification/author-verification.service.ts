@@ -223,7 +223,10 @@ export class AuthorVerificationService {
   }
 
   /** UC-VER-02 main flow step 3: "Kiểm tra tài liệu qua signed URL có TTL". */
-  async getDocumentDownloadUrl(actor: ActorContext, requestId: string): Promise<{ url: string; expiresIn: number }> {
+  async getDocumentDownloadUrl(
+    actor: ActorContext,
+    requestId: string,
+  ): Promise<{ url: string; expiresIn: number; documentId: string }> {
     assertPlatformReviewerOrAdmin(actor);
     const request = await this.authorVerificationRepository.findById(requestId);
     if (!request) {
@@ -236,7 +239,11 @@ export class AuthorVerificationService {
         "No document is attached to this request.",
       );
     }
-    return this.s3Service.createVerificationDownloadUrl(document.storageObjectKey);
+    // documentId added 2026-08-16 for the admin retention button — the caller needs it to
+    // call POST /platform/verification-documents/:id/retention, which the old {url,
+    // expiresIn}-only shape had no way to supply.
+    const { url, expiresIn } = await this.s3Service.createVerificationDownloadUrl(document.storageObjectKey);
+    return { url, expiresIn, documentId: document.id };
   }
 
   async decide(

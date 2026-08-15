@@ -3,7 +3,9 @@ import type {
   JoinOrganizationRequest,
   OrganizationMemberResponse,
   OrganizationResponse,
+  PlatformOrganizationStatsResponse,
   RegisterOrganizationWithDocumentRequest,
+  SuspendOrganizationRequest,
   UpdateMemberRequest,
 } from "@r2m/contracts";
 import {
@@ -11,6 +13,7 @@ import {
   JoinOrganizationRequestSchema,
   MAX_DOCUMENT_SIZE_BYTES,
   RegisterOrganizationWithDocumentSchema,
+  SuspendOrganizationRequestSchema,
   UpdateMemberRequestSchema,
 } from "@r2m/contracts";
 import type { ActorContext } from "@r2m/authz";
@@ -128,5 +131,31 @@ export class PlatformOrganizationsController {
     @Query("offset") offset?: string,
   ): Promise<OrganizationResponse[]> {
     return this.organizationsService.listAllForPlatform(actor, parsePageLimit(limit), parsePageOffset(offset));
+  }
+
+  @Get("stats")
+  stats(@CurrentActor() actor: ActorContext): Promise<PlatformOrganizationStatsResponse> {
+    return this.organizationsService.statsForPlatform(actor);
+  }
+
+  @Get(":id/members")
+  listMembers(@CurrentActor() actor: ActorContext, @Param("id") id: string): Promise<OrganizationMemberResponse[]> {
+    return this.organizationsService.listMembersForPlatform(actor, id);
+  }
+
+  @Post(":id/suspend")
+  @UsePipes(new ZodValidationPipe(SuspendOrganizationRequestSchema))
+  suspend(
+    @CurrentActor() actor: ActorContext,
+    @Param("id") id: string,
+    @Body() body: SuspendOrganizationRequest,
+    @Req() req: Request,
+  ): Promise<OrganizationResponse> {
+    return this.organizationsService.suspend(actor, id, body.reason, requestId(req));
+  }
+
+  @Post(":id/reactivate")
+  reactivate(@CurrentActor() actor: ActorContext, @Param("id") id: string, @Req() req: Request): Promise<OrganizationResponse> {
+    return this.organizationsService.reactivate(actor, id, requestId(req));
   }
 }

@@ -70,6 +70,16 @@ export interface OrganizationResponse {
   version: number;
 }
 
+/** `GET /platform/organizations/stats` (admin-only) — powers the admin dashboard's
+ * growth chart and type breakdown. `weeklySignups` is always exactly 12 entries
+ * (oldest→newest, `weekStart` = Monday 00:00 UTC), zero-filled for weeks with no
+ * registrations. `byType` always has one entry per `organization_type` enum value,
+ * including 0-counts. */
+export interface PlatformOrganizationStatsResponse {
+  weeklySignups: { weekStart: string; count: number }[];
+  byType: Record<string, number>;
+}
+
 /** `GET /me/pending-memberships` — surfaces self-join requests still awaiting an
  * ORG_OWNER/ORG_ADMIN decision, since `GET /organizations` (listMine) only returns
  * organizations the actor is an ACTIVE member of. */
@@ -90,3 +100,11 @@ export interface OrganizationMemberResponse {
   invitedAt: string | null;
   joinedAt: string | null;
 }
+
+/** `POST /platform/organizations/:id/suspend` (admin-only, 2026-08-16) — reason is
+ * required, same rationale-required precedent as gap resolution / moderation decisions:
+ * a restrictive action against an organization needs a recorded justification. */
+export const SuspendOrganizationRequestSchema = z.object({
+  reason: z.string().trim().min(1).max(2000),
+});
+export type SuspendOrganizationRequest = z.infer<typeof SuspendOrganizationRequestSchema>;

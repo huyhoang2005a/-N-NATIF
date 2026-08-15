@@ -14,7 +14,7 @@ import { authFetch, SessionExpiredError } from "../../../lib/api-client";
 import { PLATFORM_ROLE_LABELS } from "../../../lib/labels";
 import { navForPersona } from "../../../lib/nav";
 import { getAccessToken } from "../../../lib/session";
-import { Card, PageLoader, Shell, StatusPill } from "../../../components/ui";
+import { Card, GhostButton, PageLoader, Shell, StatusPill } from "../../../components/ui";
 
 interface ReviewItem {
   caseId: string;
@@ -30,6 +30,7 @@ export default function ReviewsPage() {
   const [me, setMe] = useState<MeResponse | null>(null);
   const [items, setItems] = useState<ReviewItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [visibleCount, setVisibleCount] = useState(20);
 
   useEffect(() => {
     if (!getAccessToken()) {
@@ -121,7 +122,7 @@ export default function ReviewsPage() {
             <p className="uikit-empty">Không có đánh giá hoặc lộ trình nào đang chờ duyệt.</p>
           ) : (
             <div className="uikit-stack">
-              {items.map((item) => (
+              {items.slice(0, visibleCount).map((item) => (
                 <Link
                   key={`${item.kind}-${item.id}`}
                   href={item.kind === "assessment" ? `/assessments/${item.id}` : `/roadmaps/${item.id}`}
@@ -157,6 +158,12 @@ export default function ReviewsPage() {
             </div>
           )}
         </Card>
+
+        {(items?.length ?? 0) > visibleCount && (
+          <GhostButton onClick={() => setVisibleCount((n) => n + 20)} style={{ marginTop: "var(--space-4)" }}>
+            Xem thêm ({(items?.length ?? 0) - visibleCount} còn lại)
+          </GhostButton>
+        )}
       </div>
     </Shell>
   );

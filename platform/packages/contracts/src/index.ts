@@ -1,4 +1,6 @@
 export * from "./dto/auth.dto";
+export * from "./dto/audit-log.dto";
+export * from "./dto/outbox-event.dto";
 export * from "./dto/organization.dto";
 export * from "./dto/organization-verification.dto";
 export * from "./dto/verification-document-retention.dto";

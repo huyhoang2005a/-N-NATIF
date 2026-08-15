@@ -38,6 +38,10 @@ export default function OrganizationVerificationsPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectNote, setRejectNote] = useState("");
+  const [visibleCount, setVisibleCount] = useState(20);
+  const [retentionDraft, setRetentionDraft] = useState<Record<string, string>>({});
+  const [retentionOpenId, setRetentionOpenId] = useState<string | null>(null);
+  const [retentionBusyId, setRetentionBusyId] = useState<string | null>(null);
 
   async function load() {
     const requests = await authFetch<OrganizationVerificationRequestResponse[]>(
@@ -83,6 +87,26 @@ export default function OrganizationVerificationsPage() {
       }
       setError(err instanceof ApiError ? describeErrorCode(err.code) : "Không mở được tài liệu.");
     }
+  }
+
+  function onSetRetention(documentId: string) {
+    const date = retentionDraft[documentId];
+    if (!date) return;
+    setRetentionBusyId(documentId);
+    setError(null);
+    authFetch(`/platform/verification-documents/${documentId}/retention`, {
+      method: "POST",
+      body: JSON.stringify({ retentionUntil: new Date(`${date}T00:00:00Z`).toISOString() }),
+    })
+      .then(() => setRetentionOpenId(null))
+      .catch((err) => {
+        if (err instanceof SessionExpiredError) {
+          router.push("/login");
+          return;
+        }
+        setError(err instanceof ApiError ? describeErrorCode(err.code) : "Không đặt được hạn lưu trữ.");
+      })
+      .finally(() => setRetentionBusyId(null));
   }
 
   useEffect(() => {
@@ -175,7 +199,7 @@ export default function OrganizationVerificationsPage() {
             <p className="uikit-empty">Không có hồ sơ tổ chức nào đang chờ xử lý.</p>
           ) : (
             <div className="uikit-stack">
-              {rows.map(({ request, organization, documents }) => {
+              {rows.slice(0, visibleCount).map(({ request, organization, documents }) => {
                 const isBusy = busyId === request.id;
                 const claimedByMe = request.reviewerUserId === me.userId;
 
@@ -210,18 +234,43 @@ export default function OrganizationVerificationsPage() {
                       ) : (
                         <div className="uikit-stack" style={{ gap: "var(--space-2)" }}>
                           {documents.map((doc) => (
-                            <div
-                              key={doc.id}
-                              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--space-3)" }}
-                            >
-                              <span style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", fontSize: 13 }}>
-                                <FileCheck2 size={16} />
-                                {ORG_VERIFICATION_DOCUMENT_TYPE_LABELS[doc.documentType] ?? doc.documentType} ·{" "}
-                                {doc.originalFilename}
-                              </span>
-                              <GhostButton icon={ExternalLink} onClick={() => onViewDocument(request.id, doc.id)}>
-                                Xem
-                              </GhostButton>
+                            <div key={doc.id}>
+                              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--space-3)" }}>
+                                <span style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", fontSize: 13 }}>
+                                  <FileCheck2 size={16} />
+                                  {ORG_VERIFICATION_DOCUMENT_TYPE_LABELS[doc.documentType] ?? doc.documentType} ·{" "}
+                                  {doc.originalFilename}
+                                </span>
+                                <div style={{ display: "flex", gap: "var(--space-2)" }}>
+                                  {me.platformRole === "PLATFORM_ADMIN" && (
+                                    <GhostButton onClick={() => setRetentionOpenId((id) => (id === doc.id ? null : doc.id))}>
+                                      Hạn lưu trữ
+                                    </GhostButton>
+                                  )}
+                                  <GhostButton icon={ExternalLink} onClick={() => onViewDocument(request.id, doc.id)}>
+                                    Xem
+                                  </GhostButton>
+                                </div>
+                              </div>
+                              {retentionOpenId === doc.id && (
+                                <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center", marginTop: "var(--space-2)" }}>
+                                  <input
+                                    type="date"
+                                    value={retentionDraft[doc.id] ?? ""}
+                                    onChange={(e) => setRetentionDraft((prev) => ({ ...prev, [doc.id]: e.target.value }))}
+                                    min={new Date(Date.now() + 86400000).toISOString().slice(0, 10)}
+                                    style={{
+                                      padding: "6px 10px",
+                                      border: "1px solid var(--uikit-slate-200)",
+                                      borderRadius: "var(--radius-sm)",
+                                      fontSize: 13,
+                                    }}
+                                  />
+                                  <PrimaryButton disabled={retentionBusyId === doc.id || !retentionDraft[doc.id]} onClick={() => onSetRetention(doc.id)}>
+                                    {retentionBusyId === doc.id ? "Đang lưu…" : "Lưu hạn"}
+                                  </PrimaryButton>
+                                </div>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -291,6 +340,12 @@ export default function OrganizationVerificationsPage() {
             </div>
           )}
         </Card>
+
+        {(rows?.length ?? 0) > visibleCount && (
+          <GhostButton onClick={() => setVisibleCount((n) => n + 20)} style={{ marginTop: "var(--space-4)" }}>
+            Xem thêm ({(rows?.length ?? 0) - visibleCount} còn lại)
+          </GhostButton>
+        )}
       </div>
     </Shell>
   );

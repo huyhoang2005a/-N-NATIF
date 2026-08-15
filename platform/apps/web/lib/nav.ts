@@ -1,9 +1,11 @@
 import {
+  AlertTriangle,
   Bell,
   Bookmark,
   Building2,
   ClipboardCheck,
   Database,
+  FileClock,
   FolderOpen,
   Flag,
   Handshake,
@@ -71,14 +73,18 @@ const PLATFORM_OPS_NAV_BASE: ShellNavItem[] = [
   { label: "Hồ sơ", href: "/profile", icon: User },
 ];
 
+/** Admin có thêm quản trị tổ chức/người dùng + kho lưu trữ case (tổ chức → tác
+ * giả → case) + 2 công cụ vận hành (nhật ký hệ thống, hàng đợi tác vụ lỗi) so
+ * với reviewer — tất cả đều admin-only ở tầng API (assertPlatformAdmin),
+ * không chỉ ẩn trên UI. */
 const PLATFORM_ADMIN_EXTRA_NAV: ShellNavItem[] = [
   { label: "Tổ chức", href: "/platform/organizations", icon: Building2 },
   { label: "Người dùng", href: "/platform/users", icon: Users },
+  { label: "Kho lưu trữ case", href: "/platform/technology-cases", icon: FolderOpen },
+  { label: "Nhật ký hệ thống", href: "/platform/audit-log", icon: FileClock },
+  { label: "Hàng đợi tác vụ lỗi", href: "/platform/outbox-events", icon: AlertTriangle },
 ];
 
-/** Admin có thêm 2 mục quản trị tổ chức/người dùng so với reviewer — cả 2 mục
- * đó hiện chưa có API "list tất cả" (chỉ /organizations trả về tổ chức actor
- * là thành viên) nên trang đích là "Sắp ra mắt", không phải dữ liệu giả. */
 export function platformOpsNav(isAdmin: boolean): ShellNavItem[] {
   return isAdmin ? [...PLATFORM_OPS_NAV_BASE.slice(0, -1), ...PLATFORM_ADMIN_EXTRA_NAV, PLATFORM_OPS_NAV_BASE.at(-1)!] : PLATFORM_OPS_NAV_BASE;
 }

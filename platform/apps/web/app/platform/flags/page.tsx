@@ -27,6 +27,7 @@ export default function FlagsPage() {
   const [decidingId, setDecidingId] = useState<string | null>(null);
   const [decisionAction, setDecisionAction] = useState<string>("HIDE");
   const [rationale, setRationale] = useState("");
+  const [visibleCount, setVisibleCount] = useState(20);
 
   async function load() {
     const rows = await authFetch<ContentFlagResponse[]>("/platform/content-flags");
@@ -113,7 +114,7 @@ export default function FlagsPage() {
             <p className="uikit-empty">Không có báo cáo nội dung nào đang chờ xử lý.</p>
           ) : (
             <div className="uikit-stack">
-              {openFlags.map((flag) => {
+              {openFlags.slice(0, visibleCount).map((flag) => {
                 const isBusy = busyId === flag.id;
                 const claimedByMe = flag.assignedReviewerUserId === me.userId;
 
@@ -202,6 +203,10 @@ export default function FlagsPage() {
             </div>
           )}
         </Card>
+
+        {openFlags.length > visibleCount && (
+          <GhostButton onClick={() => setVisibleCount((n) => n + 20)}>Xem thêm ({openFlags.length - visibleCount} còn lại)</GhostButton>
+        )}
       </div>
     </Shell>
   );

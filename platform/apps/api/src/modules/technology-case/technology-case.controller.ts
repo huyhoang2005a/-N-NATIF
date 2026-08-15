@@ -18,10 +18,11 @@ import {
   TransitionCaseRequestSchema,
 } from "@r2m/contracts";
 import type { ActorContext } from "@r2m/authz";
-import { Body, Controller, Get, Param, Post, Req, UsePipes } from "@nestjs/common";
+import { Body, Controller, Get, Param, Post, Query, Req, UsePipes } from "@nestjs/common";
 import type { Request } from "express";
 import { CurrentActor } from "../../common/decorators/current-actor.decorator";
 import { withIdempotencyKey } from "../../common/idempotency/with-idempotency-key.util";
+import { parsePageLimit, parsePageOffset } from "../../common/pagination/parse-page-params.util";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
 import { IdempotencyService } from "../platform-operations/jobs/idempotency.service";
 import { EvidenceService } from "./evidence.service";
@@ -132,5 +133,14 @@ export class PlatformTechnologyCasesController {
   @Get("summary")
   summary(@CurrentActor() actor: ActorContext): Promise<PlatformCaseSummaryResponse> {
     return this.technologyCaseService.countAllForPlatform(actor);
+  }
+
+  @Get()
+  listAll(
+    @CurrentActor() actor: ActorContext,
+    @Query("limit") limit?: string,
+    @Query("offset") offset?: string,
+  ): Promise<TechnologyCaseResponse[]> {
+    return this.technologyCaseService.listAllForPlatform(actor, parsePageLimit(limit), parsePageOffset(offset));
   }
 }

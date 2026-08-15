@@ -1,7 +1,7 @@
 import type { Database } from "@r2m/database";
 import { schema } from "@r2m/database";
 import { Inject, Injectable } from "@nestjs/common";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { DATABASE } from "../../../database/database.module";
 
 function firstOrThrow<T>(rows: T[], message: string): T {
@@ -32,6 +32,27 @@ export class OrganizationsRepository {
       limit,
       offset,
     });
+  }
+
+  /** Not spec-mandated — explicit user-approved addition for the admin dashboard's growth
+   * chart. Raw grouped rows only — the service layer zero-fills weeks/types with no rows,
+   * since that's shaping for the chart's stable axes, not a data-access concern. */
+  async statsForPlatform() {
+    const weeklySignupRows = await this.db
+      .select({
+        weekStart: sql<string>`date_trunc('week', ${schema.organization.createdAt})::date`,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(schema.organization)
+      .where(gte(schema.organization.createdAt, sql`now() - interval '12 weeks'`))
+      .groupBy(sql`1`);
+
+    const byTypeRows = await this.db
+      .select({ type: schema.organization.type, count: sql<number>`count(*)::int` })
+      .from(schema.organization)
+      .groupBy(schema.organization.type);
+
+    return { weeklySignupRows, byTypeRows };
   }
 
   /** Domain is globally unique (see `organization_domain` schema note) — used both to block

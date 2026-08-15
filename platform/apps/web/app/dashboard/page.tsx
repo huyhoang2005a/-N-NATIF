@@ -21,6 +21,8 @@ import type {
   OrganizationResponse,
   OrganizationVerificationRequestResponse,
   PlatformCaseSummaryResponse,
+  PlatformOrganizationStatsResponse,
+  PlatformUserStatsResponse,
   ReadinessAssessmentResponse,
   RecommendationItemResponse,
   ResearchNeedResponse,
@@ -30,11 +32,22 @@ import type {
   TechnologyCaseResponse,
 } from "@r2m/contracts";
 import { authFetch, SessionExpiredError } from "../../lib/api-client";
-import { PLATFORM_ROLE_LABELS, TECHNOLOGY_CASE_STATUS_LABELS } from "../../lib/labels";
+import { ORG_TYPE_LABELS, PLATFORM_ROLE_LABELS, TECHNOLOGY_CASE_STATUS_LABELS } from "../../lib/labels";
 import { navForPersona, personaOf } from "../../lib/nav";
 import { getAccessToken } from "../../lib/session";
 import { toneOf, ORGANIZATION_STATUS_TONE, TECHNOLOGY_CASE_STATUS_TONE } from "../../lib/tone";
-import { Card, MatchScoreBadge, PageLoader, SectionHeader, Shell, StatCard, StatusDot, StatusPill } from "../../components/ui";
+import {
+  Card,
+  CategoryBarChart,
+  MatchScoreBadge,
+  PageLoader,
+  SectionHeader,
+  Shell,
+  StatCard,
+  StatusDot,
+  StatusPill,
+  WeeklyGrowthChart,
+} from "../../components/ui";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -289,6 +302,8 @@ function PlatformOpsDashboardBody({ isAdmin }: { isAdmin: boolean }) {
   const [contentFlags, setContentFlags] = useState<ContentFlagResponse[] | null>(null);
   const [activeOrgCount, setActiveOrgCount] = useState<number | null>(null);
   const [caseSummary, setCaseSummary] = useState<PlatformCaseSummaryResponse | null>(null);
+  const [orgStats, setOrgStats] = useState<PlatformOrganizationStatsResponse | null>(null);
+  const [userStats, setUserStats] = useState<PlatformUserStatsResponse | null>(null);
 
   useEffect(() => {
     if (isAdmin) {
@@ -297,7 +312,9 @@ function PlatformOpsDashboardBody({ isAdmin }: { isAdmin: boolean }) {
         .catch(() => setActiveOrgCount(0));
       authFetch<PlatformCaseSummaryResponse>("/platform/technology-cases/summary")
         .then(setCaseSummary)
-        .catch(() => setCaseSummary({ total: 0, active: 0 }));
+        .catch(() => setCaseSummary({ total: 0, active: 0, byStatus: {} }));
+      authFetch<PlatformOrganizationStatsResponse>("/platform/organizations/stats").then(setOrgStats).catch(() => {});
+      authFetch<PlatformUserStatsResponse>("/platform/users/stats").then(setUserStats).catch(() => {});
     }
     Promise.all([
       authFetch<OrganizationVerificationRequestResponse[]>("/platform/organization-verifications"),
@@ -354,6 +371,54 @@ function PlatformOpsDashboardBody({ isAdmin }: { isAdmin: boolean }) {
         <StatCard label="Đánh giá & lộ trình chờ duyệt" value={reviewQueue.length} icon={ClipboardCheck} tone="indigo" />
         <StatCard href="/platform/flags" label="Nội dung bị gắn cờ" value={openFlags.length} icon={Flag} tone="rose" />
       </div>
+
+      {isAdmin && (
+        <>
+          <Card>
+            <SectionHeader title="Tăng trưởng 12 tuần gần nhất" />
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "var(--space-5)" }}>
+              {orgStats && <WeeklyGrowthChart title="Tổ chức đăng ký mới" data={orgStats.weeklySignups} />}
+              {userStats && <WeeklyGrowthChart title="Người dùng mới" data={userStats.weeklySignups} />}
+            </div>
+          </Card>
+
+          <Card>
+            <SectionHeader title="Phân bổ" />
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "var(--space-6)" }}>
+              {caseSummary && Object.values(caseSummary.byStatus).some((v) => v > 0) && (
+                <CategoryBarChart
+                  title="Case theo trạng thái"
+                  data={Object.entries(caseSummary.byStatus)
+                    .filter(([, value]) => value > 0)
+                    .sort(([, a], [, b]) => b - a)
+                    .map(([status, value]) => ({
+                      key: status,
+                      label: TECHNOLOGY_CASE_STATUS_LABELS[status] ?? status,
+                      value,
+                      tone: toneOf(TECHNOLOGY_CASE_STATUS_TONE, status),
+                    }))}
+                />
+              )}
+              {orgStats && (
+                <CategoryBarChart
+                  title="Tổ chức theo loại hình"
+                  data={Object.entries(orgStats.byType)
+                    .sort(([, a], [, b]) => b - a)
+                    .map(([type, value]) => ({ key: type, label: ORG_TYPE_LABELS[type as keyof typeof ORG_TYPE_LABELS] ?? type, value }))}
+                />
+              )}
+              {userStats && (
+                <CategoryBarChart
+                  title="Người dùng theo vai trò"
+                  data={Object.entries(userStats.byRole)
+                    .sort(([, a], [, b]) => b - a)
+                    .map(([role, value]) => ({ key: role, label: PLATFORM_ROLE_LABELS[role] ?? role, value }))}
+                />
+              )}
+            </div>
+          </Card>
+        </>
+      )}
 
       <Card>
         <SectionHeader title="Yêu cầu xác minh tổ chức gần nhất" action="Xem tất cả" href="/platform/organization-verifications" />

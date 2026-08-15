@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { MeResponse, OrganizationResponse } from "@r2m/contracts";
 import { ApiError, authFetch, SessionExpiredError } from "../../../lib/api-client";
@@ -81,7 +82,7 @@ export default function AdminOrganizationsPage() {
           ) : (
             <div className="uikit-row-list">
               {organizations.map((org) => (
-                <div key={org.id} className="uikit-row">
+                <Link key={org.id} href={`/platform/organizations/${org.id}`} className="uikit-row-link">
                   <div>
                     <p style={{ fontWeight: 500, fontSize: 14 }}>{org.name}</p>
                     <p style={{ marginTop: 2, fontSize: 12, color: "var(--uikit-slate-500)" }}>
@@ -89,7 +90,7 @@ export default function AdminOrganizationsPage() {
                     </p>
                   </div>
                   <StatusDot tone={toneOf(ORGANIZATION_STATUS_TONE, org.status)} label={ORG_STATUS_LABELS[org.status] ?? org.status} />
-                </div>
+                </Link>
               ))}
             </div>
           )}

@@ -53,7 +53,16 @@ const envSchema = z.object({
   SMTP_PORT: z.coerce.number().int().positive().default(587),
   // 587 = STARTTLS (upgrade after connecting, `secure: false` for nodemailer); 465 = implicit
   // TLS (`secure: true`) — Gmail supports both, most other providers document one or the other.
-  SMTP_SECURE: z.coerce.boolean().default(false),
+  // NOT `z.coerce.boolean()` — that does `Boolean(str)`, and `Boolean("false")` is `true`
+  // (any non-empty string is truthy in JS), so `SMTP_SECURE=false` in `.env` would coerce
+  // to `true` and make nodemailer attempt implicit TLS on port 587 (which speaks STARTTLS,
+  // not TLS-from-the-first-byte) — verified live: this produced `wrong version number`
+  // from OpenSSL. Only the literal string `"true"` coerces to `true`; everything else
+  // (including unset, which the default handles) is `false`.
+  SMTP_SECURE: z
+    .string()
+    .default("false")
+    .transform((v) => v === "true"),
   SMTP_USER: z.string().optional(),
   SMTP_PASSWORD: z.string().optional(),
   RESEND_API_KEY: z.string().min(1).optional(),

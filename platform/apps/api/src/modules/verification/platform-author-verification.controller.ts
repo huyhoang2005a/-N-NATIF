@@ -35,7 +35,7 @@ export class PlatformAuthorVerificationController {
   getDocumentUrl(
     @CurrentActor() actor: ActorContext,
     @Param("id") id: string,
-  ): Promise<{ url: string; expiresIn: number }> {
+  ): Promise<{ url: string; expiresIn: number; documentId: string }> {
     return this.authorVerificationService.getDocumentDownloadUrl(actor, id);
   }
 

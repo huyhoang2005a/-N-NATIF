@@ -19,6 +19,8 @@ export { Shell } from "./Shell";
 export type { ShellNavItem } from "./Shell";
 export { SoonPage } from "./SoonPage";
 export { MatchScoreBadge } from "./MatchScoreBadge";
+export { WeeklyGrowthChart } from "./WeeklyGrowthChart";
+export { CategoryBarChart } from "./CategoryBarChart";
 export { AbstractText } from "./AbstractText";
 export { AuthorOrgByline } from "./AuthorOrgByline";
 export { VoteButton } from "./VoteButton";

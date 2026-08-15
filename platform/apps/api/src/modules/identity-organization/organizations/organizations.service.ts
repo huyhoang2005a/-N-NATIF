@@ -5,24 +5,26 @@ import type {
   OrganizationMemberResponse,
   OrganizationResponse,
   PendingMembershipResponse,
+  PlatformOrganizationStatsResponse,
   RegisterOrganizationWithDocumentRequest,
   UpdateMemberRequest,
 } from "@r2m/contracts";
 import type { ActorContext } from "@r2m/authz";
 import { assertOrgOwnerOrAdmin, assertPlatformAdmin } from "@r2m/authz";
 import type { Database } from "@r2m/database";
-import { ConflictError, ErrorCode, ForbiddenError, NotFoundError } from "@r2m/domain";
+import { ConflictError, ErrorCode, ForbiddenError, NotFoundError, OrganizationType } from "@r2m/domain";
 import { Inject, Injectable } from "@nestjs/common";
 import * as bcrypt from "bcryptjs";
 import type { MultipartDocumentUpload } from "../../../common/multipart/document-upload.util";
 import { S3Service } from "../../../common/storage/s3.service";
+import { zeroFillWeeklySignups } from "../../../common/stats/week-buckets.util";
 import { DATABASE } from "../../../database/database.module";
 import { AuditService } from "../../platform-operations/audit/audit.service";
 import { OutboxService } from "../../platform-operations/jobs/outbox.service";
 import { EmailVerificationRepository } from "../email-verification/email-verification.repository";
 import { assertNotRemovingLastActiveOwner } from "./organizations.policy";
 import { OrganizationsRepository } from "./organizations.repository";
-import { emailDomain, slugify } from "./slug.util";
+import { emailDomain, isPublicEmailDomain, slugify } from "./slug.util";
 
 function isUniqueViolation(error: unknown): boolean {
   return typeof error === "object" && error !== null && (error as { code?: string }).code === "23505";
@@ -115,18 +117,24 @@ export class OrganizationsService {
     }
     // Domain is globally unique (organization_domain) — surface this specifically instead
     // of letting it fall through to the generic ORG_ALREADY_EXISTS catch below, so the
-    // client can offer "join that organization instead" (see joinRequest()).
-    const existingOrgByDomain = await this.organizationsRepository.findOrganizationByDomain(domain);
-    if (existingOrgByDomain) {
-      throw new ConflictError(
-        ErrorCode.ORG_DOMAIN_ALREADY_REGISTERED,
-        "An organization with this email domain is already registered.",
-        {
-          organizationId: existingOrgByDomain.id,
-          organizationName: existingOrgByDomain.name,
-          organizationStatus: existingOrgByDomain.status,
-        },
-      );
+    // client can offer "join that organization instead" (see joinRequest()). Skipped for
+    // free webmail domains (gmail.com etc.) — those aren't a signal of organizational
+    // identity, so two unrelated real organizations whose owners both use Gmail must not
+    // be treated as the same organization (see isPublicEmailDomain's doc comment).
+    const isPublicDomain = isPublicEmailDomain(domain);
+    if (!isPublicDomain) {
+      const existingOrgByDomain = await this.organizationsRepository.findOrganizationByDomain(domain);
+      if (existingOrgByDomain) {
+        throw new ConflictError(
+          ErrorCode.ORG_DOMAIN_ALREADY_REGISTERED,
+          "An organization with this email domain is already registered.",
+          {
+            organizationId: existingOrgByDomain.id,
+            organizationName: existingOrgByDomain.name,
+            organizationStatus: existingOrgByDomain.status,
+          },
+        );
+      }
     }
 
     // Generated up front (not left to the DB default) so the S3 object key can reference it
@@ -173,10 +181,14 @@ export class OrganizationsService {
           tx,
         );
 
-        await this.organizationsRepository.createOrganizationDomain(
-          { organizationId: createdOrg.id, domain, isPrimary: true },
-          tx,
-        );
+        // Not recorded for free webmail domains — `organization_domain.domain` has a DB
+        // UNIQUE constraint, and a shared provider domain isn't this org's to claim.
+        if (!isPublicDomain) {
+          await this.organizationsRepository.createOrganizationDomain(
+            { organizationId: createdOrg.id, domain, isPrimary: true },
+            tx,
+          );
+        }
 
         await this.organizationsRepository.createOrganizationMember(
           {
@@ -300,6 +312,20 @@ export class OrganizationsService {
     assertPlatformAdmin(actor);
     const rows = await this.organizationsRepository.listAll(limit, offset);
     return rows.map(toOrganizationResponse);
+  }
+
+  /** Not spec-mandated — explicit user-approved addition, powers the admin dashboard's
+   * growth chart and type-breakdown chart. */
+  async statsForPlatform(actor: ActorContext): Promise<PlatformOrganizationStatsResponse> {
+    assertPlatformAdmin(actor);
+    const { weeklySignupRows, byTypeRows } = await this.organizationsRepository.statsForPlatform();
+
+    const byType = Object.fromEntries(Object.values(OrganizationType).map((type) => [type, 0]));
+    for (const row of byTypeRows) {
+      byType[row.type] = row.count;
+    }
+
+    return { weeklySignups: zeroFillWeeklySignups(weeklySignupRows), byType };
   }
 
   async inviteMember(
@@ -467,6 +493,72 @@ export class OrganizationsService {
     assertOrgOwnerOrAdmin(actor, organizationId);
     const rows = await this.organizationsRepository.listMembers(organizationId);
     return rows.map((row) => toMemberResponse(row, row.user));
+  }
+
+  /** Not spec-mandated — explicit user-approved addition for the admin org-detail page
+   * (2026-08-16). Deliberately a separate method from `listMembers` above rather than
+   * loosening its `assertOrgOwnerOrAdmin` gate — that method backs real org-management
+   * actions and must stay scoped to the org's own owner/admin, not broadened for a
+   * read-only platform view. */
+  async listMembersForPlatform(actor: ActorContext, organizationId: string): Promise<OrganizationMemberResponse[]> {
+    assertPlatformAdmin(actor);
+    const rows = await this.organizationsRepository.listMembers(organizationId);
+    return rows.map((row) => toMemberResponse(row, row.user));
+  }
+
+  /** Not spec-mandated — explicit user-approved addition (2026-08-16): `organization_status`
+   * already had a `SUSPENDED` value declared, unused by any caller. `reason` required —
+   * same audit-trail precedent as `UsersService.suspend`. */
+  async suspend(actor: ActorContext, organizationId: string, reason: string, requestId: string | null): Promise<OrganizationResponse> {
+    assertPlatformAdmin(actor);
+    const org = await this.organizationsRepository.findById(organizationId);
+    if (!org) {
+      throw new NotFoundError(ErrorCode.ORG_NOT_FOUND, "Organization not found.");
+    }
+    if (org.status !== "ACTIVE") {
+      throw new ConflictError(ErrorCode.ORG_INVALID_TRANSITION, `Only an ACTIVE organization can be suspended (current status: ${org.status}).`);
+    }
+    const updated = await this.organizationsRepository.updateOrganization(organizationId, org.version, { status: "SUSPENDED" });
+    if (!updated) {
+      throw new ConflictError(ErrorCode.ORG_VERSION_CONFLICT, "Organization was modified concurrently — retry.");
+    }
+    await this.auditService.write({
+      actorUserId: actor.userId,
+      scopeOrganizationId: organizationId,
+      requestId,
+      action: "organization.suspend",
+      entityType: "organization",
+      entityId: organizationId,
+      beforeData: { status: org.status },
+      afterData: { status: "SUSPENDED", reason },
+    });
+    return toOrganizationResponse(updated);
+  }
+
+  async reactivate(actor: ActorContext, organizationId: string, requestId: string | null): Promise<OrganizationResponse> {
+    assertPlatformAdmin(actor);
+    const org = await this.organizationsRepository.findById(organizationId);
+    if (!org) {
+      throw new NotFoundError(ErrorCode.ORG_NOT_FOUND, "Organization not found.");
+    }
+    if (org.status !== "SUSPENDED") {
+      throw new ConflictError(ErrorCode.ORG_INVALID_TRANSITION, `Only a SUSPENDED organization can be reactivated (current status: ${org.status}).`);
+    }
+    const updated = await this.organizationsRepository.updateOrganization(organizationId, org.version, { status: "ACTIVE" });
+    if (!updated) {
+      throw new ConflictError(ErrorCode.ORG_VERSION_CONFLICT, "Organization was modified concurrently — retry.");
+    }
+    await this.auditService.write({
+      actorUserId: actor.userId,
+      scopeOrganizationId: organizationId,
+      requestId,
+      action: "organization.reactivate",
+      entityType: "organization",
+      entityId: organizationId,
+      beforeData: { status: org.status },
+      afterData: { status: "ACTIVE" },
+    });
+    return toOrganizationResponse(updated);
   }
 
   async listPendingMemberships(actor: ActorContext): Promise<PendingMembershipResponse[]> {

@@ -15,6 +15,7 @@ import { Card, GhostButton, PageLoader, PrimaryButton, Shell, StatusPill, TextFi
 interface PresignedUrlResponse {
   url: string;
   expiresIn: number;
+  documentId: string;
 }
 
 export default function AuthorVerificationsPage() {
@@ -27,6 +28,11 @@ export default function AuthorVerificationsPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectNote, setRejectNote] = useState("");
+  const [visibleCount, setVisibleCount] = useState(20);
+  const [retentionOpenRequestId, setRetentionOpenRequestId] = useState<string | null>(null);
+  const [retentionDocumentId, setRetentionDocumentId] = useState<string | null>(null);
+  const [retentionDate, setRetentionDate] = useState("");
+  const [retentionBusy, setRetentionBusy] = useState(false);
 
   async function load() {
     const rows = await authFetch<AuthorVerificationRequestResponse[]>("/platform/author-verifications");
@@ -109,6 +115,44 @@ export default function AuthorVerificationsPage() {
     window.open(url, "_blank", "noopener,noreferrer");
   }
 
+  async function onOpenRetention(requestId: string) {
+    if (retentionOpenRequestId === requestId) {
+      setRetentionOpenRequestId(null);
+      return;
+    }
+    try {
+      const { documentId } = await authFetch<PresignedUrlResponse>(`/platform/author-verifications/${requestId}/document-url`);
+      setRetentionDocumentId(documentId);
+      setRetentionOpenRequestId(requestId);
+      setRetentionDate("");
+    } catch (err) {
+      if (err instanceof SessionExpiredError) {
+        router.push("/login");
+        return;
+      }
+      setError(err instanceof ApiError ? describeErrorCode(err.code) : "Không mở được tài liệu.");
+    }
+  }
+
+  function onSetRetention() {
+    if (!retentionDocumentId || !retentionDate) return;
+    setRetentionBusy(true);
+    setError(null);
+    authFetch(`/platform/verification-documents/${retentionDocumentId}/retention`, {
+      method: "POST",
+      body: JSON.stringify({ retentionUntil: new Date(`${retentionDate}T00:00:00Z`).toISOString() }),
+    })
+      .then(() => setRetentionOpenRequestId(null))
+      .catch((err) => {
+        if (err instanceof SessionExpiredError) {
+          router.push("/login");
+          return;
+        }
+        setError(err instanceof ApiError ? describeErrorCode(err.code) : "Không đặt được hạn lưu trữ.");
+      })
+      .finally(() => setRetentionBusy(false));
+  }
+
   if (!me) return <PageLoader />;
   const nav = navForPersona("platform-ops", me.platformRole === "PLATFORM_ADMIN");
 
@@ -131,7 +175,7 @@ export default function AuthorVerificationsPage() {
             <p className="uikit-empty">Không có yêu cầu xác minh tác giả nào đang chờ xử lý.</p>
           ) : (
             <div className="uikit-stack">
-              {requests.map((request) => {
+              {requests.slice(0, visibleCount).map((request) => {
                 const isBusy = busyId === request.id;
                 const claimedByMe = request.reviewerUserId === me.userId;
 
@@ -162,6 +206,9 @@ export default function AuthorVerificationsPage() {
 
                     <div style={{ display: "flex", gap: "var(--space-3)", marginTop: "var(--space-4)", flexWrap: "wrap" }}>
                       <GhostButton onClick={() => onViewDocument(request.id)}>Xem tài liệu</GhostButton>
+                      {me.platformRole === "PLATFORM_ADMIN" && (
+                        <GhostButton onClick={() => onOpenRetention(request.id)}>Hạn lưu trữ</GhostButton>
+                      )}
 
                       {request.status === "PENDING" && (
                         <PrimaryButton disabled={isBusy} onClick={() => onClaim(request.id)}>
@@ -219,12 +266,33 @@ export default function AuthorVerificationsPage() {
                         </div>
                       </div>
                     )}
+
+                    {retentionOpenRequestId === request.id && (
+                      <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center", marginTop: "var(--space-3)" }}>
+                        <input
+                          type="date"
+                          value={retentionDate}
+                          onChange={(e) => setRetentionDate(e.target.value)}
+                          min={new Date(Date.now() + 86400000).toISOString().slice(0, 10)}
+                          style={{ padding: "6px 10px", border: "1px solid var(--uikit-slate-200)", borderRadius: "var(--radius-sm)", fontSize: 13 }}
+                        />
+                        <PrimaryButton disabled={retentionBusy || !retentionDate} onClick={onSetRetention}>
+                          {retentionBusy ? "Đang lưu…" : "Lưu hạn"}
+                        </PrimaryButton>
+                      </div>
+                    )}
                   </div>
                 );
               })}
             </div>
           )}
         </Card>
+
+        {(requests?.length ?? 0) > visibleCount && (
+          <GhostButton onClick={() => setVisibleCount((n) => n + 20)} style={{ marginTop: "var(--space-4)" }}>
+            Xem thêm ({(requests?.length ?? 0) - visibleCount} còn lại)
+          </GhostButton>
+        )}
       </div>
     </Shell>
   );

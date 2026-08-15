@@ -9,7 +9,7 @@ import type {
   TechnologyCaseResponse,
 } from "@r2m/contracts";
 import type { ActorContext } from "@r2m/authz";
-import { assertActiveMember, assertPlatformAdmin, isOrgOwnerOrAdmin } from "@r2m/authz";
+import { assertActiveMember, assertPlatformAdmin, isOrgOwnerOrAdmin, isPlatformReviewerOrAdmin } from "@r2m/authz";
 import type { Database } from "@r2m/database";
 import {
   AuthorVerificationStatus,
@@ -296,7 +296,14 @@ export class TechnologyCaseService {
     return toCaseResponse(technologyCase);
   }
 
+  /** Platform reviewer/admin sees every case (2026-08-16 fix — the "Duyệt đánh giá & lộ
+   * trình" admin review queue calls this same endpoint, and was silently empty for any
+   * reviewer/admin not personally added as a case_member on the case being reviewed). */
   async list(actor: ActorContext): Promise<TechnologyCaseResponse[]> {
+    if (isPlatformReviewerOrAdmin(actor)) {
+      const rows = await this.repository.listAllForReview();
+      return rows.map(toCaseResponse);
+    }
     const actorOrgIds = actor.memberships
       .filter((membership) => membership.status === "ACTIVE")
       .map((membership) => membership.organizationId);
@@ -304,10 +311,25 @@ export class TechnologyCaseService {
     return rows.map(toCaseResponse);
   }
 
-  /** Not spec-mandated — explicit user-approved addition, see technology-case.repository.ts. */
+  /** Not spec-mandated — explicit user-approved addition, the admin case-browse page
+   * (2026-08-16). */
+  async listAllForPlatform(actor: ActorContext, limit: number, offset: number): Promise<TechnologyCaseResponse[]> {
+    assertPlatformAdmin(actor);
+    const rows = await this.repository.listAllForPlatform(limit, offset);
+    return rows.map(toCaseResponse);
+  }
+
+  /** Not spec-mandated — explicit user-approved addition, see technology-case.repository.ts.
+   * `byStatus` is zero-filled here (not in SQL) so a status with 0 cases still appears in
+   * the admin dashboard's breakdown chart, keeping its category axis stable across reloads. */
   async countAllForPlatform(actor: ActorContext): Promise<PlatformCaseSummaryResponse> {
     assertPlatformAdmin(actor);
-    return this.repository.countAllForPlatform();
+    const { total, active, byStatus } = await this.repository.countAllForPlatform();
+    const zeroFilled = Object.fromEntries(Object.values(TechnologyCaseStatus).map((status) => [status, 0]));
+    for (const row of byStatus) {
+      zeroFilled[row.status] = row.count;
+    }
+    return { total, active, byStatus: zeroFilled };
   }
 
   async listMembers(actor: ActorContext, technologyCaseId: string): Promise<CaseMemberResponse[]> {
@@ -552,6 +574,7 @@ export class TechnologyCaseService {
   /** Actor thấy case nếu là active case_member, hoặc thuộc (active org member) một
    * organization đã link qua `case_organization` (bao gồm cả owning organization). */
   async assertVisible(actor: ActorContext, technologyCase: TechnologyCaseRow): Promise<void> {
+    if (isPlatformReviewerOrAdmin(actor)) return;
     const membership = await this.repository.findActiveMembership(technologyCase.id, actor.userId);
     if (membership) return;
     const actorOrgIds = actor.memberships

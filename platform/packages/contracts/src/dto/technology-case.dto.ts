@@ -125,8 +125,11 @@ export interface EvidenceResponse {
 }
 
 /** `GET /platform/technology-cases/summary` (admin-only) — not spec-mandated, powers the
- * admin dashboard's case-count stat tile without a full platform-wide case list. */
+ * admin dashboard's case-count stat tile without a full platform-wide case list.
+ * `byStatus` (added for the dashboard's status-breakdown chart) always has one entry per
+ * `technology_case_status` enum value, including 0-counts. */
 export interface PlatformCaseSummaryResponse {
   total: number;
   active: number;
+  byStatus: Record<string, number>;
 }

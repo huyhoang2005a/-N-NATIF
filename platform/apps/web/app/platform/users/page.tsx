@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { MeResponse, PlatformUserResponse } from "@r2m/contracts";
 import { ApiError, authFetch, SessionExpiredError } from "../../../lib/api-client";
@@ -81,7 +82,7 @@ export default function AdminUsersPage() {
           ) : (
             <div className="uikit-row-list">
               {users.map((user) => (
-                <div key={user.userId} className="uikit-row">
+                <Link key={user.userId} href={`/platform/users/${user.userId}`} className="uikit-row-link">
                   <div>
                     <p style={{ fontWeight: 500, fontSize: 14 }}>{user.displayName ?? user.primaryEmail}</p>
                     <p style={{ marginTop: 2, fontSize: 12, color: "var(--uikit-slate-500)" }}>
@@ -93,7 +94,7 @@ export default function AdminUsersPage() {
                     {!user.emailVerified && <StatusPill tone="amber">Email chưa xác thực</StatusPill>}
                     <StatusDot tone={toneOf(USER_STATUS_TONE, user.status)} label={USER_STATUS_LABELS[user.status] ?? user.status} />
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           )}

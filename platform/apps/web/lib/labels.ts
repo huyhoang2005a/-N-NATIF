@@ -7,6 +7,12 @@ export const ORG_TYPE_LABELS: Record<RegisterOrganizationRequest["organizationTy
   SUPPORT_ORGANIZATION: "Tổ chức hỗ trợ",
 };
 
+export const ORG_MEMBER_ROLE_LABELS: Record<string, string> = {
+  ORG_OWNER: "Chủ sở hữu",
+  ORG_ADMIN: "Quản trị viên",
+  MEMBER: "Thành viên",
+};
+
 export const ORG_STATUS_LABELS: Record<string, string> = {
   PENDING_VERIFICATION: "Chờ xác minh",
   ACTIVE: "Đang hoạt động",

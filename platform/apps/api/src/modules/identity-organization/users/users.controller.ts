@@ -1,15 +1,18 @@
 import type {
   AvatarUploadResponse,
+  PlatformUserDetailResponse,
   PlatformUserResponse,
+  PlatformUserStatsResponse,
   RequestAvatarUploadRequest,
+  SuspendUserRequest,
   UpdateAvatarRequest,
   UpdateProfileRequest,
   UserProfileResponse,
   UserPublicInfoResponse,
 } from "@r2m/contracts";
-import { RequestAvatarUploadSchema, UpdateAvatarRequestSchema, UpdateProfileRequestSchema } from "@r2m/contracts";
+import { RequestAvatarUploadSchema, SuspendUserRequestSchema, UpdateAvatarRequestSchema, UpdateProfileRequestSchema } from "@r2m/contracts";
 import type { ActorContext } from "@r2m/authz";
-import { BadRequestException, Body, Controller, Delete, Get, Patch, Post, Put, Query, Req, UsePipes } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, Req, UsePipes } from "@nestjs/common";
 import type { Request } from "express";
 import { CurrentActor } from "../../../common/decorators/current-actor.decorator";
 import { parsePageLimit, parsePageOffset } from "../../../common/pagination/parse-page-params.util";
@@ -103,5 +106,31 @@ export class PlatformUsersController {
     @Query("offset") offset?: string,
   ): Promise<PlatformUserResponse[]> {
     return this.usersService.listAllForPlatform(actor, parsePageLimit(limit), parsePageOffset(offset));
+  }
+
+  @Get("stats")
+  stats(@CurrentActor() actor: ActorContext): Promise<PlatformUserStatsResponse> {
+    return this.usersService.statsForPlatform(actor);
+  }
+
+  @Get(":id")
+  getById(@CurrentActor() actor: ActorContext, @Param("id") id: string): Promise<PlatformUserDetailResponse> {
+    return this.usersService.getByIdForPlatform(actor, id);
+  }
+
+  @Post(":id/suspend")
+  @UsePipes(new ZodValidationPipe(SuspendUserRequestSchema))
+  suspend(
+    @CurrentActor() actor: ActorContext,
+    @Param("id") id: string,
+    @Body() body: SuspendUserRequest,
+    @Req() req: Request,
+  ): Promise<PlatformUserResponse> {
+    return this.usersService.suspend(actor, id, body.reason, requestId(req));
+  }
+
+  @Post(":id/reactivate")
+  reactivate(@CurrentActor() actor: ActorContext, @Param("id") id: string, @Req() req: Request): Promise<PlatformUserResponse> {
+    return this.usersService.reactivate(actor, id, requestId(req));
   }
 }
