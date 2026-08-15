@@ -15,4 +15,5 @@ export * from "./dto/public-profile.dto";
 export * from "./dto/community.dto";
 export * from "./dto/moderation.dto";
 export * from "./dto/notification.dto";
+export * from "./dto/assistant.dto";
 export * from "./events/domain-events";

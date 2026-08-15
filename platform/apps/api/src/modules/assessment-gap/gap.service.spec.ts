@@ -7,6 +7,8 @@ import type { TechnologyCaseRepository } from "../technology-case/technology-cas
 import type { TechnologyCaseService } from "../technology-case/technology-case.service";
 import type { AuditService } from "../platform-operations/audit/audit.service";
 import type { OutboxService } from "../platform-operations/jobs/outbox.service";
+import type { AssessmentRepository } from "./assessment.repository";
+import type { GeminiClient } from "../assistant/gemini.client";
 
 const owner: ActorContext = {
   userId: "owner-1",
@@ -81,11 +83,25 @@ function buildService() {
 
   const auditService = { write: vi.fn().mockResolvedValue(undefined) } as unknown as AuditService;
   const outboxService = { append: vi.fn().mockResolvedValue(undefined) } as unknown as OutboxService;
+  const assessmentRepository = {
+    listByCase: vi.fn().mockResolvedValue([]),
+    findScoresWithCriteriaByAssessment: vi.fn().mockResolvedValue([]),
+  } as unknown as AssessmentRepository;
+  const geminiClient = { isConfigured: vi.fn().mockReturnValue(false), generateJson: vi.fn() } as unknown as GeminiClient;
   const db = { transaction: vi.fn((cb: (tx: unknown) => Promise<unknown>) => cb({})) };
 
-  const service = new GapService(repository, caseRepository, caseService, auditService, outboxService, db as never);
+  const service = new GapService(
+    repository,
+    caseRepository,
+    caseService,
+    auditService,
+    outboxService,
+    assessmentRepository,
+    geminiClient,
+    db as never,
+  );
 
-  return { service, repository, caseRepository, caseService, auditService, outboxService };
+  return { service, repository, caseRepository, caseService, auditService, outboxService, assessmentRepository, geminiClient };
 }
 
 describe("GapService.create (UC-GAP-01)", () => {

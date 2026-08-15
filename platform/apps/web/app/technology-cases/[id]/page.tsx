@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { Plus, UserPlus } from "lucide-react";
+import { Plus, Sparkles, UserPlus } from "lucide-react";
 import type {
   AssessmentCriterionResponse,
   AssessmentScoreResponse,
@@ -11,11 +11,13 @@ import type {
   CaseOrganizationResponse,
   EvidenceResponse,
   GapResponse,
+  GapSuggestion,
   MeResponse,
   OrganizationResponse,
   ReadinessAssessmentResponse,
   RoadmapMilestoneResponse,
   RoadmapResponse,
+  RoadmapSuggestion,
   TechnologyCaseResponse,
   TransferManifestDetailResponse,
   TransferManifestResponse,
@@ -71,6 +73,16 @@ export default function TechnologyCaseDetailPage() {
   const [gaps, setGaps] = useState<GapResponse[] | null>(null);
   const [roadmaps, setRoadmaps] = useState<RoadmapResponse[] | null>(null);
   const [milestones, setMilestones] = useState<RoadmapMilestoneResponse[]>([]);
+
+  // ---------- gap copilot ----------
+  const [showGapForm, setShowGapForm] = useState(false);
+  const [gapForm, setGapForm] = useState({ title: "", description: "", category: "", severity: "MEDIUM" });
+  const [gapSuggestions, setGapSuggestions] = useState<GapSuggestion[] | null>(null);
+
+  // ---------- roadmap copilot ----------
+  const [showRoadmapForm, setShowRoadmapForm] = useState(false);
+  const [roadmapForm, setRoadmapForm] = useState({ title: "", objective: "" });
+  const [roadmapSuggestion, setRoadmapSuggestion] = useState<RoadmapSuggestion | null>(null);
   const [transferManifests, setTransferManifests] = useState<TransferManifestResponse[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -197,6 +209,87 @@ export default function TechnologyCaseDetailPage() {
         body: JSON.stringify({}),
       });
       router.push(`/assessments/${created.id}`);
+    });
+  }
+
+  function onSuggestGaps() {
+    return runAction("suggest-gaps", async () => {
+      const suggestions = await authFetch<GapSuggestion[]>(`/technology-cases/${caseId}/gaps/suggestions`, { method: "POST" });
+      setGapSuggestions(suggestions);
+    });
+  }
+
+  function onPickGapSuggestion(s: GapSuggestion) {
+    setGapForm({ title: s.title, description: s.description, category: s.category ?? "", severity: s.severity });
+    setGapSuggestions(null);
+    setShowGapForm(true);
+  }
+
+  function onCreateGap() {
+    return runAction("create-gap", async () => {
+      await authFetch(`/technology-cases/${caseId}/gaps`, {
+        method: "POST",
+        body: JSON.stringify({
+          title: gapForm.title,
+          description: gapForm.description,
+          category: gapForm.category || undefined,
+          severity: gapForm.severity,
+          sourceAssessmentId: latestAssessment?.id,
+          evidenceIds: [],
+        }),
+      });
+      setGapForm({ title: "", description: "", category: "", severity: "MEDIUM" });
+      setShowGapForm(false);
+      await load();
+    });
+  }
+
+  function onSuggestRoadmap() {
+    return runAction("suggest-roadmap", async () => {
+      const suggestion = await authFetch<RoadmapSuggestion>(`/technology-cases/${caseId}/roadmaps/suggestions`, { method: "POST" });
+      setRoadmapSuggestion(suggestion);
+    });
+  }
+
+  function onUseRoadmapSuggestion() {
+    return runAction("use-roadmap-suggestion", async () => {
+      if (!roadmapSuggestion) return;
+      const createdRoadmap = await authFetch<RoadmapResponse>(`/technology-cases/${caseId}/roadmaps`, {
+        method: "POST",
+        body: JSON.stringify({ title: roadmapSuggestion.title, objective: roadmapSuggestion.objective }),
+      });
+      for (const m of roadmapSuggestion.milestones) {
+        const createdMilestone = await authFetch<RoadmapMilestoneResponse>(`/roadmaps/${createdRoadmap.id}/milestones`, {
+          method: "POST",
+          body: JSON.stringify({ title: m.title, description: m.description }),
+        });
+        for (const t of m.tasks) {
+          await authFetch(`/milestones/${createdMilestone.id}/tasks`, {
+            method: "POST",
+            body: JSON.stringify({ title: t.title, description: t.description }),
+          });
+        }
+        for (const gapRecordId of m.addressesGapIds) {
+          await authFetch(`/milestones/${createdMilestone.id}/gaps`, {
+            method: "POST",
+            body: JSON.stringify({ gapRecordId }),
+          });
+        }
+      }
+      setRoadmapSuggestion(null);
+      await load();
+    });
+  }
+
+  function onCreateRoadmap() {
+    return runAction("create-roadmap", async () => {
+      await authFetch(`/technology-cases/${caseId}/roadmaps`, {
+        method: "POST",
+        body: JSON.stringify({ title: roadmapForm.title, objective: roadmapForm.objective || undefined }),
+      });
+      setRoadmapForm({ title: "", objective: "" });
+      setShowRoadmapForm(false);
+      await load();
     });
   }
 
@@ -517,7 +610,36 @@ export default function TechnologyCaseDetailPage() {
 
         {tab === "Gap" && (
           <Card>
-            <h2 style={{ fontSize: 14, fontWeight: 600, marginBottom: "var(--space-3)" }}>Khoảng trống cần xử lý</h2>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-3)" }}>
+              <h2 style={{ fontSize: 14, fontWeight: 600 }}>Khoảng trống cần xử lý</h2>
+              {latestAssessment && (
+                <div style={{ display: "flex", gap: "var(--space-3)" }}>
+                  <button
+                    type="button"
+                    onClick={onSuggestGaps}
+                    disabled={busyKey === "suggest-gaps"}
+                    style={{ display: "flex", alignItems: "center", gap: 4, background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 12, fontWeight: 500, color: "var(--uikit-indigo-700)" }}
+                  >
+                    <Sparkles size={13} />
+                    {busyKey === "suggest-gaps" ? "Đang gợi ý…" : "Gợi ý bằng AI"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowGapForm((v) => !v)}
+                    style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 12, fontWeight: 500, color: "var(--uikit-indigo-700)" }}
+                  >
+                    {showGapForm ? "Đóng" : "+ Thêm gap"}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {!latestAssessment && (
+              <p style={{ fontSize: 12, color: "var(--uikit-slate-400)", marginBottom: "var(--space-3)" }}>
+                Cần có ít nhất một đánh giá (tab "Đánh giá") làm cơ sở trước khi ghi nhận gap.
+              </p>
+            )}
+
             {gaps.length === 0 ? (
               <p className="uikit-empty">Chưa có gap nào được ghi nhận từ đánh giá.</p>
             ) : (
@@ -545,12 +667,86 @@ export default function TechnologyCaseDetailPage() {
                 ))}
               </div>
             )}
+
+            {gapSuggestions && (
+              <div className="uikit-stack" style={{ marginTop: "var(--space-4)", paddingTop: "var(--space-4)", borderTop: "1px solid var(--uikit-slate-100)" }}>
+                <p style={{ fontSize: 12, fontWeight: 500, color: "var(--uikit-slate-500)" }}>
+                  Gợi ý từ AI — chọn một gợi ý để điền sẵn vào form, bạn vẫn có thể chỉnh sửa trước khi lưu.
+                </p>
+                {gapSuggestions.length === 0 ? (
+                  <p className="uikit-empty">AI không tìm thấy gap mới nào để đề xuất.</p>
+                ) : (
+                  gapSuggestions.map((s, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => onPickGapSuggestion(s)}
+                      style={{
+                        textAlign: "left",
+                        border: "1px solid var(--uikit-slate-200)",
+                        borderRadius: "var(--radius-sm)",
+                        padding: "var(--space-3)",
+                        background: "none",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ fontSize: 14, fontWeight: 500 }}>{s.title}</span>
+                        <StatusPill tone={toneOf(GAP_SEVERITY_TONE, s.severity)}>{GAP_SEVERITY_LABELS[s.severity] ?? s.severity}</StatusPill>
+                      </div>
+                      <p style={{ marginTop: 4, fontSize: 13, color: "var(--uikit-slate-500)" }}>{s.description}</p>
+                      <p style={{ marginTop: 4, fontSize: 12, color: "var(--uikit-slate-400)" }}>Lý do AI đề xuất: {s.rationale}</p>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+
+            {showGapForm && (
+              <div className="uikit-stack" style={{ marginTop: "var(--space-4)", paddingTop: "var(--space-4)", borderTop: "1px solid var(--uikit-slate-100)" }}>
+                <TextField label="Tiêu đề" value={gapForm.title} onChange={(e) => setGapForm({ ...gapForm, title: e.target.value })} />
+                <TextField label="Mô tả" as="textarea" value={gapForm.description} onChange={(e) => setGapForm({ ...gapForm, description: e.target.value })} />
+                <TextField label="Danh mục" optional value={gapForm.category} onChange={(e) => setGapForm({ ...gapForm, category: e.target.value })} />
+                <SelectField
+                  label="Mức độ nghiêm trọng"
+                  value={gapForm.severity}
+                  onChange={(e) => setGapForm({ ...gapForm, severity: e.target.value })}
+                  options={Object.keys(GAP_SEVERITY_LABELS).map((v) => ({ value: v, label: GAP_SEVERITY_LABELS[v] ?? v }))}
+                />
+                <PrimaryButton disabled={busyKey === "create-gap" || !gapForm.title || !gapForm.description} onClick={onCreateGap}>
+                  {busyKey === "create-gap" ? "Đang lưu…" : "Lưu gap"}
+                </PrimaryButton>
+              </div>
+            )}
           </Card>
         )}
 
         {tab === "Lộ trình" && (
           <Card>
-            <h2 style={{ fontSize: 14, fontWeight: 600, marginBottom: "var(--space-3)" }}>Lộ trình thương mại hoá</h2>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-3)" }}>
+              <h2 style={{ fontSize: 14, fontWeight: 600 }}>Lộ trình thương mại hoá</h2>
+              {!latestRoadmap && gaps.some((g) => g.status === "OPEN" || g.status === "IN_PROGRESS") && (
+                <div style={{ display: "flex", gap: "var(--space-3)" }}>
+                  <button
+                    type="button"
+                    onClick={onSuggestRoadmap}
+                    disabled={busyKey === "suggest-roadmap"}
+                    style={{ display: "flex", alignItems: "center", gap: 4, background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 12, fontWeight: 500, color: "var(--uikit-indigo-700)" }}
+                  >
+                    <Sparkles size={13} />
+                    {busyKey === "suggest-roadmap" ? "Đang gợi ý…" : "Gợi ý bằng AI"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowRoadmapForm((v) => !v)}
+                    style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 12, fontWeight: 500, color: "var(--uikit-indigo-700)" }}
+                  >
+                    {showRoadmapForm ? "Đóng" : "+ Tạo lộ trình"}
+                  </button>
+                </div>
+              )}
+            </div>
+
             {!latestRoadmap ? (
               <p className="uikit-empty">Chưa có roadmap nào cho case này.</p>
             ) : (
@@ -585,6 +781,45 @@ export default function TechnologyCaseDetailPage() {
                   </div>
                 )}
               </>
+            )}
+
+            {roadmapSuggestion && (
+              <div className="uikit-stack" style={{ marginTop: "var(--space-4)", paddingTop: "var(--space-4)", borderTop: "1px solid var(--uikit-slate-100)" }}>
+                <p style={{ fontSize: 12, fontWeight: 500, color: "var(--uikit-slate-500)" }}>Gợi ý từ AI — xem trước bên dưới, chấp nhận sẽ tạo roadmap + milestone + task tương ứng.</p>
+                <div style={{ border: "1px solid var(--uikit-slate-200)", borderRadius: "var(--radius-sm)", padding: "var(--space-3)" }}>
+                  <p style={{ fontSize: 14, fontWeight: 600 }}>{roadmapSuggestion.title}</p>
+                  <p style={{ marginTop: 4, fontSize: 13, color: "var(--uikit-slate-500)" }}>{roadmapSuggestion.objective}</p>
+                  <div style={{ marginTop: "var(--space-3)" }} className="uikit-stack">
+                    {roadmapSuggestion.milestones.map((m, i) => (
+                      <div key={i} style={{ borderLeft: "2px solid var(--uikit-indigo-200)", paddingLeft: "var(--space-3)" }}>
+                        <p style={{ fontSize: 13, fontWeight: 500 }}>{m.title}</p>
+                        <p style={{ marginTop: 2, fontSize: 12, color: "var(--uikit-slate-500)" }}>{m.description}</p>
+                        <ul style={{ marginTop: 4, paddingLeft: 16, fontSize: 12, color: "var(--uikit-slate-500)" }}>
+                          {m.tasks.map((t, j) => (
+                            <li key={j}>{t.title}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: "var(--space-3)" }}>
+                  <PrimaryButton disabled={busyKey === "use-roadmap-suggestion"} onClick={onUseRoadmapSuggestion}>
+                    {busyKey === "use-roadmap-suggestion" ? "Đang tạo…" : "Dùng gợi ý này"}
+                  </PrimaryButton>
+                  <GhostButton onClick={() => setRoadmapSuggestion(null)}>Bỏ qua</GhostButton>
+                </div>
+              </div>
+            )}
+
+            {showRoadmapForm && (
+              <div className="uikit-stack" style={{ marginTop: "var(--space-4)", paddingTop: "var(--space-4)", borderTop: "1px solid var(--uikit-slate-100)" }}>
+                <TextField label="Tiêu đề" value={roadmapForm.title} onChange={(e) => setRoadmapForm({ ...roadmapForm, title: e.target.value })} />
+                <TextField label="Mục tiêu" optional as="textarea" value={roadmapForm.objective} onChange={(e) => setRoadmapForm({ ...roadmapForm, objective: e.target.value })} />
+                <PrimaryButton disabled={busyKey === "create-roadmap" || !roadmapForm.title} onClick={onCreateRoadmap}>
+                  {busyKey === "create-roadmap" ? "Đang lưu…" : "Lưu roadmap"}
+                </PrimaryButton>
+              </div>
             )}
           </Card>
         )}

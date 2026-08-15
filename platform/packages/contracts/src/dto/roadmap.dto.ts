@@ -60,6 +60,39 @@ export const CreateRoadmapReviewRequestSchema = z.object({
 });
 export type CreateRoadmapReviewRequest = z.infer<typeof CreateRoadmapReviewRequestSchema>;
 
+/** AI-copilot draft output (2026-08, demo phase Gemini feature) — a *suggestion*, never
+ * persisted directly. Mirrors `CreateRoadmapRequestSchema`/`CreateMilestoneRequestSchema`/
+ * `CreateTaskRequestSchema` shapes (minus fields a suggestion can't originate — dates,
+ * assignees) so the user's accepted draft maps 1:1 onto the existing, unmodified
+ * create-roadmap → create-milestone → create-task call sequence. `addressesGapIds`
+ * references real `gap_record.id` values the caller supplied as context — the server
+ * validates every id against that same list before returning, dropping any the model
+ * invented, so the client never has to re-check id validity itself. */
+export const RoadmapSuggestionSchema = z.object({
+  title: z.string().trim().min(1).max(255),
+  objective: z.string().trim().min(1),
+  milestones: z
+    .array(
+      z.object({
+        title: z.string().trim().min(1).max(255),
+        description: z.string().trim().min(1),
+        addressesGapIds: z.array(z.string().uuid()).default([]),
+        tasks: z
+          .array(
+            z.object({
+              title: z.string().trim().min(1).max(255),
+              description: z.string().trim().min(1),
+            }),
+          )
+          .min(1)
+          .max(5),
+      }),
+    )
+    .min(1)
+    .max(6),
+});
+export type RoadmapSuggestion = z.infer<typeof RoadmapSuggestionSchema>;
+
 export interface RoadmapResponse {
   id: string;
   technologyCaseId: string;

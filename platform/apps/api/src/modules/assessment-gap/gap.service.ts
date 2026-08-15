@@ -1,4 +1,5 @@
-import type { CreateGapRequest, GapResponse, TransitionGapRequest, UpdateGapRequest } from "@r2m/contracts";
+import type { CreateGapRequest, GapResponse, GapSuggestion, TransitionGapRequest, UpdateGapRequest } from "@r2m/contracts";
+import { GapSuggestionListSchema } from "@r2m/contracts";
 import type { ActorContext } from "@r2m/authz";
 import type { Database } from "@r2m/database";
 import {
@@ -14,8 +15,10 @@ import { Inject, Injectable } from "@nestjs/common";
 import { DATABASE } from "../../database/database.module";
 import { AuditService } from "../platform-operations/audit/audit.service";
 import { OutboxService } from "../platform-operations/jobs/outbox.service";
+import { GeminiClient } from "../assistant/gemini.client";
 import { TechnologyCaseRepository } from "../technology-case/technology-case.repository";
 import { TechnologyCaseService } from "../technology-case/technology-case.service";
+import { AssessmentRepository } from "./assessment.repository";
 import { assertGapTransition } from "./domain/gap.state-machine";
 import { GapRepository } from "./gap.repository";
 
@@ -77,6 +80,8 @@ export class GapService {
     private readonly caseService: TechnologyCaseService,
     private readonly auditService: AuditService,
     private readonly outboxService: OutboxService,
+    private readonly assessmentRepository: AssessmentRepository,
+    private readonly geminiClient: GeminiClient,
     @Inject(DATABASE) private readonly db: Database,
   ) {}
 
@@ -309,5 +314,80 @@ export class GapService {
     await this.caseService.assertVisible(actor, technologyCase);
     const rows = await this.repository.listByCase(technologyCaseId);
     return rows.map(toGapResponse);
+  }
+
+  /** AI-copilot draft (2026-08, demo phase) — same write-authorization gate as
+   * `create()` (a suggestion is only useful to someone who could actually act on it), but
+   * writes nothing: returns candidate `GapSuggestion`s grounded in this case's real latest
+   * assessment scores + existing gap titles (so the model doesn't propose duplicates),
+   * for the user to review/edit and submit through the unmodified `create()` above. */
+  async suggestDrafts(actor: ActorContext, technologyCaseId: string): Promise<GapSuggestion[]> {
+    const technologyCase = await this.caseRepository.findById(technologyCaseId);
+    if (!technologyCase) {
+      throw new NotFoundError(ErrorCode.CASE_NOT_FOUND, "Technology case not found.");
+    }
+    await this.assertWriteAllowed(technologyCaseId, actor);
+
+    if (!this.geminiClient.isConfigured()) {
+      throw new ConflictError(ErrorCode.ASSISTANT_UNAVAILABLE, "AI copilot is not configured on this environment.");
+    }
+
+    const assessments = await this.assessmentRepository.listByCase(technologyCaseId);
+    const latestAssessment = assessments.find((a) => a.status === "APPROVED" || a.status === "SUBMITTED") ?? assessments[0];
+    const scoreLines = latestAssessment
+      ? (await this.assessmentRepository.findScoresWithCriteriaByAssessment(latestAssessment.id))
+          .map((s) => `- ${s.criterion.title} (mã ${s.criterion.criterionCode}): ${s.score}/${s.criterion.maxScore} — ${s.rationale}`)
+          .join("\n")
+      : "(Chưa có đánh giá nào cho case này.)";
+
+    const existingGaps = await this.repository.listByCase(technologyCaseId);
+    const existingGapLines = existingGaps.length > 0 ? existingGaps.map((g) => `- ${g.title} (${g.severity})`).join("\n") : "(Chưa có gap nào.)";
+
+    const systemInstruction = [
+      "Bạn là trợ lý gợi ý gap-analysis (khoảng trống công nghệ) cho nền tảng R2M — chuyển giao công nghệ từ nghiên cứu sang doanh nghiệp.",
+      "Chỉ dựa vào thông tin case/điểm đánh giá được cung cấp — không bịa số liệu, không bịa tên tổ chức/người liên quan.",
+      "Đề xuất 1-4 gap KHÔNG trùng với danh sách gap đã có. Mỗi gap phải bám sát tiêu chí đánh giá có điểm thấp trong dữ liệu được cung cấp.",
+      "severity chỉ được là một trong: LOW, MEDIUM, HIGH, CRITICAL.",
+      "rationale: giải thích ngắn gọn vì sao đề xuất gap này, dựa trên điểm/tiêu chí nào.",
+    ].join(" ");
+
+    const userPrompt = [
+      `Case: ${technologyCase.title}`,
+      technologyCase.description ? `Mô tả case: ${technologyCase.description}` : null,
+      `Điểm đánh giá theo tiêu chí:\n${scoreLines}`,
+      `Gap đã ghi nhận:\n${existingGapLines}`,
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+
+    const responseSchema = {
+      type: "ARRAY",
+      minItems: 1,
+      maxItems: 4,
+      items: {
+        type: "OBJECT",
+        properties: {
+          title: { type: "STRING" },
+          description: { type: "STRING" },
+          category: { type: "STRING" },
+          severity: { type: "STRING", enum: ["LOW", "MEDIUM", "HIGH", "CRITICAL"] },
+          rationale: { type: "STRING" },
+        },
+        required: ["title", "description", "severity", "rationale"],
+      },
+    };
+
+    let raw: unknown;
+    try {
+      raw = await this.geminiClient.generateJson(systemInstruction, userPrompt, responseSchema);
+    } catch {
+      throw new ConflictError(ErrorCode.ASSISTANT_UNAVAILABLE, "AI copilot could not generate suggestions right now — try again shortly.");
+    }
+
+    const parsed = GapSuggestionListSchema.safeParse(raw);
+    if (!parsed.success) {
+      throw new ConflictError(ErrorCode.ASSISTANT_UNAVAILABLE, "AI copilot returned an unexpected response — try again.");
+    }
+    return parsed.data;
   }
 }

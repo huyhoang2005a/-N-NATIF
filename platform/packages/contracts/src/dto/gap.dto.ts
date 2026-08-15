@@ -49,6 +49,21 @@ export const TransitionGapRequestSchema = z
   );
 export type TransitionGapRequest = z.infer<typeof TransitionGapRequestSchema>;
 
+/** AI-copilot draft output (2026-08, demo phase Gemini feature) — a *suggestion*, never
+ * persisted directly. The user reviews/edits and submits through the unmodified
+ * `CreateGapRequestSchema` flow, so this schema intentionally mirrors it minus the fields
+ * a suggestion can't originate (`ownerUserId`, `dueDate`, `evidenceIds`) plus a
+ * `rationale` explaining the model's reasoning for the user to judge. */
+export const GapSuggestionSchema = z.object({
+  title: z.string().trim().min(1).max(255),
+  description: z.string().trim().min(1),
+  category: z.string().trim().max(120).optional(),
+  severity: z.enum(gapSeverityValues),
+  rationale: z.string().trim().min(1),
+});
+export type GapSuggestion = z.infer<typeof GapSuggestionSchema>;
+export const GapSuggestionListSchema = z.array(GapSuggestionSchema).max(5);
+
 export interface GapResponse {
   id: string;
   technologyCaseId: string;

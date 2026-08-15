@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { TechnologyCaseModule } from "../technology-case/technology-case.module";
+import { AssistantModule } from "../assistant/assistant.module";
 import { AuditModule } from "../platform-operations/audit/audit.module";
 import { JobsModule } from "../platform-operations/jobs/jobs.module";
 import { AssessmentGapCaseController, AssessmentsController, GapsController } from "./assessment-gap.controller";
@@ -15,7 +16,7 @@ import { GapService } from "./gap.service";
  * module thật). Imports `TechnologyCaseModule` (exports `TechnologyCaseRepository`/
  * `TechnologyCaseService` từ Phase 4) để tái dùng `applyTransition`/`assertVisible`. */
 @Module({
-  imports: [AuditModule, JobsModule, TechnologyCaseModule],
+  imports: [AuditModule, JobsModule, TechnologyCaseModule, AssistantModule],
   controllers: [AssessmentFrameworksController, AssessmentGapCaseController, AssessmentsController, GapsController],
   providers: [AssessmentFrameworkRepository, AssessmentRepository, AssessmentService, GapRepository, GapService],
   // Exported for `modules/roadmap-transfer` — RoadmapService reads open CRITICAL gaps

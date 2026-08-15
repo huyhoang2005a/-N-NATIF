@@ -10,8 +10,10 @@ import type {
   RoadmapMilestoneResponse,
   RoadmapResponse,
   RoadmapReviewResponse,
+  RoadmapSuggestion,
   RoadmapTaskResponse,
 } from "@r2m/contracts";
+import { RoadmapSuggestionSchema } from "@r2m/contracts";
 import type { ActorContext } from "@r2m/authz";
 import type { Database } from "@r2m/database";
 import {
@@ -31,6 +33,7 @@ import { TechnologyCaseRepository } from "../technology-case/technology-case.rep
 import { TechnologyCaseService } from "../technology-case/technology-case.service";
 import { GapRepository } from "../assessment-gap/gap.repository";
 import { toGapResponse } from "../assessment-gap/gap.service";
+import { GeminiClient } from "../assistant/gemini.client";
 import { wouldCreateCycle } from "./domain/cycle-detection";
 import { assertRoadmapTransition } from "./domain/roadmap.state-machine";
 import { RoadmapRepository } from "./roadmap.repository";
@@ -180,6 +183,7 @@ export class RoadmapService {
     private readonly gapRepository: GapRepository,
     private readonly auditService: AuditService,
     private readonly outboxService: OutboxService,
+    private readonly geminiClient: GeminiClient,
     @Inject(DATABASE) private readonly db: Database,
   ) {}
 
@@ -730,5 +734,99 @@ export class RoadmapService {
     await this.caseService.assertVisible(actor, technologyCase);
     const rows = await this.repository.listGapLinksByMilestone(milestoneId);
     return rows.map((row) => toGapResponse(row.gap));
+  }
+
+  /** AI-copilot draft (2026-08, demo phase) — same write-authorization gate as
+   * `create()`, writes nothing: returns a candidate `RoadmapSuggestion` (title/objective/
+   * milestones/tasks) grounded in this case's real OPEN/IN_PROGRESS gaps, for the user to
+   * review/edit before submitting through the unmodified `create()`/`createMilestone()`/
+   * `createTask()`/`linkMilestoneGap()` sequence above. `addressesGapIds` in the model's
+   * output is filtered down to ids that are actually in the supplied gap list — an id the
+   * model invented is silently dropped rather than trusted. */
+  async suggestDraft(actor: ActorContext, technologyCaseId: string): Promise<RoadmapSuggestion> {
+    const technologyCase = await this.caseRepository.findById(technologyCaseId);
+    if (!technologyCase) {
+      throw new NotFoundError(ErrorCode.CASE_NOT_FOUND, "Technology case not found.");
+    }
+    await this.assertWriteAllowed(technologyCaseId, actor);
+
+    if (!this.geminiClient.isConfigured()) {
+      throw new ConflictError(ErrorCode.ASSISTANT_UNAVAILABLE, "AI copilot is not configured on this environment.");
+    }
+
+    const allGaps = await this.gapRepository.listByCase(technologyCaseId);
+    const openGaps = allGaps.filter((g) => g.status === "OPEN" || g.status === "IN_PROGRESS");
+    if (openGaps.length === 0) {
+      throw new ConflictError(
+        ErrorCode.ASSISTANT_UNAVAILABLE,
+        "No open gap to build a roadmap draft from — record at least one gap first.",
+      );
+    }
+    const openGapIds = new Set(openGaps.map((g) => g.id));
+    const gapLines = openGaps.map((g) => `- id ${g.id} — ${g.title} (${g.severity}): ${g.description}`).join("\n");
+
+    const systemInstruction = [
+      "Bạn là trợ lý gợi ý lộ trình thương mại hoá công nghệ cho nền tảng R2M.",
+      "Chỉ dựa vào case và danh sách gap được cung cấp — không bịa mốc thời gian cụ thể, không bịa tên người/tổ chức.",
+      "Đề xuất 1 roadmap gồm 1-6 milestone, mỗi milestone giải quyết ít nhất 1 gap trong danh sách (addressesGapIds phải là id có trong danh sách được cung cấp), mỗi milestone có 1-5 task hành động cụ thể.",
+      "Không đặt startDate/dueDate/tên người phụ trách — phần đó người dùng tự điền sau khi duyệt.",
+    ].join(" ");
+
+    const userPrompt = [`Case: ${technologyCase.title}`, technologyCase.description ? `Mô tả case: ${technologyCase.description}` : null, `Gap đang mở cần xử lý:\n${gapLines}`]
+      .filter(Boolean)
+      .join("\n\n");
+
+    const responseSchema = {
+      type: "OBJECT",
+      properties: {
+        title: { type: "STRING" },
+        objective: { type: "STRING" },
+        milestones: {
+          type: "ARRAY",
+          minItems: 1,
+          maxItems: 6,
+          items: {
+            type: "OBJECT",
+            properties: {
+              title: { type: "STRING" },
+              description: { type: "STRING" },
+              addressesGapIds: { type: "ARRAY", items: { type: "STRING" } },
+              tasks: {
+                type: "ARRAY",
+                minItems: 1,
+                maxItems: 5,
+                items: {
+                  type: "OBJECT",
+                  properties: { title: { type: "STRING" }, description: { type: "STRING" } },
+                  required: ["title", "description"],
+                },
+              },
+            },
+            required: ["title", "description", "tasks"],
+          },
+        },
+      },
+      required: ["title", "objective", "milestones"],
+    };
+
+    let raw: unknown;
+    try {
+      raw = await this.geminiClient.generateJson(systemInstruction, userPrompt, responseSchema);
+    } catch {
+      throw new ConflictError(ErrorCode.ASSISTANT_UNAVAILABLE, "AI copilot could not generate a roadmap draft right now — try again shortly.");
+    }
+
+    const parsed = RoadmapSuggestionSchema.safeParse(raw);
+    if (!parsed.success) {
+      throw new ConflictError(ErrorCode.ASSISTANT_UNAVAILABLE, "AI copilot returned an unexpected response — try again.");
+    }
+
+    return {
+      ...parsed.data,
+      milestones: parsed.data.milestones.map((m) => ({
+        ...m,
+        addressesGapIds: m.addressesGapIds.filter((id) => openGapIds.has(id)),
+      })),
+    };
   }
 }

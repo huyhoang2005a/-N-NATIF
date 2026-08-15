@@ -4,6 +4,7 @@ import type {
   CreateAssessmentRequest,
   CreateGapRequest,
   GapResponse,
+  GapSuggestion,
   ReadinessAssessmentResponse,
   TransitionGapRequest,
   UpdateGapRequest,
@@ -18,9 +19,11 @@ import {
   UpsertAssessmentScoreRequestSchema,
 } from "@r2m/contracts";
 import type { ActorContext } from "@r2m/authz";
-import { Body, Controller, Get, Param, Patch, Post, Put, Req, UsePipes } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post, Put, Req, UseGuards, UsePipes } from "@nestjs/common";
 import type { Request } from "express";
 import { CurrentActor } from "../../common/decorators/current-actor.decorator";
+import { RateLimit } from "../../common/decorators/rate-limit.decorator";
+import { RateLimitGuard } from "../../common/guards/rate-limit.guard";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
 import { AssessmentService } from "./assessment.service";
 import { GapService } from "./gap.service";
@@ -73,6 +76,15 @@ export class AssessmentGapCaseController {
   @Get(":id/gaps")
   listGaps(@CurrentActor() actor: ActorContext, @Param("id") id: string): Promise<GapResponse[]> {
     return this.gapService.listByCase(actor, id);
+  }
+
+  /** AI-copilot draft (2026-08) — returns suggestions only, never writes. Same
+   * rate-limit shape as `assistant-chat` (real cost-metered LLM call per request). */
+  @UseGuards(RateLimitGuard)
+  @RateLimit({ keyPrefix: "gap-suggestions", points: 10, durationSeconds: 60 })
+  @Post(":id/gaps/suggestions")
+  suggestGaps(@CurrentActor() actor: ActorContext, @Param("id") id: string): Promise<GapSuggestion[]> {
+    return this.gapService.suggestDrafts(actor, id);
   }
 }
 

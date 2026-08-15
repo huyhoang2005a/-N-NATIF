@@ -10,6 +10,7 @@ import type {
   RoadmapMilestoneResponse,
   RoadmapResponse,
   RoadmapReviewResponse,
+  RoadmapSuggestion,
   RoadmapTaskResponse,
 } from "@r2m/contracts";
 import {
@@ -21,9 +22,11 @@ import {
   LinkMilestoneGapRequestSchema,
 } from "@r2m/contracts";
 import type { ActorContext } from "@r2m/authz";
-import { Body, Controller, Get, Param, Post, Req, UsePipes } from "@nestjs/common";
+import { Body, Controller, Get, Param, Post, Req, UseGuards, UsePipes } from "@nestjs/common";
 import type { Request } from "express";
 import { CurrentActor } from "../../common/decorators/current-actor.decorator";
+import { RateLimit } from "../../common/decorators/rate-limit.decorator";
+import { RateLimitGuard } from "../../common/guards/rate-limit.guard";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
 import { RoadmapService } from "./roadmap.service";
 
@@ -51,6 +54,14 @@ export class RoadmapCaseController {
   @Get(":id/roadmaps")
   listByCase(@CurrentActor() actor: ActorContext, @Param("id") id: string): Promise<RoadmapResponse[]> {
     return this.roadmapService.listByCase(actor, id);
+  }
+
+  /** AI-copilot draft (2026-08) — returns a suggestion only, never writes. */
+  @UseGuards(RateLimitGuard)
+  @RateLimit({ keyPrefix: "roadmap-suggestions", points: 10, durationSeconds: 60 })
+  @Post(":id/roadmaps/suggestions")
+  suggestRoadmap(@CurrentActor() actor: ActorContext, @Param("id") id: string): Promise<RoadmapSuggestion> {
+    return this.roadmapService.suggestDraft(actor, id);
   }
 }
 

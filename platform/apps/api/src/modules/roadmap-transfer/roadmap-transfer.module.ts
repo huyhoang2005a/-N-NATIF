@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { TechnologyCaseModule } from "../technology-case/technology-case.module";
 import { AssessmentGapModule } from "../assessment-gap/assessment-gap.module";
+import { AssistantModule } from "../assistant/assistant.module";
 import { AuditModule } from "../platform-operations/audit/audit.module";
 import { JobsModule } from "../platform-operations/jobs/jobs.module";
 import { ResourceCatalogModule } from "../resource-catalog/resource-catalog.module";
@@ -18,7 +19,7 @@ import { TransferManifestService } from "./transfer/transfer.service";
  * và `ResourceCatalogModule` (Sprint 6.2 — `TransferManifestService.share()` tạo
  * `resource_access_grant` qua `ResourceAccessGrantsRepository` đã export). */
 @Module({
-  imports: [AuditModule, JobsModule, TechnologyCaseModule, AssessmentGapModule, ResourceCatalogModule],
+  imports: [AuditModule, JobsModule, TechnologyCaseModule, AssessmentGapModule, ResourceCatalogModule, AssistantModule],
   controllers: [RoadmapCaseController, RoadmapsController, MilestonesController, TransferManifestCaseController, TransferManifestsController],
   providers: [RoadmapRepository, RoadmapService, TransferManifestRepository, TransferManifestService],
 })

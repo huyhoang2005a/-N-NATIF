@@ -14,6 +14,7 @@ export { Tabs } from "./Tabs";
 export { BackLink } from "./BackLink";
 export { BackButton } from "./BackButton";
 export { PageLoader } from "./PageLoader";
+export { AssistantWidget } from "./AssistantWidget";
 export { Shell } from "./Shell";
 export type { ShellNavItem } from "./Shell";
 export { SoonPage } from "./SoonPage";

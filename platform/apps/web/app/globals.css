@@ -98,6 +98,116 @@ select {
   }
 }
 
+/* ---------- assistant widget (floating AI chat) ---------- */
+
+.uikit-assistant-fab {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 60;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: none;
+  background: var(--uikit-indigo-700);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 6px 20px -4px rgba(67, 56, 202, 0.5);
+}
+.uikit-assistant-fab:hover { background: var(--uikit-indigo-800); }
+.uikit-assistant-fab svg { width: 24px; height: 24px; }
+
+.uikit-assistant-panel {
+  position: fixed;
+  right: 24px;
+  bottom: 88px;
+  z-index: 60;
+  width: min(360px, calc(100vw - 48px));
+  max-height: min(520px, calc(100vh - 140px));
+  background: #ffffff;
+  border: 1px solid var(--uikit-slate-200);
+  border-radius: var(--radius-md);
+  box-shadow: 0 20px 48px -16px rgba(15, 23, 42, 0.35);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.uikit-assistant-panel__header {
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--uikit-slate-100);
+  background: var(--uikit-indigo-50);
+}
+.uikit-assistant-panel__title { margin: 0; font-size: 14px; font-weight: 600; color: var(--uikit-indigo-800); }
+.uikit-assistant-panel__subtitle { margin: 2px 0 0; font-size: 12px; color: var(--uikit-slate-500); }
+.uikit-assistant-panel__body {
+  flex: 1;
+  min-height: 160px;
+  overflow-y: auto;
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.uikit-assistant-empty { font-size: 12.5px; color: var(--uikit-slate-400); line-height: 1.6; }
+.uikit-assistant-msg {
+  max-width: 85%;
+  padding: 8px 12px;
+  border-radius: 12px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+.uikit-assistant-msg--user {
+  align-self: flex-end;
+  background: var(--uikit-indigo-700);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+.uikit-assistant-msg--assistant {
+  align-self: flex-start;
+  background: var(--uikit-slate-100);
+  color: var(--uikit-slate-900);
+  border-bottom-left-radius: 4px;
+}
+.uikit-assistant-msg--typing { color: var(--uikit-slate-400); font-style: italic; }
+.uikit-assistant-panel__form {
+  display: flex;
+  gap: 8px;
+  padding: var(--space-3);
+  border-top: 1px solid var(--uikit-slate-100);
+}
+.uikit-assistant-panel__form input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--uikit-slate-200);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  font-size: 13.5px;
+}
+.uikit-assistant-panel__form input:focus-visible { outline: none; border-color: var(--uikit-indigo-700); }
+.uikit-assistant-panel__form button {
+  appearance: none;
+  border: none;
+  background: var(--uikit-indigo-700);
+  color: #fff;
+  border-radius: var(--radius-sm);
+  width: 36px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.uikit-assistant-panel__form button:disabled { opacity: 0.5; cursor: not-allowed; }
+.uikit-assistant-panel__form button svg { width: 16px; height: 16px; }
+@media (max-width: 480px) {
+  .uikit-assistant-fab { right: 16px; bottom: 16px; }
+  .uikit-assistant-panel { right: 12px; bottom: 80px; }
+}
+
 /* ---------- page loader (spinning brand mark) ---------- */
 
 @keyframes r2m-spin {

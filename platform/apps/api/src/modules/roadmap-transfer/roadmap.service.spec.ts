@@ -7,6 +7,7 @@ import type { TechnologyCaseRepository } from "../technology-case/technology-cas
 import type { TechnologyCaseService } from "../technology-case/technology-case.service";
 import type { AuditService } from "../platform-operations/audit/audit.service";
 import type { OutboxService } from "../platform-operations/jobs/outbox.service";
+import type { GeminiClient } from "../assistant/gemini.client";
 
 const owner: ActorContext = {
   userId: "owner-1",
@@ -87,10 +88,12 @@ function buildService() {
   const gapRepository = {
     findById: vi.fn(),
     findOpenCriticalGaps: vi.fn().mockResolvedValue([]),
+    listByCase: vi.fn().mockResolvedValue([]),
   } as unknown as GapRepository;
 
   const auditService = { write: vi.fn().mockResolvedValue(undefined) } as unknown as AuditService;
   const outboxService = { append: vi.fn().mockResolvedValue(undefined) } as unknown as OutboxService;
+  const geminiClient = { isConfigured: vi.fn().mockReturnValue(false), generateJson: vi.fn() } as unknown as GeminiClient;
   const db = { transaction: vi.fn((cb: (tx: unknown) => Promise<unknown>) => cb({})) };
 
   const service = new RoadmapService(
@@ -100,10 +103,11 @@ function buildService() {
     gapRepository,
     auditService,
     outboxService,
+    geminiClient,
     db as never,
   );
 
-  return { service, repository, caseRepository, caseService, gapRepository, auditService, outboxService };
+  return { service, repository, caseRepository, caseService, gapRepository, auditService, outboxService, geminiClient };
 }
 
 describe("RoadmapService.create", () => {

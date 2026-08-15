@@ -17,6 +17,7 @@ import { AssessmentGapModule } from "./modules/assessment-gap/assessment-gap.mod
 import { RoadmapTransferModule } from "./modules/roadmap-transfer/roadmap-transfer.module";
 import { CompanyDiscoveryModule } from "./modules/company-discovery/company-discovery.module";
 import { CommunityModule } from "./modules/community/community.module";
+import { AssistantModule } from "./modules/assistant/assistant.module";
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { CommunityModule } from "./modules/community/community.module";
     RoadmapTransferModule,
     CompanyDiscoveryModule,
     CommunityModule,
+    AssistantModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

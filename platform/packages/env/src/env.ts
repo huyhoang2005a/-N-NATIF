@@ -60,6 +60,22 @@ const envSchema = z.object({
   EMAIL_FROM_ADDRESS: z.string().optional(),
   EMAIL_FROM_NAME: z.string().min(1).optional(),
   WEB_APP_URL: z.string().min(1).default("http://localhost:3001"),
+
+  // --- AI assistant (2026-08, demo phase) — Gemini via Google AI Studio, chosen because
+  // it's free/cheap to test with before committing to a paid provider (Claude/OpenAI) once
+  // the feature proves out. Optional: the endpoint returns a clear "chưa cấu hình" error
+  // instead of the API crashing at boot when unset. ---
+  GEMINI_API_KEY: z.string().optional(),
+  // "gemini-2.5-flash" 404s on newer Google AI Studio keys ("no longer available to new
+  // users") — verified live against the actual key in use. "gemini-flash-latest" (resolves
+  // to gemini-3.6-flash, a reasoning model) worked initially but its free-tier daily quota
+  // is only 20 requests/model/day — got fully exhausted same-day just from copilot testing,
+  // breaking the chatbot too (shared model = shared quota bucket). Switched default to
+  // "gemini-flash-lite-latest" — separate quota bucket, no "thinking" token overhead (no
+  // `thoughtsTokenCount` in its usage metadata, unlike the reasoning model), still supports
+  // JSON-mode structured output. Re-verify quota headroom before switching back to a
+  // reasoning-tier model, or move off the free tier before demoing at higher volume.
+  GEMINI_MODEL: z.string().min(1).default("gemini-flash-lite-latest"),
 });
 
 export type AppEnv = z.infer<typeof envSchema>;

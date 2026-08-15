@@ -5,6 +5,9 @@ import { schema } from "@r2m/database";
 import { eq } from "drizzle-orm";
 import { logger } from "../logger";
 import { deleteResourceObject, getResourceObjectBuffer } from "./s3-object";
+import { extractText } from "../ingestion/extract-text";
+import { chunkText } from "../ingestion/chunk-text";
+import { embedChunkText } from "../ingestion/gemini-embed";
 
 /** Phase 7 Sprint 7.4 — the `ResourceIngestionQueued` handler was a no-op through Phase 2
  * (see the "Phase 2 simplification" comment group in outbox-dispatcher.ts) — this is where
@@ -62,5 +65,41 @@ export async function scanResourceUpload(db: Database, resourceVersionId: string
     return;
   }
 
+  await ingestResourceChunks(db, resourceVersionId, buffer, sniffed);
+
   await db.update(schema.resourceIngestionJob).set({ status: "COMPLETED", completedAt: new Date() }).where(eq(schema.resourceIngestionJob.id, ingestionJobId));
+}
+
+/** Spec items 13-14 (`01_workflow_theo_phase.md` §Phase 2): "extract text từ file → chunk
+ * nội dung → lưu resource_chunk" + "sinh embedding cho từng chunk". Was never implemented
+ * (see the doc comment on `resourceChunk` in `packages/database/src/schema/resource.ts`) —
+ * `resource_chunk` was always empty, so the FTS-based recommendation engine
+ * (`generate-recommendation-run.ts`) could never surface any results. Runs after the
+ * malware scan passes, inside the same ingestion job. Non-PDF (image) or extraction-empty
+ * resources simply produce 0 chunks — not a failure, matches "MIME mismatch"/"no text
+ * layer" being a legitimate outcome, not an error. */
+async function ingestResourceChunks(db: Database, resourceVersionId: string, buffer: Buffer, mimeType: string): Promise<void> {
+  let text: string | null;
+  try {
+    text = await extractText(buffer, mimeType);
+  } catch (error) {
+    logger.warn({ err: error, resourceVersionId }, "ingestResourceChunks: text extraction failed, skipping chunking");
+    return;
+  }
+  if (!text) return;
+
+  const chunks = chunkText(text);
+  if (chunks.length === 0) return;
+
+  for (const chunk of chunks) {
+    const embedding = await embedChunkText(chunk.content);
+    await db.insert(schema.resourceChunk).values({
+      resourceVersionId,
+      chunkIndex: chunk.chunkIndex,
+      content: chunk.content,
+      tokenCount: chunk.tokenCount,
+      embedding,
+    });
+  }
+  logger.info({ resourceVersionId, chunkCount: chunks.length }, "ingestResourceChunks: chunks stored");
 }

@@ -22,6 +22,10 @@ export const ErrorCode = {
   // Not spec-mandated (avatar upload is outside docs/spec/, explicit user-approved
   // addition) — same MIME-sniff/malware-scan guard as VERIFICATION_DOCUMENT_REJECTED.
   AVATAR_REJECTED: "AVATAR_REJECTED",
+  // Assistant chatbot (2026-08, demo phase, Gemini) — thrown when GEMINI_API_KEY isn't
+  // configured or the upstream call fails, so the UI can show a clear "chưa sẵn sàng"
+  // state instead of a generic 500.
+  ASSISTANT_UNAVAILABLE: "ASSISTANT_UNAVAILABLE",
 
   // ORG_*
   ORG_ALREADY_EXISTS: "ORG_ALREADY_EXISTS",

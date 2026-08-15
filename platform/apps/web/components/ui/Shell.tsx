@@ -9,6 +9,7 @@ import type { MeResponse, NotificationResponse } from "@r2m/contracts";
 import { apiFetch, authFetch } from "../../lib/api-client";
 import { REFRESH_ACTIVE_NAV_EVENT } from "../../lib/refresh-event";
 import { clearTokens } from "../../lib/session";
+import { AssistantWidget } from "./AssistantWidget";
 import { BrandMark } from "./BrandMark";
 
 export interface ShellNavItem {
@@ -161,6 +162,7 @@ export function Shell({
         </div>
         <main className="uikit-main">{children}</main>
       </div>
+      <AssistantWidget />
     </div>
   );
 }
