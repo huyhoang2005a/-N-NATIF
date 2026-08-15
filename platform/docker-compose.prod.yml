@@ -1,0 +1,152 @@
+name: r2m-v5-prod
+
+# Full containerized stack for a real server — as opposed to infra/docker/docker-compose.yml,
+# which only runs infra services (postgres/redis/minio/clamav) for `pnpm dev` on the host.
+#
+# Run from the repo root so `.env` here is picked up automatically for ${VAR} substitution:
+#   docker compose -f docker-compose.prod.yml build
+#   docker compose -f docker-compose.prod.yml run --rm migrate   # once, before first `up`
+#   docker compose -f docker-compose.prod.yml up -d
+#
+# `api`/`worker` get DATABASE_URL/REDIS_URL/S3_ENDPOINT/CLAMAV_HOST/OTEL endpoint OVERRIDDEN
+# below to the in-network service names — the plain `.env` values (localhost:5432 etc.) are
+# for the host-process `pnpm dev` workflow and do not resolve inside these containers.
+# Everything else (JWT secrets, SMTP/Resend, GEMINI_API_KEY, WEB_APP_URL) comes from `.env`
+# via `env_file` unchanged.
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: r2m
+      POSTGRES_PASSWORD: r2m
+      POSTGRES_DB: r2m_dev
+    volumes:
+      - r2m-prod-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U r2m -d r2m_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY_ID}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_ACCESS_KEY}
+    volumes:
+      - r2m-prod-minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  clamav:
+    image: clamav/clamav:1.4
+    healthcheck:
+      test: ["CMD", "clamdcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 5m
+    restart: unless-stopped
+
+  # One-off — NOT part of `up`'s default set. Run once before the first `up`, and again
+  # after any deploy that adds new migrations. Reuses the api image (packages/database's
+  # compiled dist + drizzle-orm are already in it).
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://r2m:r2m@postgres:5432/r2m_dev
+    command: ["node", "packages/database/dist/migrate.js"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles: ["tools"]
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://r2m:r2m@postgres:5432/r2m_dev
+      APP_DATABASE_URL: postgres://r2m_app:r2m_app_secret@postgres:5432/r2m_dev
+      REDIS_URL: redis://redis:6379
+      S3_ENDPOINT: http://minio:9000
+      CLAMAV_HOST: clamav
+      # Not overridden: if .env sets a real value it'll just fail to connect (Jaeger isn't
+      # part of this stack), which OTEL treats as non-fatal — tracing is instrumentation,
+      # not core functionality. Setting this to "" instead would FAIL BOOT — env.ts's
+      # OTEL_EXPORTER_OTLP_ENDPOINT is `z.string().min(1).optional()`, which (like the
+      # SMTP_USER gotcha documented in packages/env/src/env.ts) rejects "" but allows unset.
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://r2m:r2m@postgres:5432/r2m_dev
+      APP_DATABASE_URL: postgres://r2m_app:r2m_app_secret@postgres:5432/r2m_dev
+      REDIS_URL: redis://redis:6379
+      S3_ENDPOINT: http://minio:9000
+      CLAMAV_HOST: clamav
+      # Not overridden: if .env sets a real value it'll just fail to connect (Jaeger isn't
+      # part of this stack), which OTEL treats as non-fatal — tracing is instrumentation,
+      # not core functionality. Setting this to "" instead would FAIL BOOT — env.ts's
+      # OTEL_EXPORTER_OTLP_ENDPOINT is `z.string().min(1).optional()`, which (like the
+      # SMTP_USER gotcha documented in packages/env/src/env.ts) rejects "" but allows unset.
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        # Browser-facing — point this at the API's real public URL for a non-localhost
+        # deployment (see the ARG comment in apps/web/Dockerfile). Reads WEB'S OWN var
+        # from .env if set there, otherwise falls back to localhost for a same-host demo.
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:3000/v1}
+    ports:
+      - "3001:3001"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  r2m-prod-postgres-data:
+  r2m-prod-minio-data:
