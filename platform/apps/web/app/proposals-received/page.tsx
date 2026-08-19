@@ -9,7 +9,12 @@ import { PLATFORM_ROLE_LABELS, PROPOSAL_STATUS_LABELS } from "../../lib/labels";
 import { navForPersona, personaOf } from "../../lib/nav";
 import { getAccessToken } from "../../lib/session";
 import { PROPOSAL_STATUS_TONE, toneOf } from "../../lib/tone";
-import { Card, PageLoader, SectionHeader, Shell, StatusDot } from "../../components/ui";
+import { Card, PageLoader, RemoveButton, SectionHeader, Shell, StatusDot } from "../../components/ui";
+
+/** Only a decided proposal can be dismissed from view — one still awaiting a decision must
+ * stay visible (dismissing it would be a confusing way to lose track of something
+ * actionable). Matches the backend's own guard in proposals.service.ts#dismiss. */
+const DISMISSABLE_STATUSES = new Set(["ACCEPTED", "REJECTED", "WITHDRAWN"]);
 
 interface NeedWithProposals {
   need: ResearchNeedResponse;
@@ -22,6 +27,17 @@ export default function ProposalsReceivedPage() {
   const [organizations, setOrganizations] = useState<OrganizationResponse[] | null>(null);
   const [groups, setGroups] = useState<NeedWithProposals[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  function onDismiss(needId: string, proposalId: string) {
+    return authFetch(`/proposals/${proposalId}/dismiss`, { method: "POST" }).then(() => {
+      setGroups((prev) =>
+        prev
+          ?.map((g) => (g.need.id === needId ? { ...g, proposals: g.proposals.filter((p) => p.id !== proposalId) } : g))
+          .filter((g) => g.proposals.length > 0) ?? null,
+      );
+    });
+  }
 
   useEffect(() => {
     if (!getAccessToken()) {
@@ -76,6 +92,12 @@ export default function ProposalsReceivedPage() {
           nhu cầu nghiên cứu.
         </p>
 
+        {actionError && (
+          <p className="uikit-alert-error" role="alert">
+            {actionError}
+          </p>
+        )}
+
         {groups.length === 0 ? (
           <Card>
             <p className="uikit-empty">Chưa có đề xuất nào được gửi cho nhu cầu nghiên cứu của bạn.</p>
@@ -86,10 +108,23 @@ export default function ProposalsReceivedPage() {
               <SectionHeader title={need.title} />
               <div className="uikit-row-list">
                 {proposals.map((p) => (
-                  <Link key={p.id} href={`/needs/${need.id}`} className="uikit-row-link">
-                    <span style={{ fontSize: 14, fontWeight: 500 }}>{p.title}</span>
-                    <StatusDot tone={toneOf(PROPOSAL_STATUS_TONE, p.status)} label={PROPOSAL_STATUS_LABELS[p.status] ?? p.status} />
-                  </Link>
+                  <div key={p.id} className="uikit-row">
+                    <Link href={`/needs/${need.id}`} style={{ fontSize: 14, fontWeight: 500, color: "var(--uikit-slate-900)", textDecoration: "none" }}>
+                      {p.title}
+                    </Link>
+                    <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+                      <StatusDot tone={toneOf(PROPOSAL_STATUS_TONE, p.status)} label={PROPOSAL_STATUS_LABELS[p.status] ?? p.status} />
+                      {DISMISSABLE_STATUSES.has(p.status) && (
+                        <RemoveButton
+                          label="Ẩn khỏi màn hình"
+                          confirmLabel="Ẩn đề xuất này?"
+                          onRemove={() => onDismiss(need.id, p.id)}
+                          onSessionExpired={() => router.push("/login")}
+                          onError={setActionError}
+                        />
+                      )}
+                    </div>
+                  </div>
                 ))}
               </div>
             </Card>

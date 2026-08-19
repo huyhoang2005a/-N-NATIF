@@ -295,6 +295,49 @@ export class ProposalsService {
     return toProposalResponse(updated);
   }
 
+  /** Not spec-mandated — explicit user-approved addition (2026-08-19): "ẩn khỏi màn hình"
+   * for a decided proposal on the company-received side (see `dismissedAt`'s schema
+   * comment). Only settable once terminal (ACCEPTED/REJECTED/WITHDRAWN) — a proposal still
+   * awaiting a decision must stay visible, dismissing it would just be a confusing way to
+   * lose track of something still actionable. Company-side membership check, same as
+   * review/accept/reject — any active member of the owning company org may declutter their
+   * own team's list, not just whoever originally decided it. */
+  async dismiss(actor: ActorContext, proposalId: string, requestIdHeader: string | null): Promise<ResearchProposalResponse> {
+    const { proposal } = await this.loadForCompanyAction(actor, proposalId);
+    if (
+      proposal.status !== ProposalStatus.ACCEPTED &&
+      proposal.status !== ProposalStatus.REJECTED &&
+      proposal.status !== ProposalStatus.WITHDRAWN
+    ) {
+      throw new ConflictError(
+        ErrorCode.DISCOVERY_PROPOSAL_STATE_INVALID,
+        "Only a decided proposal (accepted/rejected/withdrawn) can be dismissed from view.",
+      );
+    }
+
+    const updated = await this.db.transaction(async (tx) => {
+      const result = await this.repository.update(proposalId, proposal.version, { dismissedAt: new Date() }, tx);
+      if (!result) {
+        throw new ConflictError(ErrorCode.DISCOVERY_PROPOSAL_STATE_INVALID, "Proposal was modified concurrently — retry.");
+      }
+      await this.auditService.write(
+        {
+          actorUserId: actor.userId,
+          requestId: requestIdHeader,
+          action: "research_proposal.dismiss",
+          entityType: "research_proposal",
+          entityId: proposalId,
+          beforeData: proposal,
+          afterData: result,
+        },
+        tx,
+      );
+      return result;
+    });
+
+    return toProposalResponse(updated);
+  }
+
   async listForNeed(actor: ActorContext, researchNeedId: string): Promise<ResearchProposalResponse[]> {
     const need = await this.needsRepository.findById(researchNeedId);
     if (!need) {

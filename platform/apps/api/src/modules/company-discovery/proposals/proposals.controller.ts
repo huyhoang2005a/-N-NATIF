@@ -77,4 +77,11 @@ export class ProposalsController {
   withdraw(@CurrentActor() actor: ActorContext, @Param("id") id: string, @Req() req: Request): Promise<ResearchProposalResponse> {
     return this.service.withdraw(actor, id, requestId(req));
   }
+
+  /** Not spec-mandated — explicit user-approved addition (2026-08-19), see
+   * proposals.service.ts#dismiss. */
+  @Post(":id/dismiss")
+  dismiss(@CurrentActor() actor: ActorContext, @Param("id") id: string, @Req() req: Request): Promise<ResearchProposalResponse> {
+    return this.service.dismiss(actor, id, requestId(req));
+  }
 }

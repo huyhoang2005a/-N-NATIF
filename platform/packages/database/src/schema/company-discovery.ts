@@ -100,6 +100,11 @@ export const researchProposal = pgTable(
     decidedByUserId: uuid("decided_by_user_id").references(() => userAccount.id),
     decisionReason: text("decision_reason"),
     decidedAt: timestamp("decided_at", { withTimezone: true }),
+    // Company-side-only "hide from my received-proposals list" (2026-08-19) — only settable
+    // once the proposal has a terminal status (ACCEPTED/REJECTED/WITHDRAWN), never touches
+    // the proposer's own `/proposals` ("Đề xuất của tôi") view, which ignores this column
+    // entirely. Not a real status transition, just a per-viewer declutter flag.
+    dismissedAt: timestamp("dismissed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     version: integer("version").notNull().default(1),

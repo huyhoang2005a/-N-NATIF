@@ -1,7 +1,7 @@
 import type { Database } from "@r2m/database";
 import { schema } from "@r2m/database";
 import { Inject, Injectable } from "@nestjs/common";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { DATABASE } from "../../../database/database.module";
 
 function firstOrThrow<T>(rows: T[], message: string): T {
@@ -23,9 +23,13 @@ export class ProposalsRepository {
     return this.db.query.researchProposal.findFirst({ where: eq(schema.researchProposal.id, id) });
   }
 
+  /** `dismissedAt IS NULL` — company-side "ẩn khỏi màn hình" for decided proposals (see
+   * `dismissedAt`'s schema comment). Only ever affects this company-facing query, never
+   * `listByAuthor` below — the proposer must always see the full real history of what they
+   * submitted, regardless of what the receiving company chose to declutter on their end. */
   async listByNeed(researchNeedId: string) {
     return this.db.query.researchProposal.findMany({
-      where: eq(schema.researchProposal.researchNeedId, researchNeedId),
+      where: and(eq(schema.researchProposal.researchNeedId, researchNeedId), isNull(schema.researchProposal.dismissedAt)),
       orderBy: [desc(schema.researchProposal.createdAt)],
     });
   }
