@@ -294,6 +294,52 @@ export class ResourcesService {
     return this.getById(actor, id);
   }
 
+  /** Not spec-mandated — explicit user-approved addition (2026-08-19): a genuine hard
+   * DELETE, unlike every other lifecycle action in this module (which are status
+   * transitions — see `domain/resource.state-machine.ts`). Deliberately narrow: only the
+   * resource's own creator, only while still DRAFT (never published — `publishVersion`
+   * is the only writer of ACTIVE), and only when `hasDependents` confirms nothing else in
+   * the system references it yet. Anything wider (ACTIVE resources, other users' drafts)
+   * must go through archive/withdraw instead once those transitions get an endpoint —
+   * this is not a general-purpose delete. */
+  async remove(actor: ActorContext, id: string, requestIdHeader: string | null): Promise<void> {
+    const resource = await this.resourcesRepository.findById(id);
+    if (!resource) {
+      throw new NotFoundError(ErrorCode.RESOURCE_NOT_FOUND, "Resource not found.");
+    }
+    if (resource.createdByUserId !== actor.userId) {
+      throw new ForbiddenError(ErrorCode.AUTH_FORBIDDEN, "Only the resource's creator may delete it.");
+    }
+    if (resource.status !== ResourceStatus.DRAFT) {
+      throw new ConflictError(
+        ErrorCode.RESOURCE_INVALID_TRANSITION,
+        "Only a DRAFT resource (never published) can be deleted — use archive/withdraw once published.",
+      );
+    }
+    if (await this.resourcesRepository.hasDependents(id)) {
+      throw new ConflictError(
+        ErrorCode.RESOURCE_NOT_DELETABLE,
+        "This resource already has votes, saves, access grants, annotations, citations, or evidence linked to it — it can no longer be deleted.",
+      );
+    }
+
+    await this.db.transaction(async (tx) => {
+      await this.auditService.write(
+        {
+          actorUserId: actor.userId,
+          scopeOrganizationId: resource.ownerOrganizationId,
+          requestId: requestIdHeader,
+          action: "resource.delete",
+          entityType: "resource",
+          entityId: id,
+          beforeData: resource,
+        },
+        tx,
+      );
+      await this.resourcesRepository.deleteDraftCascade(id, tx);
+    });
+  }
+
   async createVersion(
     actor: ActorContext,
     resourceId: string,

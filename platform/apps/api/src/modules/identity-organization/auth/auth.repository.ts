@@ -30,6 +30,17 @@ export class AuthRepository {
     });
   }
 
+  /** Login-gate check (see `AuthService.login`) — the org this user registered and owns,
+   * if any. A user only ever holds one ORG_OWNER membership under the current
+   * one-owner-per-registration flow, so `findFirst` is enough (not `findMany`). */
+  async findOwnedOrganizationStatus(userId: string) {
+    const membership = await this.db.query.organizationMember.findFirst({
+      where: and(eq(schema.organizationMember.userId, userId), eq(schema.organizationMember.role, "ORG_OWNER")),
+      with: { organization: true },
+    });
+    return membership?.organization ?? null;
+  }
+
   async findLocalIdentityByUserId(userId: string) {
     return this.db.query.userIdentity.findFirst({
       where: and(eq(schema.userIdentity.provider, "LOCAL"), eq(schema.userIdentity.userId, userId)),

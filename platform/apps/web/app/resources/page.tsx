@@ -9,7 +9,7 @@ import { authFetch, SessionExpiredError } from "../../lib/api-client";
 import { PLATFORM_ROLE_LABELS, RESOURCE_ACCESS_LEVEL_LABELS, RESOURCE_TYPE_LABELS } from "../../lib/labels";
 import { navForPersona, personaOf } from "../../lib/nav";
 import { getAccessToken } from "../../lib/session";
-import { Card, PageLoader, PrimaryButtonLink, SaveButton, Shell, Tabs, VoteButton } from "../../components/ui";
+import { Card, PageLoader, PrimaryButtonLink, RemoveButton, SaveButton, Shell, Tabs, VoteButton } from "../../components/ui";
 
 const SORT_TABS = ["Mới nhất", "Điểm cao nhất", "Thịnh hành"] as const;
 const SORT_TAB_TO_VALUE: Record<(typeof SORT_TABS)[number], "new" | "top" | "hot"> = {
@@ -34,6 +34,7 @@ function ResourcesPageInner() {
   const [organizations, setOrganizations] = useState<OrganizationResponse[] | null>(null);
   const [resources, setResources] = useState<ResourceResponse[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [sortTab, setSortTab] = useState<(typeof SORT_TABS)[number]>("Mới nhất");
 
   useEffect(() => {
@@ -73,6 +74,12 @@ function ResourcesPageInner() {
     setResources((prev) => (prev ? prev.map((r) => (r.id === resourceId ? { ...r, ...next } : r)) : prev));
   }
 
+  function onDelete(resourceId: string) {
+    return authFetch<void>(`/resources/${resourceId}`, { method: "DELETE" }).then(() => {
+      setResources((prev) => (prev ? prev.filter((r) => r.id !== resourceId) : prev));
+    });
+  }
+
   if (error) {
     return (
       <div className="uikit-main" style={{ maxWidth: 720, margin: "0 auto" }}>
@@ -98,6 +105,12 @@ function ResourcesPageInner() {
 
         {q && <Tabs tabs={[...SORT_TABS]} active={sortTab} onChange={(t) => setSortTab(t as (typeof SORT_TABS)[number])} />}
 
+        {actionError && (
+          <p className="uikit-alert-error" role="alert">
+            {actionError}
+          </p>
+        )}
+
         <Card>
           {resources.length === 0 ? (
             <p className="uikit-empty">
@@ -114,6 +127,7 @@ function ResourcesPageInner() {
                     <th>Loại</th>
                     <th>Quyền truy cập</th>
                     <th>Bình chọn</th>
+                    <th />
                     <th />
                   </tr>
                 </thead>
@@ -145,6 +159,17 @@ function ResourcesPageInner() {
                           onChange={(next) => onSaveChange(r.id, next)}
                           onSessionExpired={() => router.push("/login")}
                         />
+                      </td>
+                      <td>
+                        {r.status === "DRAFT" && r.createdByUserId === me.userId && (
+                          <RemoveButton
+                            label="Xoá tài nguyên nháp"
+                            confirmLabel="Xoá tài nguyên nháp này?"
+                            onRemove={() => onDelete(r.id)}
+                            onSessionExpired={() => router.push("/login")}
+                            onError={setActionError}
+                          />
+                        )}
                       </td>
                     </tr>
                   ))}

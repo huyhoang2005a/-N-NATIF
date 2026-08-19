@@ -14,6 +14,13 @@ export const ErrorCode = {
   AUTH_EMAIL_VERIFICATION_TOKEN_INVALID: "AUTH_EMAIL_VERIFICATION_TOKEN_INVALID",
   AUTH_EMAIL_VERIFICATION_TOKEN_EXPIRED: "AUTH_EMAIL_VERIFICATION_TOKEN_EXPIRED",
   AUTH_EMAIL_VERIFICATION_RATE_LIMITED: "AUTH_EMAIL_VERIFICATION_RATE_LIMITED",
+  // Not spec-mandated, explicit user-approved addition: login is blocked for the ORG_OWNER
+  // of an organization whose verification hasn't been approved yet — before this, login
+  // succeeded regardless of `organization.status`, so a rejected/still-pending owner could
+  // reach the whole app with a fully valid session. Two distinct codes (not one) since the
+  // UI copy differs meaningfully: PENDING says "wait", REJECTED says "re-register".
+  AUTH_ORGANIZATION_PENDING_VERIFICATION: "AUTH_ORGANIZATION_PENDING_VERIFICATION",
+  AUTH_ORGANIZATION_REJECTED: "AUTH_ORGANIZATION_REJECTED",
   // Not spec-mandated (change-password is outside docs/spec/, explicit user-approved
   // addition like the join-org flow) — same AUTH_* naming convention as the rest of the
   // group. 403, not 401: distinct from AUTH_UNAUTHENTICATED so apps/web's authFetch
@@ -82,6 +89,12 @@ export const ErrorCode = {
   // Phase 7 Sprint 7.4 — publish gate: the version's ingestion job (MIME sniff + malware
   // scan) hasn't reached COMPLETED yet, or failed (MIME_MISMATCH/MALWARE_DETECTED).
   RESOURCE_VERSION_NOT_SCANNED: "RESOURCE_VERSION_NOT_SCANNED",
+  // Not spec-mandated — explicit user-approved addition (2026-08-19): narrowly-scoped
+  // hard-delete for a DRAFT resource owned by its creator. Thrown when status isn't
+  // DRAFT/actor isn't the creator would instead be RESOURCE_INVALID_TRANSITION/
+  // AUTH_FORBIDDEN — this code is specifically "DRAFT + owned, but has dependent rows
+  // (vote/save/access-grant/citation/annotation/evidence) so deleting would orphan data".
+  RESOURCE_NOT_DELETABLE: "RESOURCE_NOT_DELETABLE",
 
   // ANNOTATION_* (UC-RES-02)
   ANNOTATION_NOT_FOUND: "ANNOTATION_NOT_FOUND",
@@ -103,6 +116,11 @@ export const ErrorCode = {
   CASE_PARTNER_MEMBER_ORG_NOT_LINKED: "CASE_PARTNER_MEMBER_ORG_NOT_LINKED",
   CASE_ORGANIZATION_ROLE_NOT_ALLOWED: "CASE_ORGANIZATION_ROLE_NOT_ALLOWED",
   CASE_INVALID_TRANSITION: "CASE_INVALID_TRANSITION",
+  // Not spec-mandated — explicit user-approved addition (2026-08-19), same shape as
+  // RESOURCE_NOT_DELETABLE above: narrowly-scoped hard-delete for a DRAFT case owned by
+  // its creator, thrown only when the (should-be-impossible per the DRAFT→EVIDENCE_
+  // COLLECTION auto-transition invariant) defensive evidence check finds a row anyway.
+  CASE_NOT_DELETABLE: "CASE_NOT_DELETABLE",
 
   // EVIDENCE_* (UC-EVD-01)
   EVIDENCE_NOT_FOUND: "EVIDENCE_NOT_FOUND",

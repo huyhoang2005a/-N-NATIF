@@ -108,6 +108,15 @@ export interface CaseOrganizationResponse {
   organizationId: string;
   role: string;
   joinedAt: string;
+  /** Denormalized (2026-08-19 fix) — `GET /technology-cases/:id/organizations` is gated on
+   * the CASE's own visibility (`assertVisible`: case_member OR any linked org's member OR
+   * platform reviewer/admin), which is broader than "member of this specific org". The
+   * frontend previously called `GET /organizations/:id` per linked org to get its name,
+   * which 403s for a legitimate case viewer who can see the case but isn't a member of
+   * every org linked to it (e.g. a partner-org member looking up the owning org's name) —
+   * denormalizing the name here means the case detail page never needs that per-org call. */
+  organizationName: string;
+  organizationSlug: string;
 }
 
 export interface EvidenceResponse {

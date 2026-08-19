@@ -8,7 +8,9 @@ import { PLATFORM_ROLE_LABELS, PROPOSAL_STATUS_LABELS } from "../../lib/labels";
 import { navForPersona, personaOf } from "../../lib/nav";
 import { getAccessToken } from "../../lib/session";
 import { PROPOSAL_STATUS_TONE, toneOf } from "../../lib/tone";
-import { Card, PageLoader, Shell, StatusDot } from "../../components/ui";
+import { Card, PageLoader, RemoveButton, Shell, StatusDot } from "../../components/ui";
+
+const WITHDRAWABLE_STATUSES = new Set(["SUBMITTED", "UNDER_REVIEW"]);
 
 export default function ProposalsPage() {
   const router = useRouter();
@@ -16,6 +18,7 @@ export default function ProposalsPage() {
   const [organizations, setOrganizations] = useState<OrganizationResponse[] | null>(null);
   const [proposals, setProposals] = useState<ResearchProposalResponse[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!getAccessToken()) {
@@ -41,6 +44,12 @@ export default function ProposalsPage() {
       });
   }, [router]);
 
+  function onWithdraw(proposalId: string) {
+    return authFetch<ResearchProposalResponse>(`/proposals/${proposalId}/withdraw`, { method: "POST" }).then((updated) => {
+      setProposals((prev) => (prev ? prev.map((p) => (p.id === updated.id ? updated : p)) : prev));
+    });
+  }
+
   if (error) {
     return (
       <div className="uikit-main" style={{ maxWidth: 720, margin: "0 auto" }}>
@@ -63,6 +72,12 @@ export default function ProposalsPage() {
           <a href="/needs">Nhu cầu nghiên cứu</a> để gửi đề xuất mới.
         </p>
 
+        {actionError && (
+          <p className="uikit-alert-error" role="alert">
+            {actionError}
+          </p>
+        )}
+
         <Card>
           {proposals.length === 0 ? (
             <p className="uikit-empty">Bạn chưa gửi đề xuất nào.</p>
@@ -71,7 +86,18 @@ export default function ProposalsPage() {
               {proposals.map((p) => (
                 <div key={p.id} className="uikit-row-link" style={{ cursor: "default" }}>
                   <span style={{ fontSize: 14, fontWeight: 500 }}>{p.title}</span>
-                  <StatusDot tone={toneOf(PROPOSAL_STATUS_TONE, p.status)} label={PROPOSAL_STATUS_LABELS[p.status] ?? p.status} />
+                  <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+                    <StatusDot tone={toneOf(PROPOSAL_STATUS_TONE, p.status)} label={PROPOSAL_STATUS_LABELS[p.status] ?? p.status} />
+                    {WITHDRAWABLE_STATUSES.has(p.status) && (
+                      <RemoveButton
+                        label="Rút đề xuất"
+                        confirmLabel="Rút đề xuất này?"
+                        onRemove={() => onWithdraw(p.id)}
+                        onSessionExpired={() => router.push("/login")}
+                        onError={setActionError}
+                      />
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

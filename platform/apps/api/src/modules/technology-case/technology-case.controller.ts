@@ -18,7 +18,7 @@ import {
   TransitionCaseRequestSchema,
 } from "@r2m/contracts";
 import type { ActorContext } from "@r2m/authz";
-import { Body, Controller, Get, Param, Post, Query, Req, UsePipes } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Param, Post, Query, Req, UsePipes } from "@nestjs/common";
 import type { Request } from "express";
 import { CurrentActor } from "../../common/decorators/current-actor.decorator";
 import { withIdempotencyKey } from "../../common/idempotency/with-idempotency-key.util";
@@ -60,6 +60,14 @@ export class TechnologyCasesController {
   @Get(":id")
   getById(@CurrentActor() actor: ActorContext, @Param("id") id: string): Promise<TechnologyCaseResponse> {
     return this.technologyCaseService.getById(actor, id);
+  }
+
+  /** Not spec-mandated — explicit user-approved addition, see technology-case.service.ts
+   * #remove. Narrowly-scoped hard delete: creator-only, DRAFT-only, zero-evidence-only. */
+  @Delete(":id")
+  @HttpCode(204)
+  remove(@CurrentActor() actor: ActorContext, @Param("id") id: string, @Req() req: Request): Promise<void> {
+    return this.technologyCaseService.remove(actor, id, requestId(req));
   }
 
   @Get(":id/members")

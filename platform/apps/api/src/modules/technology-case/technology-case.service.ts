@@ -90,6 +90,7 @@ function toOrganizationResponse(row: {
   organizationId: string;
   role: string;
   joinedAt: Date;
+  organization: { name: string; slug: string };
 }): CaseOrganizationResponse {
   return {
     id: row.id,
@@ -97,6 +98,8 @@ function toOrganizationResponse(row: {
     organizationId: row.organizationId,
     role: row.role,
     joinedAt: row.joinedAt.toISOString(),
+    organizationName: row.organization.name,
+    organizationSlug: row.organization.slug,
   };
 }
 
@@ -449,11 +452,12 @@ export class TechnologyCaseService {
       );
     }
 
-    const organization = await this.db.transaction(async (tx) => {
+    const { created, organization } = await this.db.transaction(async (tx) => {
       const created = await this.repository.createOrganization(
         { technologyCaseId, organizationId: input.organizationId, role: input.role },
         tx,
       );
+      const organization = await this.repository.findOrganizationNameAndSlug(input.organizationId, tx);
       await this.auditService.write(
         {
           actorUserId: actor.userId,
@@ -466,10 +470,10 @@ export class TechnologyCaseService {
         },
         tx,
       );
-      return created;
+      return { created, organization };
     });
 
-    return toOrganizationResponse(organization);
+    return toOrganizationResponse({ ...created, organization });
   }
 
   /** SUC-07 — HTTP-facing manual transition. Phase 3 chỉ hỗ trợ target
@@ -561,6 +565,51 @@ export class TechnologyCaseService {
     );
 
     return updated as TechnologyCaseRow;
+  }
+
+  /** Not spec-mandated — explicit user-approved addition (2026-08-19): a genuine hard
+   * DELETE, unlike `transition` (a status change — see `domain/technology-case.state-
+   * machine.ts`). Deliberately narrow: only the case's creator, only while still DRAFT
+   * (before the first evidence row auto-transitions it away — see `applyTransition`),
+   * and only after `hasEvidence` confirms nothing downstream references it. A case with
+   * assessments/gaps/roadmaps can't exist yet at DRAFT (those all require
+   * EVIDENCE_COLLECTION+), so evidence is the one dependent that actually needs checking.
+   * Anything past DRAFT has no delete/archive endpoint at all yet (COMMERCIALIZED→ARCHIVED
+   * is a real transition-table edge but no endpoint calls it — see the state machine's own
+   * doc comment) — this is not a general-purpose delete. */
+  async remove(actor: ActorContext, id: string, requestIdHeader: string | null): Promise<void> {
+    const technologyCase = await this.findByIdOrThrow(id);
+    if (technologyCase.createdByUserId !== actor.userId) {
+      throw new ForbiddenError(ErrorCode.AUTH_FORBIDDEN, "Only the case's creator may delete it.");
+    }
+    if (technologyCase.lifecycleStatus !== TechnologyCaseStatus.DRAFT) {
+      throw new ConflictError(
+        ErrorCode.CASE_INVALID_TRANSITION,
+        "Only a DRAFT case (before evidence collection started) can be deleted.",
+      );
+    }
+    if (await this.repository.hasEvidence(id)) {
+      throw new ConflictError(
+        ErrorCode.CASE_NOT_DELETABLE,
+        "This case already has evidence linked to it and can no longer be deleted.",
+      );
+    }
+
+    await this.db.transaction(async (tx) => {
+      await this.auditService.write(
+        {
+          actorUserId: actor.userId,
+          scopeOrganizationId: technologyCase.owningOrganizationId,
+          requestId: requestIdHeader,
+          action: "technology_case.delete",
+          entityType: "technology_case",
+          entityId: id,
+          beforeData: technologyCase,
+        },
+        tx,
+      );
+      await this.repository.deleteDraftCascade(id, tx);
+    });
   }
 
   async findByIdOrThrow(id: string): Promise<TechnologyCaseRow> {

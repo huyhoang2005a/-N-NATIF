@@ -34,6 +34,27 @@ export class AuthService {
       throw new UnauthenticatedError(ErrorCode.AUTH_ACCOUNT_SUSPENDED, "Account is not active.");
     }
 
+    // Registration creates the org owner's account with `user.status = ACTIVE` immediately
+    // (so the account exists to receive the decision email/notification) — but the org
+    // itself starts PENDING_VERIFICATION, and platform review can still REJECT it. Without
+    // this check, an owner whose org was never approved (or was rejected) could still log
+    // in and reach the whole app. Only gates the ORG_OWNER — members/authors/platform staff
+    // are unaffected. `SUSPENDED`/`ARCHIVED` orgs deliberately fall through here: those are
+    // a separate lifecycle (see `ORG_STATUS_LABELS`), not this registration-approval gate.
+    const ownedOrganization = await this.authRepository.findOwnedOrganizationStatus(found.user.id);
+    if (ownedOrganization?.status === "PENDING_VERIFICATION") {
+      throw new UnauthenticatedError(
+        ErrorCode.AUTH_ORGANIZATION_PENDING_VERIFICATION,
+        "Organization verification is still pending review.",
+      );
+    }
+    if (ownedOrganization?.status === "REJECTED") {
+      throw new UnauthenticatedError(
+        ErrorCode.AUTH_ORGANIZATION_REJECTED,
+        "Organization verification was rejected — register again with corrected documents.",
+      );
+    }
+
     await this.authRepository.touchLastLogin(found.user.id);
     return this.issueTokens(found.user.id);
   }

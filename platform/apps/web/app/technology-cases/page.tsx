@@ -9,7 +9,7 @@ import { PLATFORM_ROLE_LABELS, TECHNOLOGY_CASE_STATUS_LABELS } from "../../lib/l
 import { navForPersona, personaOf } from "../../lib/nav";
 import { getAccessToken } from "../../lib/session";
 import { toneOf, TECHNOLOGY_CASE_STATUS_TONE } from "../../lib/tone";
-import { Card, PageLoader, PrimaryButtonLink, Shell, StatusDot } from "../../components/ui";
+import { Card, PageLoader, PrimaryButtonLink, RemoveButton, Shell, StatusDot } from "../../components/ui";
 
 export default function TechnologyCasesPage() {
   const router = useRouter();
@@ -17,6 +17,7 @@ export default function TechnologyCasesPage() {
   const [organizations, setOrganizations] = useState<OrganizationResponse[] | null>(null);
   const [cases, setCases] = useState<TechnologyCaseResponse[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!getAccessToken()) {
@@ -42,6 +43,12 @@ export default function TechnologyCasesPage() {
       });
   }, [router]);
 
+  function onDelete(caseId: string) {
+    return authFetch<void>(`/technology-cases/${caseId}`, { method: "DELETE" }).then(() => {
+      setCases((prev) => (prev ? prev.filter((c) => c.id !== caseId) : prev));
+    });
+  }
+
   if (error) {
     return (
       <div className="uikit-main" style={{ maxWidth: 720, margin: "0 auto" }}>
@@ -63,6 +70,12 @@ export default function TechnologyCasesPage() {
           <PrimaryButtonLink href="/technology-cases/new">+ Tạo case mới</PrimaryButtonLink>
         </div>
 
+        {actionError && (
+          <p className="uikit-alert-error" role="alert">
+            {actionError}
+          </p>
+        )}
+
         <Card>
           {cases.length === 0 ? (
             <p className="uikit-empty">
@@ -72,13 +85,26 @@ export default function TechnologyCasesPage() {
           ) : (
             <div className="uikit-row-list">
               {cases.map((c) => (
-                <Link key={c.id} href={`/technology-cases/${c.id}`} className="uikit-row-link">
-                  <span style={{ fontSize: 14, fontWeight: 500 }}>{c.title}</span>
-                  <StatusDot
-                    tone={toneOf(TECHNOLOGY_CASE_STATUS_TONE, c.lifecycleStatus)}
-                    label={TECHNOLOGY_CASE_STATUS_LABELS[c.lifecycleStatus] ?? c.lifecycleStatus}
-                  />
-                </Link>
+                <div key={c.id} className="uikit-row">
+                  <Link href={`/technology-cases/${c.id}`} style={{ fontSize: 14, fontWeight: 500, color: "var(--uikit-slate-900)", textDecoration: "none" }}>
+                    {c.title}
+                  </Link>
+                  <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+                    <StatusDot
+                      tone={toneOf(TECHNOLOGY_CASE_STATUS_TONE, c.lifecycleStatus)}
+                      label={TECHNOLOGY_CASE_STATUS_LABELS[c.lifecycleStatus] ?? c.lifecycleStatus}
+                    />
+                    {c.lifecycleStatus === "DRAFT" && c.createdByUserId === me.userId && (
+                      <RemoveButton
+                        label="Xoá case nháp"
+                        confirmLabel="Xoá case nháp này?"
+                        onRemove={() => onDelete(c.id)}
+                        onSessionExpired={() => router.push("/login")}
+                        onError={setActionError}
+                      />
+                    )}
+                  </div>
+                </div>
               ))}
             </div>
           )}

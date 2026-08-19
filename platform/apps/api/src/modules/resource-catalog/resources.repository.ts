@@ -181,4 +181,57 @@ export class ResourcesRepository {
     });
     return grant !== undefined;
   }
+
+  /** Not spec-mandated — explicit user-approved addition (2026-08-19), backs the narrowly
+   * scoped DRAFT-resource hard-delete. `status = DRAFT` alone doesn't prove "safe to
+   * delete" (CLAUDE.md rule 4 spirit applied to deletion: verify, don't assume) — a PUBLIC
+   * DRAFT resource is still visible/votable/saveable per `assertVisible`'s accessLevel-only
+   * check, and the ingestion worker chunks a version regardless of publish state. Checks
+   * every table with a real FK to `resource`/`resource_version`: votes, saves, access
+   * grants, annotations, citations, evidence (evidence implies annotations/citations too,
+   * checked separately for a precise error, cost is negligible — all indexed lookups). */
+  async hasDependents(resourceId: string): Promise<boolean> {
+    const versionRows = await this.db.query.resourceVersion.findMany({
+      where: eq(schema.resourceVersion.resourceId, resourceId),
+      columns: { id: true },
+    });
+    const versionIds = versionRows.map((v) => v.id);
+
+    const [vote, save, grant] = await Promise.all([
+      this.db.query.contentVote.findFirst({ where: eq(schema.contentVote.resourceId, resourceId) }),
+      this.db.query.contentSave.findFirst({ where: eq(schema.contentSave.resourceId, resourceId) }),
+      this.db.query.resourceAccessGrant.findFirst({ where: eq(schema.resourceAccessGrant.resourceId, resourceId) }),
+    ]);
+    if (vote || save || grant) return true;
+    if (versionIds.length === 0) return false;
+
+    const [annotation, citation, evidence] = await Promise.all([
+      this.db.query.annotation.findFirst({ where: inArray(schema.annotation.resourceVersionId, versionIds) }),
+      this.db.query.citation.findFirst({ where: inArray(schema.citation.resourceVersionId, versionIds) }),
+      this.db.query.evidence.findFirst({ where: inArray(schema.evidence.resourceVersionId, versionIds) }),
+    ]);
+    return Boolean(annotation || citation || evidence);
+  }
+
+  /** Cascades child rows created atomically at `register()` time (version, ingestion job,
+   * optional paper metadata, and any chunks the ingestion worker produced) before deleting
+   * the resource itself — Postgres FK default is RESTRICT (no `onDelete: cascade`
+   * declared anywhere in `schema/resource.ts`), so a bare `DELETE FROM resource` would
+   * otherwise fail. Caller (`ResourcesService.remove`) has already confirmed
+   * `hasDependents` is false, so this never touches vote/save/grant/annotation/citation/
+   * evidence rows — there are none. */
+  async deleteDraftCascade(resourceId: string, tx: Database): Promise<void> {
+    const versionRows = await tx.query.resourceVersion.findMany({
+      where: eq(schema.resourceVersion.resourceId, resourceId),
+      columns: { id: true },
+    });
+    const versionIds = versionRows.map((v) => v.id);
+    if (versionIds.length > 0) {
+      await tx.delete(schema.resourceChunk).where(inArray(schema.resourceChunk.resourceVersionId, versionIds));
+      await tx.delete(schema.resourceIngestionJob).where(inArray(schema.resourceIngestionJob.resourceVersionId, versionIds));
+    }
+    await tx.delete(schema.paperMetadata).where(eq(schema.paperMetadata.resourceId, resourceId));
+    await tx.delete(schema.resourceVersion).where(eq(schema.resourceVersion.resourceId, resourceId));
+    await tx.delete(schema.resource).where(eq(schema.resource.id, resourceId));
+  }
 }

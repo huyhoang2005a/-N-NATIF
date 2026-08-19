@@ -10,7 +10,7 @@ import { NEED_STATUS_LABELS, PLATFORM_ROLE_LABELS } from "../../lib/labels";
 import { navForPersona, personaOf } from "../../lib/nav";
 import { getAccessToken } from "../../lib/session";
 import { NEED_STATUS_TONE, toneOf } from "../../lib/tone";
-import { Card, PageLoader, PrimaryButtonLink, SaveButton, Shell, StatusDot, Tabs, VoteButton } from "../../components/ui";
+import { Card, PageLoader, PrimaryButtonLink, RemoveButton, SaveButton, Shell, StatusDot, Tabs, VoteButton } from "../../components/ui";
 
 const SORT_TABS = ["Mới nhất", "Điểm cao nhất", "Thịnh hành"] as const;
 const SORT_TAB_TO_VALUE: Record<(typeof SORT_TABS)[number], "new" | "top" | "hot"> = {
@@ -36,6 +36,7 @@ function NeedsPageInner() {
   const [needs, setNeeds] = useState<ResearchNeedResponse[] | null>(null);
   const [publicNeeds, setPublicNeeds] = useState<ResearchNeedResponse[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [sortTab, setSortTab] = useState<(typeof SORT_TABS)[number]>("Mới nhất");
 
   useEffect(() => {
@@ -79,6 +80,12 @@ function NeedsPageInner() {
     setPublicNeeds((prev) => (prev ? prev.map((n) => (n.id === needId ? { ...n, ...next } : n)) : prev));
   }
 
+  function onClose(needId: string) {
+    return authFetch<ResearchNeedResponse>(`/research-needs/${needId}/close`, { method: "POST" }).then((updated) => {
+      setNeeds((prev) => (prev ? prev.map((n) => (n.id === updated.id ? updated : n)) : prev));
+    });
+  }
+
   if (error) {
     return (
       <div className="uikit-main" style={{ maxWidth: 720, margin: "0 auto" }}>
@@ -114,6 +121,11 @@ function NeedsPageInner() {
             <p style={{ fontSize: 12, fontWeight: 600, color: "var(--uikit-slate-500)", marginBottom: "var(--space-3)" }}>
               Nhu cầu của tổ chức tôi
             </p>
+            {actionError && (
+              <p className="uikit-alert-error" role="alert" style={{ marginBottom: "var(--space-3)" }}>
+                {actionError}
+              </p>
+            )}
             {needs.length === 0 ? (
               <p className="uikit-empty">
                 Chưa có nhu cầu nghiên cứu nào. Đăng nhu cầu để nhận đề xuất từ tác giả hoặc gợi
@@ -122,10 +134,23 @@ function NeedsPageInner() {
             ) : (
               <div className="uikit-row-list">
                 {needs.map((n) => (
-                  <Link key={n.id} href={`/needs/${n.id}`} className="uikit-row-link">
-                    <span style={{ fontSize: 14, fontWeight: 500 }}>{n.title}</span>
-                    <StatusDot tone={toneOf(NEED_STATUS_TONE, n.status)} label={NEED_STATUS_LABELS[n.status] ?? n.status} />
-                  </Link>
+                  <div key={n.id} className="uikit-row">
+                    <Link href={`/needs/${n.id}`} style={{ fontSize: 14, fontWeight: 500, color: "var(--uikit-slate-900)", textDecoration: "none" }}>
+                      {n.title}
+                    </Link>
+                    <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+                      <StatusDot tone={toneOf(NEED_STATUS_TONE, n.status)} label={NEED_STATUS_LABELS[n.status] ?? n.status} />
+                      {n.status === "OPEN" && (
+                        <RemoveButton
+                          label="Đóng nhu cầu"
+                          confirmLabel="Đóng nhu cầu này?"
+                          onRemove={() => onClose(n.id)}
+                          onSessionExpired={() => router.push("/login")}
+                          onError={setActionError}
+                        />
+                      )}
+                    </div>
+                  </div>
                 ))}
               </div>
             )}

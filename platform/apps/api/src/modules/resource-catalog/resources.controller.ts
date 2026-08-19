@@ -18,7 +18,7 @@ import {
   RequestResourceUploadSchema,
 } from "@r2m/contracts";
 import type { ActorContext } from "@r2m/authz";
-import { Body, Controller, Delete, Get, Param, Post, Query, Req, UseGuards, UsePipes } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Param, Post, Query, Req, UseGuards, UsePipes } from "@nestjs/common";
 import type { Request } from "express";
 import { CurrentActor } from "../../common/decorators/current-actor.decorator";
 import { RateLimit } from "../../common/decorators/rate-limit.decorator";
@@ -77,6 +77,14 @@ export class ResourcesController {
   @Get(":id")
   getById(@CurrentActor() actor: ActorContext, @Param("id") id: string): Promise<ResourceResponse> {
     return this.resourcesService.getById(actor, id);
+  }
+
+  /** Not spec-mandated — explicit user-approved addition, see resources.service.ts#remove.
+   * Narrowly-scoped hard delete: creator-only, DRAFT-only, zero-dependents-only. */
+  @Delete(":id")
+  @HttpCode(204)
+  remove(@CurrentActor() actor: ActorContext, @Param("id") id: string, @Req() req: Request): Promise<void> {
+    return this.resourcesService.remove(actor, id, requestId(req));
   }
 
   /** Cộng đồng đợt 1 — upvote, không downvote (đã chốt cùng người dùng). Idempotent: vote

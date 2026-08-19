@@ -62,7 +62,7 @@ export default function TechnologyCaseDetailPage() {
   const [me, setMe] = useState<MeResponse | null>(null);
   const [myOrganizations, setMyOrganizations] = useState<OrganizationResponse[] | null>(null);
   const [technologyCase, setTechnologyCase] = useState<TechnologyCaseResponse | null>(null);
-  const [owningOrg, setOwningOrg] = useState<OrganizationResponse | null>(null);
+  const [owningOrgName, setOwningOrgName] = useState<string | null>(null);
   const [members, setMembers] = useState<CaseMemberResponse[] | null>(null);
   const [userNames, setUserNames] = useState<Record<string, string>>({});
   const [caseOrganizations, setCaseOrganizations] = useState<CaseOrganizationResponse[] | null>(null);
@@ -113,8 +113,7 @@ export default function TechnologyCaseDetailPage() {
       authFetch<OrganizationResponse[]>("/organizations"),
     ]);
     const tc = await authFetch<TechnologyCaseResponse>(`/technology-cases/${caseId}`);
-    const [org, memberRows, caseOrgRows, evidenceRows, assessmentRows, gapRows, roadmapRows, transferManifestRows] = await Promise.all([
-      authFetch<OrganizationResponse>(`/organizations/${tc.owningOrganizationId}`),
+    const [memberRows, caseOrgRows, evidenceRows, assessmentRows, gapRows, roadmapRows, transferManifestRows] = await Promise.all([
       authFetch<CaseMemberResponse[]>(`/technology-cases/${caseId}/members`),
       authFetch<CaseOrganizationResponse[]>(`/technology-cases/${caseId}/organizations`),
       authFetch<EvidenceResponse[]>(`/technology-cases/${caseId}/evidence`),
@@ -138,7 +137,7 @@ export default function TechnologyCaseDetailPage() {
     setMe(meResponse);
     setMyOrganizations(myOrgs);
     setTechnologyCase(tc);
-    setOwningOrg(org);
+    setOwningOrgName(caseOrgRows.find((o) => o.organizationId === tc.owningOrganizationId)?.organizationName ?? null);
     setMembers(memberRows);
     fetchUserNames(memberRows.map((m) => m.userId)).then(setUserNames);
     setCaseOrganizations(caseOrgRows);
@@ -430,7 +429,7 @@ export default function TechnologyCaseDetailPage() {
     );
   }
 
-  if (!technologyCase || !owningOrg || !members || !caseOrganizations || !evidence || !assessments || !gaps || !roadmaps || !transferManifests) {
+  if (!technologyCase || !members || !caseOrganizations || !evidence || !assessments || !gaps || !roadmaps || !transferManifests) {
     return (
       <Shell brandLabel="R2M" me={me} roleLabel={roleLabel} nav={nav}>
         <PageLoader inline />
@@ -452,7 +451,7 @@ export default function TechnologyCaseDetailPage() {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-4)" }}>
           <div>
             <h1 style={{ fontSize: 22 }}>{technologyCase.title}</h1>
-            <p style={{ marginTop: "var(--space-1)", fontSize: 13, color: "var(--uikit-slate-500)" }}>{owningOrg.name}</p>
+            <p style={{ marginTop: "var(--space-1)", fontSize: 13, color: "var(--uikit-slate-500)" }}>{owningOrgName ?? "—"}</p>
           </div>
           <StatusDot
             tone={toneOf(TECHNOLOGY_CASE_STATUS_TONE, technologyCase.lifecycleStatus)}
@@ -477,7 +476,7 @@ export default function TechnologyCaseDetailPage() {
               </div>
               <div>
                 <dt style={{ fontSize: 12, color: "var(--uikit-slate-400)" }}>Tổ chức chủ trì</dt>
-                <dd style={{ margin: 0, color: "var(--uikit-slate-900)" }}>{owningOrg.name}</dd>
+                <dd style={{ margin: 0, color: "var(--uikit-slate-900)" }}>{owningOrgName ?? "—"}</dd>
               </div>
               <div>
                 <dt style={{ fontSize: 12, color: "var(--uikit-slate-400)" }}>Mô tả</dt>
@@ -1113,7 +1112,7 @@ export default function TechnologyCaseDetailPage() {
                 <div className="uikit-row-list">
                   {caseOrganizations.map((o) => (
                     <div key={o.id} className="uikit-row">
-                      <span style={{ fontFamily: "var(--font-mono)", fontSize: 13 }}>{o.organizationId.slice(0, 8)}</span>
+                      <span style={{ fontSize: 13, fontWeight: 500 }}>{o.organizationName}</span>
                       <span style={{ fontSize: 13, color: "var(--uikit-slate-500)" }}>{CASE_ORGANIZATION_ROLE_LABELS[o.role] ?? o.role}</span>
                     </div>
                   ))}

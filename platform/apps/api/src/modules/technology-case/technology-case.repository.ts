@@ -32,6 +32,18 @@ export class TechnologyCaseRepository {
     return firstOrThrow(rows, "createOrganization: insert returned no row");
   }
 
+  /** Companion to `createOrganization` above — `.returning()` on the insert only gives back
+   * `case_organization`'s own columns, not the joined `organization` name/slug that
+   * `toOrganizationResponse` needs (see that function's comment). FK on `organizationId`
+   * guarantees the row exists, so `firstOrThrow` here can't actually be hit in practice. */
+  async findOrganizationNameAndSlug(organizationId: string, tx: Database) {
+    const rows = await tx
+      .select({ name: schema.organization.name, slug: schema.organization.slug })
+      .from(schema.organization)
+      .where(eq(schema.organization.id, organizationId));
+    return firstOrThrow(rows, "findOrganizationNameAndSlug: organization not found");
+  }
+
   async createMember(values: typeof schema.caseMember.$inferInsert, tx: Database) {
     const rows = await tx.insert(schema.caseMember).values(values).returning();
     return firstOrThrow(rows, "createMember: insert returned no row");
@@ -140,10 +152,19 @@ export class TechnologyCaseRepository {
     });
   }
 
+  /** `with: { organization: true }` — the case detail page needs each linked org's name
+   * (owning org's name shown as the page subtitle), and calling `GET /organizations/:id`
+   * per org for that would 403 for a legitimate case viewer who isn't an active member of
+   * that *specific* org (e.g. a PARTNER_COMPANY-side case member, or anyone visible via
+   * `assertVisible`'s broader "case_member OR any linked org member" rule) — that endpoint
+   * gates on the org's own membership, not the case's visibility. This endpoint already
+   * gates on `assertVisible` (see service), so denormalizing the name here is the fix: once
+   * an actor can see the case, they can see the names of every org linked to it. */
   async listOrganizations(technologyCaseId: string) {
     return this.db.query.caseOrganization.findMany({
       where: eq(schema.caseOrganization.technologyCaseId, technologyCaseId),
       orderBy: [schema.caseOrganization.joinedAt],
+      with: { organization: true },
     });
   }
 
@@ -205,5 +226,35 @@ export class TechnologyCaseRepository {
       ),
     });
     return row !== undefined;
+  }
+
+  /** Not spec-mandated — explicit user-approved addition (2026-08-19), backs the narrowly
+   * scoped DRAFT-case hard-delete. Defensive only: `EvidenceService.create` always flips
+   * the case out of DRAFT (via `applyTransition`) in the SAME transaction as the first
+   * evidence row it creates (see technology-case.service.ts's `createCaseCore` doc comment
+   * + `applyTransition`), so a case still reading DRAFT here should never have evidence —
+   * this exists to fail loudly (ConflictError, not silent data loss) if that invariant is
+   * ever violated instead of trusting it blindly. */
+  async hasEvidence(technologyCaseId: string): Promise<boolean> {
+    const row = await this.db.query.evidence.findFirst({
+      where: eq(schema.evidence.technologyCaseId, technologyCaseId),
+    });
+    return row !== undefined;
+  }
+
+  /** Cascades the child rows `createCaseCore` always creates atomically with a DRAFT case
+   * (origin, profile, the OWNING_ORGANIZATION link, the OWNER member, 1 status-history row)
+   * before deleting the case itself — Postgres FK default is RESTRICT (no
+   * `onDelete: cascade` declared in `schema/technology-case.ts`), so a bare
+   * `DELETE FROM technology_case` would otherwise fail even for a same-transaction DRAFT
+   * case. Caller (`TechnologyCaseService.remove`) has already confirmed `hasEvidence` is
+   * false and that only DRAFT-time rows exist. */
+  async deleteDraftCascade(technologyCaseId: string, tx: Database): Promise<void> {
+    await tx.delete(schema.caseStatusHistory).where(eq(schema.caseStatusHistory.technologyCaseId, technologyCaseId));
+    await tx.delete(schema.caseMember).where(eq(schema.caseMember.technologyCaseId, technologyCaseId));
+    await tx.delete(schema.caseOrganization).where(eq(schema.caseOrganization.technologyCaseId, technologyCaseId));
+    await tx.delete(schema.technologyProfile).where(eq(schema.technologyProfile.technologyCaseId, technologyCaseId));
+    await tx.delete(schema.caseOrigin).where(eq(schema.caseOrigin.technologyCaseId, technologyCaseId));
+    await tx.delete(schema.technologyCase).where(eq(schema.technologyCase.id, technologyCaseId));
   }
 }
