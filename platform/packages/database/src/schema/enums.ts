@@ -189,6 +189,7 @@ export const caseOriginTypeEnum = pgEnum("case_origin_type", [
   "DISCOVERY_RECOMMENDATION",
   "RESEARCH_PROPOSAL",
   "IMPORT",
+  "DISCOVERY_DIRECT_REQUEST",
 ]);
 
 export const caseOrganizationRoleEnum = pgEnum("case_organization_role", [

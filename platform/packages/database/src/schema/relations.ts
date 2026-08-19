@@ -842,6 +842,10 @@ export const caseInitiationRequestRelations = relations(caseInitiationRequest, (
     fields: [caseInitiationRequest.recommendationItemId],
     references: [recommendationItem.id],
   }),
+  resourceVersion: one(resourceVersion, {
+    fields: [caseInitiationRequest.resourceVersionId],
+    references: [resourceVersion.id],
+  }),
   requestingOrganization: one(organization, {
     fields: [caseInitiationRequest.requestingOrganizationId],
     references: [organization.id],

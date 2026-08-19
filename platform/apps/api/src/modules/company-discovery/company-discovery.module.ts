@@ -12,6 +12,7 @@ import {
   CaseInitiationRequestsController,
   OrganizationCaseInitiationsController,
   RecommendationItemCaseInitiationsController,
+  ResourceCaseInitiationsController,
 } from "./case-initiations/case-initiations.controller";
 import { CaseInitiationsRepository } from "./case-initiations/case-initiations.repository";
 import { CaseInitiationsService } from "./case-initiations/case-initiations.service";
@@ -66,6 +67,7 @@ import { SavedItemsService } from "./saved-items/saved-items.service";
     CompanyProfileFeedController,
     RecommendationItemsController,
     RecommendationItemCaseInitiationsController,
+    ResourceCaseInitiationsController,
     CaseInitiationRequestsController,
     OrganizationCaseInitiationsController,
     PublicAuthorProfileController,

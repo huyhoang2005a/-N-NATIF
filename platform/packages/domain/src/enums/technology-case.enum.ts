@@ -24,6 +24,12 @@ export const CaseOriginType = {
   DISCOVERY_RECOMMENDATION: "DISCOVERY_RECOMMENDATION",
   RESEARCH_PROPOSAL: "RESEARCH_PROPOSAL",
   IMPORT: "IMPORT",
+  /** Case initiation request sent directly from a resource/version a company browsed —
+   * no AI recommendation run involved (2026-08-19). Distinct from
+   * `DISCOVERY_RECOMMENDATION` (which always has a `recommendationItemId`) so the
+   * `case_origin` CHECK constraint can still enforce "exactly the right FK is set per
+   * origin_type" without a cross-table lookup — see manual migrations 0016/0017. */
+  DISCOVERY_DIRECT_REQUEST: "DISCOVERY_DIRECT_REQUEST",
 } as const;
 export type CaseOriginType = (typeof CaseOriginType)[keyof typeof CaseOriginType];
 

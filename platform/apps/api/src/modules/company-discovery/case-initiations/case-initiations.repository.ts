@@ -28,13 +28,34 @@ export class CaseInitiationsRepository {
     });
   }
 
+  /** Resource-sourced `create()`/`accept()` path (2026-08-19) — the version + its
+   * resource, no recommendation run involved. Mirrors `findItemForInitiation`'s shape
+   * (resource reachable via a `with`) so both source branches load what they need the
+   * same way. */
+  async findResourceVersionWithResource(resourceVersionId: string) {
+    return this.db.query.resourceVersion.findFirst({
+      where: eq(schema.resourceVersion.id, resourceVersionId),
+      with: { resource: true },
+    });
+  }
+
   async createRequest(values: typeof schema.caseInitiationRequest.$inferInsert, tx: Database) {
     const rows = await tx.insert(schema.caseInitiationRequest).values(values).returning();
     return firstOrThrow(rows, "createRequest: insert returned no row");
   }
 
+  /** `with` on both possible sources so `toResponse` can resolve `resourceTitle`
+   * regardless of which one is set (2026-08-19) — exactly one is ever non-null. */
+  private readonly withResourceTitle = {
+    recommendationItem: { with: { resourceVersion: { with: { resource: true } } } },
+    resourceVersion: { with: { resource: true } },
+  } as const;
+
   async findById(id: string) {
-    return this.db.query.caseInitiationRequest.findFirst({ where: eq(schema.caseInitiationRequest.id, id) });
+    return this.db.query.caseInitiationRequest.findFirst({
+      where: eq(schema.caseInitiationRequest.id, id),
+      with: this.withResourceTitle,
+    });
   }
 
   /** Optimistic lock — mirrors `ProposalsRepository.update`. */
@@ -51,6 +72,7 @@ export class CaseInitiationsRepository {
     return this.db.query.caseInitiationRequest.findMany({
       where: eq(schema.caseInitiationRequest.targetAuthorUserId, targetAuthorUserId),
       orderBy: [desc(schema.caseInitiationRequest.createdAt)],
+      with: this.withResourceTitle,
     });
   }
 
@@ -58,6 +80,7 @@ export class CaseInitiationsRepository {
     return this.db.query.caseInitiationRequest.findMany({
       where: eq(schema.caseInitiationRequest.requestingOrganizationId, requestingOrganizationId),
       orderBy: [desc(schema.caseInitiationRequest.createdAt)],
+      with: this.withResourceTitle,
     });
   }
 }

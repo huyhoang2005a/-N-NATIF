@@ -544,7 +544,11 @@ export class ResourcesService {
    * resource's content). Content itself is further restricted to a PUBLISHED version unless
    * the actor is the resource's own creator — a DRAFT version's file shouldn't be servable
    * to arbitrary org members/grantees just because the resource entity is visible. */
-  private async loadVisibleVersion(actor: ActorContext, resourceId: string, versionId: string) {
+  /** Made public (2026-08-19) for `company-discovery/case-initiations/case-initiations.
+   * service.ts`'s resource-sourced `create()` path — same reuse rationale as
+   * `assertVisible` below (deliberately the non-manager-safe check, NOT
+   * `assertCanManageResource`). */
+  async loadVisibleVersion(actor: ActorContext, resourceId: string, versionId: string) {
     const version = await this.resourcesRepository.findVersionById(versionId);
     if (!version || version.resourceId !== resourceId) {
       throw new NotFoundError(ErrorCode.RESOURCE_VERSION_NOT_FOUND, "Resource version not found.");

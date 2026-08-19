@@ -232,7 +232,10 @@ export interface RecommendationRunCompletedEvent {
 export interface CaseInitiationRequestedEvent {
   type: "CaseInitiationRequested";
   caseInitiationRequestId: string;
-  recommendationItemId: string;
+  /** Exactly one of these two is set — resource-sourced requests (2026-08-19) have no
+   * recommendation item. */
+  recommendationItemId?: string;
+  resourceVersionId?: string;
   requestingOrganizationId: string;
   targetAuthorUserId: string;
 }

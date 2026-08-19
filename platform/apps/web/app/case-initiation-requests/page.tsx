@@ -104,8 +104,9 @@ export default function CaseInitiationRequestsPage() {
       <div className="uikit-stack">
         <h1 style={{ fontSize: 22 }}>Yêu cầu khởi tạo case</h1>
         <p style={{ fontSize: 13, color: "var(--uikit-slate-500)" }}>
-          Các doanh nghiệp quan tâm đến tài nguyên của bạn qua gợi ý AI có thể gửi yêu cầu
-          khởi tạo Technology Case — chấp nhận sẽ tự động tạo case với bạn là chủ trì.
+          Các doanh nghiệp quan tâm đến tài liệu của bạn — qua gợi ý AI hoặc gửi trực tiếp
+          từ trang tài liệu — có thể gửi yêu cầu khởi tạo Technology Case; chấp nhận sẽ tự
+          động tạo case với bạn là chủ trì.
         </p>
 
         {actionError && (
@@ -129,6 +130,10 @@ export default function CaseInitiationRequestsPage() {
                       {CASE_INITIATION_STATUS_LABELS[r.status] ?? r.status}
                     </StatusPill>
                   </div>
+                  <p style={{ marginTop: "var(--space-2)", fontSize: 14, fontWeight: 600 }}>{r.resourceTitle}</p>
+                  <p style={{ fontSize: 12, color: "var(--uikit-slate-500)" }}>
+                    {r.recommendationItemId ? "Qua gợi ý AI" : "Gửi trực tiếp từ trang tài liệu"}
+                  </p>
                   {r.message && <p style={{ marginTop: "var(--space-2)", fontSize: 13 }}>{r.message}</p>}
                   {r.expiresAt && r.status === "PENDING" && (
                     <p style={{ marginTop: "var(--space-2)", fontSize: 12, color: "var(--uikit-slate-500)" }}>

@@ -184,6 +184,18 @@ export const CreateCaseInitiationRequestSchema = z.object({
 });
 export type CreateCaseInitiationRequest = z.infer<typeof CreateCaseInitiationRequestSchema>;
 
+/** Resource-sourced creation (2026-08-19) — sent from `/resources/:id/versions/:versionId/
+ * case-initiation-requests` when a company browses a resource directly, with no
+ * recommendation run to infer the requesting company org from. `requestingOrganizationId`
+ * is therefore explicit here, same pattern as `CreateResearchProposalRequestSchema.
+ * proposerOrganizationId` above — an actor can belong to multiple ENTERPRISE orgs, so it
+ * must never be guessed. */
+export const CreateResourceCaseInitiationRequestSchema = z.object({
+  requestingOrganizationId: z.string().uuid(),
+  message: z.string().trim().max(2000).optional(),
+});
+export type CreateResourceCaseInitiationRequest = z.infer<typeof CreateResourceCaseInitiationRequestSchema>;
+
 export const DeclineCaseInitiationRequestSchema = z.object({
   responseNote: z.string().trim().max(2000).optional(),
 });
@@ -191,7 +203,15 @@ export type DeclineCaseInitiationRequest = z.infer<typeof DeclineCaseInitiationR
 
 export interface CaseInitiationRequestResponse {
   id: string;
-  recommendationItemId: string;
+  recommendationItemId: string | null;
+  /** Resource-sourced requests only (2026-08-19) — null for the original
+   * recommendation-item-sourced path. Exactly one of `recommendationItemId`/
+   * `resourceVersionId` is ever non-null. */
+  resourceVersionId: string | null;
+  /** Title of the resource this request is about, resolved server-side from whichever
+   * source is set — lets the author's inbox show "what is this about" without the
+   * frontend needing to know which source branch produced the request. */
+  resourceTitle: string;
   requestingOrganizationId: string;
   requestedByUserId: string;
   targetAuthorUserId: string;

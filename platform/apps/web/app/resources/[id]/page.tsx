@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Ban, Download, Eye, FilePlus2, Flag, Plus, Save, Sparkles, Trash2, UploadCloud } from "lucide-react";
+import { Ban, Download, Eye, FilePlus2, Flag, Handshake, Plus, Save, Sparkles, Trash2, UploadCloud } from "lucide-react";
 import type {
   AnnotationResponse,
+  CaseInitiationRequestResponse,
   ContentFlagResponse,
   MeResponse,
   OrganizationResponse,
@@ -271,6 +272,29 @@ export default function ResourceDetailPage() {
     });
   }
 
+  // ---------- company: request case initiation directly from this document (2026-08-19) ----------
+  const [caseInitiationFormOpen, setCaseInitiationFormOpen] = useState(false);
+  const [caseInitiationOrgId, setCaseInitiationOrgId] = useState("");
+  const [caseInitiationMessage, setCaseInitiationMessage] = useState("");
+  const [caseInitiationSent, setCaseInitiationSent] = useState(false);
+
+  const publishedVersion = versions.find((v) => v.status === "PUBLISHED") ?? null;
+
+  function onSendCaseInitiationRequest() {
+    if (!publishedVersion || !caseInitiationOrgId) return Promise.resolve();
+    return runAction("send-case-initiation-request", async () => {
+      await authFetch<CaseInitiationRequestResponse>(
+        `/resources/${resourceId}/versions/${publishedVersion.id}/case-initiation-requests`,
+        {
+          method: "POST",
+          body: JSON.stringify({ requestingOrganizationId: caseInitiationOrgId, message: caseInitiationMessage.trim() || undefined }),
+        },
+      );
+      setCaseInitiationSent(true);
+      setCaseInitiationFormOpen(false);
+    });
+  }
+
   if (!me || !organizations) {
     if (loadError) {
       return (
@@ -285,7 +309,8 @@ export default function ResourceDetailPage() {
   }
 
   const roleLabel = PLATFORM_ROLE_LABELS[me.platformRole] ?? me.platformRole;
-  const nav = navForPersona(personaOf(me, organizations), me.platformRole === "PLATFORM_ADMIN");
+  const persona = personaOf(me, organizations);
+  const nav = navForPersona(persona, me.platformRole === "PLATFORM_ADMIN");
 
   if (loadError) {
     return (
@@ -304,6 +329,14 @@ export default function ResourceDetailPage() {
       </Shell>
     );
   }
+
+  // Company viewer, browsing a document NOT owned by any of their own organizations — the
+  // "gửi yêu cầu tạo case từ tài liệu này" flow. Independent of the author-side "Tạo case
+  // công nghệ từ tài liệu này" button above (gated the opposite way, on
+  // `authorVerificationStatus`) — the two are never meant to show to the same viewer, but
+  // each is gated on its own condition regardless, not on the other being hidden.
+  const ownsResource = organizations.some((org) => org.id === resource.ownerOrganizationId);
+  const canRequestCaseInitiation = persona === "company" && !ownsResource && publishedVersion !== null;
 
   return (
     <Shell brandLabel="R2M" me={me} roleLabel={roleLabel} nav={nav}>
@@ -337,6 +370,22 @@ export default function ResourceDetailPage() {
                 Tạo case công nghệ từ tài liệu này
               </GhostButton>
             )}
+            {canRequestCaseInitiation && (
+              caseInitiationSent ? (
+                <span style={{ fontSize: 13, color: "var(--uikit-slate-500)" }}>Đã gửi yêu cầu, chờ tác giả phản hồi.</span>
+              ) : (
+                <GhostButton
+                  icon={Handshake}
+                  onClick={() => {
+                    setCaseInitiationOrgId(organizations.length === 1 ? organizations[0].id : "");
+                    setCaseInitiationMessage("");
+                    setCaseInitiationFormOpen(true);
+                  }}
+                >
+                  Gửi yêu cầu tạo lộ trình sử dụng tài liệu này
+                </GhostButton>
+              )
+            )}
             {flaggedIds.has(resourceId) ? (
               <span style={{ fontSize: 13, color: "var(--uikit-slate-400)" }}>Đã báo cáo</span>
             ) : (
@@ -354,6 +403,47 @@ export default function ResourceDetailPage() {
           </div>
         </div>
         {resource.description && <p style={{ fontSize: 14, color: "var(--uikit-slate-700)" }}>{resource.description}</p>}
+
+        {caseInitiationFormOpen && (
+          <Card>
+            <SectionHeader title="Gửi yêu cầu tạo lộ trình sử dụng tài liệu này" />
+            <p style={{ fontSize: 13, color: "var(--uikit-slate-500)", marginTop: "var(--space-2)" }}>
+              Tác giả sẽ nhận được yêu cầu này và có thể chấp nhận để tự động tạo một Technology Case, với tổ chức của bạn
+              được thêm vào với vai trò đối tác (PARTNER_COMPANY).
+            </p>
+            <div className="uikit-stack" style={{ marginTop: "var(--space-3)" }}>
+              {organizations.length > 1 && (
+                <SelectField
+                  label="Tổ chức của bạn gửi yêu cầu"
+                  value={caseInitiationOrgId}
+                  onChange={(e) => setCaseInitiationOrgId(e.target.value)}
+                  options={[
+                    { value: "", label: "— Chọn tổ chức —" },
+                    ...organizations.map((org) => ({ value: org.id, label: org.name })),
+                  ]}
+                />
+              )}
+              <TextField
+                label="Lời nhắn"
+                as="textarea"
+                optional
+                value={caseInitiationMessage}
+                onChange={(e) => setCaseInitiationMessage(e.target.value)}
+              />
+            </div>
+            <div style={{ display: "flex", gap: "var(--space-3)", marginTop: "var(--space-4)" }}>
+              <PrimaryButton
+                disabled={busyKey === "send-case-initiation-request" || !caseInitiationOrgId}
+                onClick={onSendCaseInitiationRequest}
+              >
+                {busyKey === "send-case-initiation-request" ? "Đang gửi…" : "Gửi yêu cầu"}
+              </PrimaryButton>
+              <GhostButton disabled={busyKey === "send-case-initiation-request"} onClick={() => setCaseInitiationFormOpen(false)}>
+                Huỷ
+              </GhostButton>
+            </div>
+          </Card>
+        )}
 
         {flaggingTarget?.type === "RESOURCE" && flaggingTarget.id === resourceId && (
           <Card>

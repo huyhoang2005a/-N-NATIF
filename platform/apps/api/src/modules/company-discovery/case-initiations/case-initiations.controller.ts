@@ -1,5 +1,10 @@
-import type { CaseInitiationRequestResponse, CreateCaseInitiationRequest, DeclineCaseInitiationRequest } from "@r2m/contracts";
-import { CreateCaseInitiationRequestSchema, DeclineCaseInitiationRequestSchema } from "@r2m/contracts";
+import type {
+  CaseInitiationRequestResponse,
+  CreateCaseInitiationRequest,
+  CreateResourceCaseInitiationRequest,
+  DeclineCaseInitiationRequest,
+} from "@r2m/contracts";
+import { CreateCaseInitiationRequestSchema, CreateResourceCaseInitiationRequestSchema, DeclineCaseInitiationRequestSchema } from "@r2m/contracts";
 import type { ActorContext } from "@r2m/authz";
 import { Body, Controller, Get, Param, Post, Req, UsePipes } from "@nestjs/common";
 import type { Request } from "express";
@@ -30,6 +35,34 @@ export class RecommendationItemCaseInitiationsController {
   ): Promise<CaseInitiationRequestResponse> {
     return withIdempotencyKey(this.idempotencyService, actor.userId, req, body, 201, () =>
       this.service.create(actor, id, body, requestId(req)),
+    );
+  }
+}
+
+/** Resource-sourced path (2026-08-19) — declared here (Company & Discovery module)
+ * rather than on `ResourcesController` (Resource Catalog module) to avoid a circular
+ * module dependency: `CompanyDiscoveryModule` already imports `ResourceCatalogModule`
+ * (for `ResourcesService`/`ResourcesRepository`, see its module comment), so the reverse
+ * import would cycle. Route path is still under `/resources/...` — only the controller's
+ * declaring module differs, not the URL shape. */
+@Controller("resources/:id/versions/:versionId/case-initiation-requests")
+export class ResourceCaseInitiationsController {
+  constructor(
+    private readonly service: CaseInitiationsService,
+    private readonly idempotencyService: IdempotencyService,
+  ) {}
+
+  @Post()
+  @UsePipes(new ZodValidationPipe(CreateResourceCaseInitiationRequestSchema))
+  create(
+    @CurrentActor() actor: ActorContext,
+    @Param("id") id: string,
+    @Param("versionId") versionId: string,
+    @Body() body: CreateResourceCaseInitiationRequest,
+    @Req() req: Request,
+  ): Promise<CaseInitiationRequestResponse> {
+    return withIdempotencyKey(this.idempotencyService, actor.userId, req, body, 201, () =>
+      this.service.createFromResourceVersion(actor, id, versionId, body, requestId(req)),
     );
   }
 }

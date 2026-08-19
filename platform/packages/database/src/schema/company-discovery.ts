@@ -189,13 +189,18 @@ export const recommendationCitation = pgTable(
   (table) => [uniqueIndex("uq_recommendation_citation_item_citation").on(table.recommendationItemId, table.citationId)],
 );
 
+/** `recommendationItemId`/`resourceVersionId` — exactly one non-null (never both, never
+ * neither): a request either comes from an AI-matched `recommendation_item`, or is sent
+ * directly from a resource/version a company browsed with no recommendation run involved
+ * (2026-08-19 addition). Enforced by `chk_case_initiation_request_exactly_one_source` in
+ * manual migration 0015, same "exactly one source FK" technique as
+ * `recommendation_run`'s context CHECK constraint above. */
 export const caseInitiationRequest = pgTable(
   "case_initiation_request",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    recommendationItemId: uuid("recommendation_item_id")
-      .notNull()
-      .references(() => recommendationItem.id),
+    recommendationItemId: uuid("recommendation_item_id").references(() => recommendationItem.id),
+    resourceVersionId: uuid("resource_version_id").references(() => resourceVersion.id),
     requestingOrganizationId: uuid("requesting_organization_id")
       .notNull()
       .references(() => organization.id),
