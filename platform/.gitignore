@@ -4,6 +4,13 @@ dist/
 .turbo/
 coverage/
 *.log
+# TypeScript incremental-build cache — was accidentally committed for all 8 packages while
+# dist/ (the actual output it tracks) is gitignored. On a fresh checkout, tsc's incremental
+# logic trusts this stale file and believes outputs already exist, so it silently skips
+# re-emitting some of them (e.g. domain's dist/index.d.ts) — breaks every downstream
+# package's typecheck with a bogus "Cannot find module" error. Root cause of every CI run
+# failing since the first commit (2026-08-19 fix).
+*.tsbuildinfo
 .env
 .env.*.local
 .DS_Store
