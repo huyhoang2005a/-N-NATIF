@@ -21,6 +21,8 @@ import type {
   OrganizationResponse,
   OrganizationVerificationRequestResponse,
   PlatformCaseSummaryResponse,
+  PlatformDashboardMonthlyPoint,
+  PlatformDashboardResponse,
   PlatformOrganizationStatsResponse,
   PlatformUserStatsResponse,
   ReadinessAssessmentResponse,
@@ -39,14 +41,17 @@ import { toneOf, ORGANIZATION_STATUS_TONE, TECHNOLOGY_CASE_STATUS_TONE } from ".
 import {
   Card,
   CategoryBarChart,
+  DonutChart,
+  KpiTrendCard,
   MatchScoreBadge,
+  MonthlyStatsTable,
+  MonthlyTrendChart,
   PageLoader,
   SectionHeader,
   Shell,
   StatCard,
   StatusDot,
   StatusPill,
-  WeeklyGrowthChart,
 } from "../../components/ui";
 
 export default function DashboardPage() {
@@ -287,6 +292,19 @@ function CompanyDashboardBody({ me, organizations }: { me: MeResponse; organizat
   );
 }
 
+/** `null` when the previous month has no baseline to compare against (0 → N is not a
+ * meaningful "% growth" — it's "started existing"), rather than showing a fabricated
+ * +100%/Infinity%. */
+function momDeltaPct(current: number, previous: number): number | null {
+  if (previous === 0) return null;
+  return ((current - previous) / previous) * 100;
+}
+
+function approvalRatePct(point: PlatformDashboardMonthlyPoint): number | null {
+  const decided = point.verificationsApproved + point.verificationsRejected;
+  return decided > 0 ? (point.verificationsApproved / decided) * 100 : null;
+}
+
 interface ReviewQueueItem {
   caseId: string;
   caseTitle: string;
@@ -304,6 +322,7 @@ function PlatformOpsDashboardBody({ isAdmin }: { isAdmin: boolean }) {
   const [caseSummary, setCaseSummary] = useState<PlatformCaseSummaryResponse | null>(null);
   const [orgStats, setOrgStats] = useState<PlatformOrganizationStatsResponse | null>(null);
   const [userStats, setUserStats] = useState<PlatformUserStatsResponse | null>(null);
+  const [dashboardStats, setDashboardStats] = useState<PlatformDashboardResponse | null>(null);
 
   useEffect(() => {
     if (isAdmin) {
@@ -315,6 +334,7 @@ function PlatformOpsDashboardBody({ isAdmin }: { isAdmin: boolean }) {
         .catch(() => setCaseSummary({ total: 0, active: 0, byStatus: {} }));
       authFetch<PlatformOrganizationStatsResponse>("/platform/organizations/stats").then(setOrgStats).catch(() => {});
       authFetch<PlatformUserStatsResponse>("/platform/users/stats").then(setUserStats).catch(() => {});
+      authFetch<PlatformDashboardResponse>("/platform/dashboard-stats").then(setDashboardStats).catch(() => {});
     }
     Promise.all([
       authFetch<OrganizationVerificationRequestResponse[]>("/platform/organization-verifications"),
@@ -372,21 +392,75 @@ function PlatformOpsDashboardBody({ isAdmin }: { isAdmin: boolean }) {
         <StatCard href="/platform/flags" label="Nội dung bị gắn cờ" value={openFlags.length} icon={Flag} tone="rose" />
       </div>
 
-      {isAdmin && (
+      {isAdmin && dashboardStats && (
         <>
+          {(() => {
+            const monthly = dashboardStats.monthly;
+            const current = monthly[monthly.length - 1];
+            const previous = monthly[monthly.length - 2];
+            if (!current || !previous) return null;
+            const currentRate = approvalRatePct(current);
+            const previousRate = approvalRatePct(previous);
+            return (
+              <div className="uikit-card-grid uikit-card-grid--5">
+                <KpiTrendCard
+                  label="Người dùng mới"
+                  value={current.newUsers.toLocaleString("vi-VN")}
+                  values={monthly.map((m) => m.newUsers)}
+                  deltaPct={momDeltaPct(current.newUsers, previous.newUsers)}
+                />
+                <KpiTrendCard
+                  label="Tổ chức mới"
+                  value={current.newOrganizations.toLocaleString("vi-VN")}
+                  values={monthly.map((m) => m.newOrganizations)}
+                  deltaPct={momDeltaPct(current.newOrganizations, previous.newOrganizations)}
+                />
+                <KpiTrendCard
+                  label="Case công nghệ mới"
+                  value={current.newTechnologyCases.toLocaleString("vi-VN")}
+                  values={monthly.map((m) => m.newTechnologyCases)}
+                  deltaPct={momDeltaPct(current.newTechnologyCases, previous.newTechnologyCases)}
+                />
+                <KpiTrendCard
+                  label="Tài nguyên mới"
+                  value={current.newResources.toLocaleString("vi-VN")}
+                  values={monthly.map((m) => m.newResources)}
+                  deltaPct={momDeltaPct(current.newResources, previous.newResources)}
+                />
+                <KpiTrendCard
+                  label="Tỷ lệ duyệt hồ sơ"
+                  value={currentRate === null ? "—" : `${currentRate.toFixed(0)}%`}
+                  values={monthly.map((m) => approvalRatePct(m) ?? 0)}
+                  deltaPct={currentRate !== null && previousRate !== null ? currentRate - previousRate : null}
+                />
+              </div>
+            );
+          })()}
+
           <Card>
-            <SectionHeader title="Tăng trưởng 12 tuần gần nhất" />
+            <SectionHeader title="Xu hướng tăng trưởng 6 tháng gần nhất" />
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "var(--space-5)" }}>
-              {orgStats && <WeeklyGrowthChart title="Tổ chức đăng ký mới" data={orgStats.weeklySignups} />}
-              {userStats && <WeeklyGrowthChart title="Người dùng mới" data={userStats.weeklySignups} />}
+              <MonthlyTrendChart
+                title="Người dùng mới theo tháng"
+                data={dashboardStats.monthly.map((m) => ({ month: m.month, count: m.newUsers }))}
+              />
+              <MonthlyTrendChart
+                title="Case công nghệ mới theo tháng"
+                data={dashboardStats.monthly.map((m) => ({ month: m.month, count: m.newTechnologyCases }))}
+              />
             </div>
+          </Card>
+
+          <Card>
+            <SectionHeader title="Chi tiết theo tháng" />
+            <MonthlyStatsTable rows={dashboardStats.monthly} />
           </Card>
 
           <Card>
             <SectionHeader title="Phân bổ" />
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "var(--space-6)" }}>
               {caseSummary && Object.values(caseSummary.byStatus).some((v) => v > 0) && (
-                <CategoryBarChart
+                <DonutChart
                   title="Case theo trạng thái"
                   data={Object.entries(caseSummary.byStatus)
                     .filter(([, value]) => value > 0)

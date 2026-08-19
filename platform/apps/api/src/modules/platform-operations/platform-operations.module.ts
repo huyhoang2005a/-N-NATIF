@@ -2,6 +2,9 @@ import { Module } from "@nestjs/common";
 import { VerificationModule } from "../verification/verification.module";
 import { PlatformAuditLogController } from "./audit/audit.controller";
 import { AuditModule } from "./audit/audit.module";
+import { PlatformDashboardController } from "./dashboard/platform-dashboard.controller";
+import { PlatformDashboardRepository } from "./dashboard/platform-dashboard.repository";
+import { PlatformDashboardService } from "./dashboard/platform-dashboard.service";
 import { JobsModule } from "./jobs/jobs.module";
 import { PlatformOutboxController } from "./jobs/outbox.controller";
 import { ContentFlagsController, PlatformContentFlagsController } from "./moderation/moderation.controller";
@@ -26,8 +29,16 @@ import { NotificationsService } from "./notifications/notifications.service";
     NotificationsController,
     PlatformAuditLogController,
     PlatformOutboxController,
+    PlatformDashboardController,
   ],
-  providers: [ModerationRepository, ModerationService, NotificationsRepository, NotificationsService],
+  providers: [
+    ModerationRepository,
+    ModerationService,
+    NotificationsRepository,
+    NotificationsService,
+    PlatformDashboardRepository,
+    PlatformDashboardService,
+  ],
   exports: [AuditModule, JobsModule],
 })
 export class PlatformOperationsModule {}

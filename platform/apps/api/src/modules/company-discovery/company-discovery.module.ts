@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { StorageModule } from "../../common/storage/storage.module";
 import { CommunityModule } from "../community/community.module";
 import { OrganizationsModule } from "../identity-organization/organizations/organizations.module";
 import { AuditModule } from "../platform-operations/audit/audit.module";
@@ -53,7 +54,7 @@ import { SavedItemsService } from "./saved-items/saved-items.service";
  * generated asynchronously by the worker via the same outbox pattern as every other
  * side-effect in this app, no separate queue infra. */
 @Module({
-  imports: [OrganizationsModule, AuditModule, JobsModule, TechnologyCaseModule, CommunityModule, ResourceCatalogModule],
+  imports: [OrganizationsModule, AuditModule, JobsModule, TechnologyCaseModule, CommunityModule, ResourceCatalogModule, StorageModule],
   controllers: [
     CompanyProfileController,
     ResearchNeedsController,

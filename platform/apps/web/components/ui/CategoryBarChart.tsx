@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { Tone } from "../../lib/tone";
 
-const TONE_VAR: Record<Tone, string> = {
+export const TONE_VAR: Record<Tone, string> = {
   gray: "var(--uikit-slate-400)",
   blue: "var(--uikit-blue-500)",
   green: "var(--uikit-emerald-500)",

@@ -1146,15 +1146,25 @@ select {
 .uikit-card-grid--4 {
   grid-template-columns: repeat(4, 1fr);
 }
+.uikit-card-grid--5 {
+  grid-template-columns: repeat(5, 1fr);
+}
+@media (max-width: 1080px) {
+  .uikit-card-grid--5 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
 @media (max-width: 860px) {
   .uikit-card-grid--3,
-  .uikit-card-grid--4 {
+  .uikit-card-grid--4,
+  .uikit-card-grid--5 {
     grid-template-columns: repeat(2, 1fr);
   }
 }
 @media (max-width: 560px) {
   .uikit-card-grid--3,
-  .uikit-card-grid--4 {
+  .uikit-card-grid--4,
+  .uikit-card-grid--5 {
     grid-template-columns: 1fr;
   }
 }
@@ -1220,6 +1230,46 @@ select {
   margin: 2px 0 0;
   font-size: 11px;
   color: var(--uikit-slate-400);
+}
+
+/* ---------- KPI trend card (admin dashboard) ---------- */
+
+.uikit-kpicard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.uikit-kpicard__value {
+  font-family: var(--font-mono);
+  font-size: 26px;
+  font-weight: 600;
+  color: var(--uikit-slate-900);
+  margin: 0;
+  line-height: 1.2;
+}
+.uikit-kpicard__label {
+  font-size: 13px;
+  color: var(--uikit-slate-500);
+  margin: 2px 0 0;
+  text-wrap: balance;
+}
+.uikit-kpicard__delta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  margin: 0;
+}
+.uikit-kpicard__delta--up {
+  color: var(--uikit-emerald-700);
+}
+.uikit-kpicard__delta--down {
+  color: var(--uikit-rose-700);
+}
+.uikit-kpicard__delta--muted {
+  color: var(--uikit-slate-400);
+  font-weight: 400;
 }
 
 /* ---------- section header ---------- */
@@ -1675,6 +1725,12 @@ select {
   width: 56px;
   height: 56px;
   font-size: 18px;
+}
+.uikit-avatar--md {
+  width: 36px;
+  height: 36px;
+  font-size: 13px;
+  flex-shrink: 0;
 }
 .uikit-avatar__edit-btn {
   position: absolute;

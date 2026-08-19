@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { RefreshCw } from "lucide-react";
-import type { ActivityFeedItemResponse, MeResponse, OrganizationResponse } from "@r2m/contracts";
+import type { ActivityFeedAttribution, ActivityFeedItemResponse, MeResponse, OrganizationResponse } from "@r2m/contracts";
 import { authFetch, SessionExpiredError } from "../../lib/api-client";
 import { NEED_STATUS_LABELS, PLATFORM_ROLE_LABELS, RESOURCE_TYPE_LABELS } from "../../lib/labels";
 import { navForPersona, personaOf } from "../../lib/nav";
@@ -12,6 +12,50 @@ import { REFRESH_ACTIVE_NAV_EVENT } from "../../lib/refresh-event";
 import { getAccessToken } from "../../lib/session";
 import { NEED_STATUS_TONE, toneOf } from "../../lib/tone";
 import { Card, GhostButton, PageLoader, SaveButton, Shell, StatusDot, VoteButton } from "../../components/ui";
+
+function initialsOf(name: string): string {
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .slice(-2)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase();
+}
+
+/** Post-header avatar — same `.uikit-avatar` visual language as `Shell`'s topbar avatar
+ * (real image when set, initials circle otherwise), just sized for a feed card header
+ * instead of the topbar. */
+function FeedAvatar({ name, avatarUrl }: { name: string; avatarUrl: string | null }) {
+  return (
+    <div className="uikit-avatar uikit-avatar--md" aria-hidden="true">
+      {avatarUrl ? <img src={avatarUrl} alt="" className="uikit-avatar__img" /> : <span>{initialsOf(name) || "?"}</span>}
+    </div>
+  );
+}
+
+function FeedByline({ attribution }: { attribution: ActivityFeedAttribution }) {
+  const name = attribution.authorName ?? attribution.organizationName ?? "R2M";
+  const href = attribution.authorSlug
+    ? `/authors/${attribution.authorSlug}`
+    : attribution.organizationSlug
+      ? `/organizations/${attribution.organizationSlug}`
+      : null;
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+      <FeedAvatar name={name} avatarUrl={attribution.avatarUrl} />
+      <div>
+        {href ? (
+          <Link href={href} style={{ fontSize: 14, fontWeight: 600, color: "var(--uikit-slate-900)", textDecoration: "none" }}>
+            {name}
+          </Link>
+        ) : (
+          <span style={{ fontSize: 14, fontWeight: 600, color: "var(--uikit-slate-900)" }}>{name}</span>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function ActivityFeedPage() {
   const router = useRouter();
@@ -113,7 +157,7 @@ export default function ActivityFeedPage() {
 
   return (
     <Shell brandLabel="R2M" me={me} roleLabel={PLATFORM_ROLE_LABELS[me.platformRole] ?? me.platformRole} nav={nav}>
-      <div className="uikit-stack">
+      <div className="uikit-stack" style={{ maxWidth: 640, margin: "0 auto" }}>
         <div
           style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--space-3)" }}
           onDoubleClick={() => load({ silent: true })}
@@ -125,75 +169,83 @@ export default function ActivityFeedPage() {
           </GhostButton>
         </div>
 
-        <Card>
-          {items.length === 0 ? (
+        {items.length === 0 ? (
+          <Card>
             <p className="uikit-empty">
               Chưa có hoạt động nào từ tác giả/tổ chức bạn đang theo dõi — hãy theo dõi thêm
               tác giả hoặc tổ chức trên trang hồ sơ công khai của họ để lấp đầy bảng tin này.
             </p>
-          ) : (
-            <div className="uikit-row-list">
-              {items.map((item) => {
-                const itemId = item.type === "RESOURCE" ? item.resource.id : item.researchNeed.id;
-                return (
-                  <div key={`${item.type}-${itemId}`} className="uikit-row">
-                    {item.type === "RESOURCE" ? (
-                      <Link href={`/resources/${item.resource.id}`} style={{ fontSize: 14, fontWeight: 500, color: "var(--uikit-slate-900)", textDecoration: "none" }}>
-                        {item.resource.title}
-                        <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 400, color: "var(--uikit-slate-500)" }}>
-                          {RESOURCE_TYPE_LABELS[item.resource.type] ?? item.resource.type}
-                        </span>
-                      </Link>
-                    ) : (
-                      <Link href={`/needs/${item.researchNeed.id}`} style={{ fontSize: 14, fontWeight: 500, color: "var(--uikit-slate-900)", textDecoration: "none" }}>
-                        {item.researchNeed.title}
-                      </Link>
-                    )}
-                    <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
-                      {item.type === "RESOURCE" ? (
-                        <>
-                          <VoteButton
-                            path={`/resources/${item.resource.id}/votes`}
-                            votedByMe={item.resource.votedByMe}
-                            voteCount={item.resource.voteCount}
-                            onChange={(next) => onVoteChange(item.resource.id, next)}
-                            onSessionExpired={() => router.push("/login")}
-                          />
-                          <SaveButton
-                            path={`/resources/${item.resource.id}/saves`}
-                            savedByMe={item.resource.savedByMe}
-                            onChange={(next) => onSaveChange(item.resource.id, next)}
-                            onSessionExpired={() => router.push("/login")}
-                          />
-                        </>
-                      ) : (
-                        <>
-                          <VoteButton
-                            path={`/research-needs/${item.researchNeed.id}/votes`}
-                            votedByMe={item.researchNeed.votedByMe}
-                            voteCount={item.researchNeed.voteCount}
-                            onChange={(next) => onVoteChange(item.researchNeed.id, next)}
-                            onSessionExpired={() => router.push("/login")}
-                          />
-                          <SaveButton
-                            path={`/research-needs/${item.researchNeed.id}/saves`}
-                            savedByMe={item.researchNeed.savedByMe}
-                            onChange={(next) => onSaveChange(item.researchNeed.id, next)}
-                            onSessionExpired={() => router.push("/login")}
-                          />
-                          <StatusDot
-                            tone={toneOf(NEED_STATUS_TONE, item.researchNeed.status)}
-                            label={NEED_STATUS_LABELS[item.researchNeed.status] ?? item.researchNeed.status}
-                          />
-                        </>
+          </Card>
+        ) : (
+          items.map((item) => {
+            const itemId = item.type === "RESOURCE" ? item.resource.id : item.researchNeed.id;
+            const title = item.type === "RESOURCE" ? item.resource.title : item.researchNeed.title;
+            const href = item.type === "RESOURCE" ? `/resources/${item.resource.id}` : `/needs/${item.researchNeed.id}`;
+            const kindLabel = item.type === "RESOURCE" ? RESOURCE_TYPE_LABELS[item.resource.type] ?? item.resource.type : null;
+            const voteInfo = item.type === "RESOURCE" ? item.resource : item.researchNeed;
+            const votePath = item.type === "RESOURCE" ? `/resources/${itemId}/votes` : `/research-needs/${itemId}/votes`;
+            const savePath = item.type === "RESOURCE" ? `/resources/${itemId}/saves` : `/research-needs/${itemId}/saves`;
+
+            return (
+              <Card key={`${item.type}-${itemId}`} className="uikit-stack" style={{ gap: "var(--space-3)" }}>
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+                  <FeedByline attribution={item.attribution} />
+                  <span style={{ fontSize: 12, color: "var(--uikit-slate-500)", whiteSpace: "nowrap" }}>
+                    {new Date(item.occurredAt).toLocaleString("vi-VN")}
+                  </span>
+                </div>
+
+                <div>
+                  <Link href={href} style={{ fontSize: 16, fontWeight: 600, color: "var(--uikit-slate-900)", textDecoration: "none" }}>
+                    {title}
+                  </Link>
+                  {(kindLabel || item.type === "RESEARCH_NEED") && (
+                    <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", marginTop: 2 }}>
+                      {kindLabel && <span style={{ fontSize: 12, color: "var(--uikit-slate-500)" }}>{kindLabel}</span>}
+                      {item.type === "RESEARCH_NEED" && (
+                        <StatusDot
+                          tone={toneOf(NEED_STATUS_TONE, item.researchNeed.status)}
+                          label={NEED_STATUS_LABELS[item.researchNeed.status] ?? item.researchNeed.status}
+                        />
                       )}
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </Card>
+                  )}
+                  {item.summary && (
+                    <p
+                      style={{
+                        marginTop: "var(--space-2)",
+                        fontSize: 14,
+                        color: "var(--uikit-slate-700)",
+                        display: "-webkit-box",
+                        WebkitLineClamp: 3,
+                        WebkitBoxOrient: "vertical",
+                        overflow: "hidden",
+                      }}
+                    >
+                      {item.summary}
+                    </p>
+                  )}
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", borderTop: "1px solid var(--uikit-slate-200)", paddingTop: "var(--space-3)" }}>
+                  <VoteButton
+                    path={votePath}
+                    votedByMe={voteInfo.votedByMe}
+                    voteCount={voteInfo.voteCount}
+                    onChange={(next) => onVoteChange(itemId, next)}
+                    onSessionExpired={() => router.push("/login")}
+                  />
+                  <SaveButton
+                    path={savePath}
+                    savedByMe={voteInfo.savedByMe}
+                    onChange={(next) => onSaveChange(itemId, next)}
+                    onSessionExpired={() => router.push("/login")}
+                  />
+                </div>
+              </Card>
+            );
+          })
+        )}
       </div>
     </Shell>
   );

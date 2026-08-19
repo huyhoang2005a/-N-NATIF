@@ -88,7 +88,9 @@ export class ResearchNeedsRepository {
   }
 
   /** Đợt 4 (activity feed) — needs from followed organizations only (no individual
-   * "author" concept for a research need). */
+   * "author" concept for a research need). `statementVersions` (latest only) embedded so
+   * the feed card can show a content preview (`problemStatement`) without a second query
+   * per need — same no-N+1 pattern as `listPublicOpen` above. */
   async listRecentPublicOpenForOrganizations(organizationIds: string[], limit: number) {
     if (organizationIds.length === 0) return [];
     return this.db.query.researchNeed.findMany({
@@ -99,6 +101,12 @@ export class ResearchNeedsRepository {
       ),
       orderBy: [desc(schema.researchNeed.publishedAt)],
       limit,
+      with: {
+        statementVersions: {
+          orderBy: [desc(schema.needStatementVersion.versionNo)],
+          limit: 1,
+        },
+      },
     });
   }
 
