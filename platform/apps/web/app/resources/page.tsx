@@ -98,9 +98,18 @@ function ResourcesPageInner() {
       <div className="uikit-stack">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "var(--space-3)" }}>
           <h1 style={{ fontSize: 22 }}>{q ? `Kết quả tìm kiếm: "${q}"` : "Tài nguyên của tôi"}</h1>
-          <PrimaryButtonLink href="/resources/new" icon={Plus}>
-            Đăng tài nguyên mới
-          </PrimaryButtonLink>
+          {me.authorVerificationStatus === "VERIFIED" ? (
+            <PrimaryButtonLink href="/resources/new" icon={Plus}>
+              Đăng tài nguyên mới
+            </PrimaryButtonLink>
+          ) : (
+            <p style={{ fontSize: 13, color: "var(--uikit-slate-500)" }}>
+              Bạn cần được xác minh là tác giả trước khi đăng tài nguyên.{" "}
+              <Link href="/profile" style={{ color: "var(--uikit-indigo-700)" }}>
+                Xác minh ngay
+              </Link>
+            </p>
+          )}
         </div>
 
         {q && <Tabs tabs={[...SORT_TABS]} active={sortTab} onChange={(t) => setSortTab(t as (typeof SORT_TABS)[number])} />}

@@ -14,7 +14,7 @@ import { describeErrorCode } from "../../../lib/error-messages";
 import { PLATFORM_ROLE_LABELS, RESOURCE_ACCESS_LEVEL_LABELS, RESOURCE_TYPE_LABELS } from "../../../lib/labels";
 import { navForPersona, personaOf } from "../../../lib/nav";
 import { getAccessToken } from "../../../lib/session";
-import { BackLink, PageLoader, PrimaryButton, SelectField, Shell, TextField } from "../../../components/ui";
+import { AuthorVerificationGate, BackLink, PageLoader, PrimaryButton, SelectField, Shell, TextField } from "../../../components/ui";
 
 export default function ResourceNewPage() {
   const router = useRouter();
@@ -117,7 +117,9 @@ export default function ResourceNewPage() {
       <BackLink href="/resources">Quay lại danh sách tài nguyên</BackLink>
       <h1 style={{ fontSize: 22, marginBottom: "var(--space-5)" }}>Đăng tài nguyên mới</h1>
 
-      {organizations.length === 0 ? (
+      {me.authorVerificationStatus !== "VERIFIED" ? (
+        <AuthorVerificationGate message="Bạn cần được xác minh là tác giả trước khi đăng tài nguyên. Gửi yêu cầu xác minh ở trang Hồ sơ." />
+      ) : organizations.length === 0 ? (
         <p className="uikit-empty">Bạn cần là thành viên của ít nhất 1 tổ chức trước khi đăng tài nguyên.</p>
       ) : (
         <form onSubmit={onSubmit} className="uikit-card uikit-stack">

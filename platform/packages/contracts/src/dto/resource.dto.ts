@@ -177,6 +177,24 @@ export interface AnnotationResponse {
   updatedAt: string;
 }
 
+/** `GET /resources/:id/versions/:versionId/content-url` — presigned S3 GET URL for the
+ * version's uploaded file, same shape as `ResourceUploadResponse`'s presign-on-write
+ * counterpart. Only issued for a PUBLISHED version (or any version if the actor is the
+ * resource's creator) with a real `storageObjectKey` — see resources.service.ts. */
+export interface ResourceVersionContentUrlResponse {
+  url: string;
+  expiresIn: number;
+}
+
+/** `POST /resources/:id/versions/:versionId/summarize` — Gemini-generated Vietnamese
+ * summary of the version's extracted text (`resource_chunk` rows). `summary` is null when
+ * the version has no extracted chunks yet (ingestion not done / nothing to summarize) —
+ * distinct from the `ASSISTANT_UNAVAILABLE` error thrown when Gemini itself isn't
+ * configured or fails. */
+export interface ResourceVersionSummaryResponse {
+  summary: string | null;
+}
+
 export interface ResourceAccessGrantResponse {
   id: string;
   resourceId: string;

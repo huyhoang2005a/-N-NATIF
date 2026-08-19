@@ -77,6 +77,10 @@ export const resourceVersion = pgTable(
       .notNull()
       .references(() => userAccount.id),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    /** Cache of the Gemini-generated Vietnamese summary of this version's extracted text
+     * (`resource_chunk` rows) — generated once on first `POST .../summarize` call, reused
+     * after. Null until generated (see manual migration 0013). */
+    aiSummary: text("ai_summary"),
   },
   (table) => [
     uniqueIndex("uq_resource_version_resource_version_no").on(table.resourceId, table.versionNo),

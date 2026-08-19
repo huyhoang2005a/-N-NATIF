@@ -65,9 +65,18 @@ export default function TechnologyCasesPage() {
   return (
     <Shell brandLabel="R2M" me={me} roleLabel={PLATFORM_ROLE_LABELS[me.platformRole] ?? me.platformRole} nav={nav}>
       <div className="uikit-stack">
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "var(--space-3)" }}>
           <h1 style={{ fontSize: 22 }}>Case của tôi</h1>
-          <PrimaryButtonLink href="/technology-cases/new">+ Tạo case mới</PrimaryButtonLink>
+          {me.authorVerificationStatus === "VERIFIED" ? (
+            <PrimaryButtonLink href="/technology-cases/new">+ Tạo case mới</PrimaryButtonLink>
+          ) : (
+            <p style={{ fontSize: 13, color: "var(--uikit-slate-500)" }}>
+              Bạn cần là tác giả đã xác minh mới tạo được case.{" "}
+              <Link href="/profile" style={{ color: "var(--uikit-indigo-700)" }}>
+                Xác minh ngay
+              </Link>
+            </p>
+          )}
         </div>
 
         {actionError && (

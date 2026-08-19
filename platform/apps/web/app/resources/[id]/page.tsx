@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Ban, Flag, Plus, Save, Trash2, UploadCloud } from "lucide-react";
+import { Ban, Download, Eye, FilePlus2, Flag, Plus, Save, Sparkles, Trash2, UploadCloud } from "lucide-react";
 import type {
   AnnotationResponse,
   ContentFlagResponse,
@@ -11,7 +11,9 @@ import type {
   ResourceAccessGrantResponse,
   ResourceResponse,
   ResourceUploadResponse,
+  ResourceVersionContentUrlResponse,
   ResourceVersionResponse,
+  ResourceVersionSummaryResponse,
 } from "@r2m/contracts";
 import { ApiError, authFetch, SessionExpiredError } from "../../../lib/api-client";
 import { describeErrorCode } from "../../../lib/error-messages";
@@ -20,6 +22,13 @@ import { navForPersona, personaOf } from "../../../lib/nav";
 import { getAccessToken } from "../../../lib/session";
 import { fetchUserNames } from "../../../lib/user-lookup";
 import { BackLink, Card, GhostButton, PageLoader, PrimaryButton, SaveButton, SectionHeader, SelectField, Shell, StatusPill, TextField, VoteButton } from "../../../components/ui";
+
+type SummaryState =
+  | { status: "loading" }
+  | { status: "loaded"; text: string }
+  | { status: "empty" }
+  | { status: "unavailable" }
+  | { status: "error" };
 
 const PERMISSION_OPTIONS = [
   { value: "VIEW", label: "Xem" },
@@ -144,6 +153,55 @@ export default function ResourceDetailPage() {
       await authFetch<ResourceVersionResponse>(`/resource-versions/${versionId}/publish`, { method: "POST" });
       await loadVersionsAndAnnotations();
     });
+  }
+
+  // ---------- view / download file content ----------
+  function onViewVersion(versionId: string) {
+    return runAction(`view-${versionId}`, async () => {
+      const res = await authFetch<ResourceVersionContentUrlResponse>(
+        `/resources/${resourceId}/versions/${versionId}/content-url`,
+      );
+      window.open(res.url, "_blank", "noopener,noreferrer");
+    });
+  }
+
+  function onDownloadVersion(versionId: string) {
+    return runAction(`download-${versionId}`, async () => {
+      const res = await authFetch<ResourceVersionContentUrlResponse>(
+        `/resources/${resourceId}/versions/${versionId}/content-url?download=true`,
+      );
+      const link = document.createElement("a");
+      link.href = res.url;
+      link.rel = "noopener";
+      link.click();
+    });
+  }
+
+  // ---------- AI summary ----------
+  const [summaries, setSummaries] = useState<Record<string, SummaryState>>({});
+
+  function onSummarizeVersion(versionId: string) {
+    setSummaries((prev) => ({ ...prev, [versionId]: { status: "loading" } }));
+    authFetch<ResourceVersionSummaryResponse>(`/resources/${resourceId}/versions/${versionId}/summarize`, {
+      method: "POST",
+    })
+      .then((res) => {
+        setSummaries((prev) => ({
+          ...prev,
+          [versionId]: res.summary ? { status: "loaded", text: res.summary } : { status: "empty" },
+        }));
+      })
+      .catch((err) => {
+        if (err instanceof SessionExpiredError) {
+          router.push("/login");
+          return;
+        }
+        if (err instanceof ApiError && err.code === "ASSISTANT_UNAVAILABLE") {
+          setSummaries((prev) => ({ ...prev, [versionId]: { status: "unavailable" } }));
+          return;
+        }
+        setSummaries((prev) => ({ ...prev, [versionId]: { status: "error" } }));
+      });
   }
 
   // ---------- annotations ----------
@@ -274,6 +332,11 @@ export default function ResourceDetailPage() {
               onSessionExpired={() => router.push("/login")}
             />
             <StatusPill tone={resource.status === "ACTIVE" ? "green" : "gray"}>{resource.status}</StatusPill>
+            {me.authorVerificationStatus === "VERIFIED" && (
+              <GhostButton icon={FilePlus2} onClick={() => router.push(`/technology-cases/new?fromResourceId=${resourceId}`)}>
+                Tạo case công nghệ từ tài liệu này
+              </GhostButton>
+            )}
             {flaggedIds.has(resourceId) ? (
               <span style={{ fontSize: 13, color: "var(--uikit-slate-400)" }}>Đã báo cáo</span>
             ) : (
@@ -333,19 +396,48 @@ export default function ResourceDetailPage() {
             <p className="uikit-empty">Chưa có phiên bản nào.</p>
           ) : (
             <div className="uikit-row-list" style={{ marginTop: "var(--space-3)" }}>
-              {versions.map((v) => (
-                <div key={v.id} className="uikit-row">
-                  <span style={{ fontSize: 14 }}>v{v.versionNo}{v.versionLabel ? ` · ${v.versionLabel}` : ""}</span>
-                  <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
-                    <StatusPill tone={v.status === "PUBLISHED" ? "green" : "gray"}>{v.status}</StatusPill>
-                    {v.status === "DRAFT" && (
-                      <GhostButton icon={UploadCloud} disabled={busyKey === `publish-${v.id}`} onClick={() => onPublishVersion(v.id)}>
-                        {busyKey === `publish-${v.id}` ? "Đang xuất bản…" : "Xuất bản"}
-                      </GhostButton>
+              {versions.map((v) => {
+                const summary = summaries[v.id];
+                return (
+                  <div key={v.id}>
+                    <div className="uikit-row">
+                      <span style={{ fontSize: 14 }}>v{v.versionNo}{v.versionLabel ? ` · ${v.versionLabel}` : ""}</span>
+                      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", flexWrap: "wrap" }}>
+                        <StatusPill tone={v.status === "PUBLISHED" ? "green" : "gray"}>{v.status}</StatusPill>
+                        {v.status === "DRAFT" && (
+                          <GhostButton icon={UploadCloud} disabled={busyKey === `publish-${v.id}`} onClick={() => onPublishVersion(v.id)}>
+                            {busyKey === `publish-${v.id}` ? "Đang xuất bản…" : "Xuất bản"}
+                          </GhostButton>
+                        )}
+                        {v.storageObjectKey && (
+                          <>
+                            <GhostButton icon={Eye} disabled={busyKey === `view-${v.id}`} onClick={() => onViewVersion(v.id)}>
+                              {busyKey === `view-${v.id}` ? "Đang mở…" : "Xem file"}
+                            </GhostButton>
+                            <GhostButton icon={Download} disabled={busyKey === `download-${v.id}`} onClick={() => onDownloadVersion(v.id)}>
+                              {busyKey === `download-${v.id}` ? "Đang tải…" : "Tải xuống"}
+                            </GhostButton>
+                          </>
+                        )}
+                        {(!summary || summary.status === "error") && (
+                          <GhostButton icon={Sparkles} onClick={() => onSummarizeVersion(v.id)}>
+                            {summary?.status === "error" ? "Thử lại tóm tắt AI" : "Tóm tắt AI"}
+                          </GhostButton>
+                        )}
+                      </div>
+                    </div>
+                    {summary && (
+                      <div style={{ marginTop: "var(--space-2)", padding: "var(--space-3)", background: "var(--uikit-slate-50)", borderRadius: "var(--radius-sm)" }}>
+                        {summary.status === "loading" && <p className="uikit-empty">Đang tóm tắt bằng AI…</p>}
+                        {summary.status === "loaded" && <p style={{ fontSize: 13, color: "var(--uikit-slate-700)" }}>{summary.text}</p>}
+                        {summary.status === "empty" && <p className="uikit-empty">Chưa có nội dung để tóm tắt.</p>}
+                        {summary.status === "unavailable" && <p className="uikit-empty">Trợ lý AI chưa sẵn sàng.</p>}
+                        {summary.status === "error" && <p className="uikit-empty">Tóm tắt thất bại, vui lòng thử lại.</p>}
+                      </div>
                     )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
           <div className="uikit-stack" style={{ marginTop: "var(--space-4)" }}>

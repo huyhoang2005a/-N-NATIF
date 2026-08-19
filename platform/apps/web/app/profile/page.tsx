@@ -21,6 +21,7 @@ import { ALLOWED_AVATAR_MIME_TYPES, ALLOWED_DOCUMENT_MIME_TYPES, MAX_AVATAR_SIZE
 import { ApiError, authFetch, SessionExpiredError } from "../../lib/api-client";
 import { describeErrorCode } from "../../lib/error-messages";
 import {
+  AUTHOR_VERIFICATION_STATUS_LABELS,
   ORG_STATUS_LABELS,
   ORG_TYPE_LABELS,
   ORG_VERIFICATION_DOCUMENT_TYPE_LABELS,
@@ -29,7 +30,7 @@ import {
 } from "../../lib/labels";
 import { navForPersona, personaOf } from "../../lib/nav";
 import { getAccessToken } from "../../lib/session";
-import { toneOf, ORGANIZATION_STATUS_TONE, VERIFICATION_REQUEST_STATUS_TONE } from "../../lib/tone";
+import { toneOf, AUTHOR_VERIFICATION_STATUS_TONE, ORGANIZATION_STATUS_TONE, VERIFICATION_REQUEST_STATUS_TONE } from "../../lib/tone";
 import { Card, FileField, GhostButton, PageLoader, PrimaryButton, SectionHeader, SelectField, Shell, StatusPill, TextField } from "../../components/ui";
 
 const DOCUMENT_TYPE_OPTIONS = [
@@ -893,6 +894,8 @@ export default function ProfilePage() {
         <Card>
           <SectionHeader title="Xác minh tác giả" />
           {verifyResult ? (
+            // Vừa nộp yêu cầu trong phiên này — có state request-level chi tiết hơn
+            // (PENDING/IN_REVIEW/...) so với authorVerificationStatus ở mức hồ sơ.
             <div>
               <StatusPill tone={toneOf(VERIFICATION_REQUEST_STATUS_TONE, verifyResult.status)}>
                 {VERIFICATION_REQUEST_STATUS_LABELS[verifyResult.status] ?? verifyResult.status}
@@ -901,8 +904,43 @@ export default function ProfilePage() {
                 Trạng thái xác minh sẽ được cập nhật qua thông báo khi kiểm định viên xử lý xong.
               </p>
             </div>
+          ) : me.authorVerificationStatus === "VERIFIED" ? (
+            <div>
+              <StatusPill tone={toneOf(AUTHOR_VERIFICATION_STATUS_TONE, me.authorVerificationStatus)}>
+                {AUTHOR_VERIFICATION_STATUS_LABELS[me.authorVerificationStatus]}
+              </StatusPill>
+              <p style={{ marginTop: "var(--space-3)", fontSize: 13, color: "var(--uikit-slate-500)" }}>
+                Bạn đã được xác minh là tác giả — có thể đăng tài nguyên, tạo technology case và
+                gửi đề xuất nghiên cứu.
+              </p>
+            </div>
+          ) : me.authorVerificationStatus === "PENDING" ? (
+            <div>
+              <StatusPill tone={toneOf(AUTHOR_VERIFICATION_STATUS_TONE, me.authorVerificationStatus)}>
+                {AUTHOR_VERIFICATION_STATUS_LABELS[me.authorVerificationStatus]}
+              </StatusPill>
+              <p style={{ marginTop: "var(--space-3)", fontSize: 13, color: "var(--uikit-slate-500)" }}>
+                Yêu cầu xác minh của bạn đang chờ kiểm định viên xử lý. Bạn sẽ nhận được thông
+                báo khi có kết quả.
+              </p>
+            </div>
+          ) : me.authorVerificationStatus === "SUSPENDED" ? (
+            <div>
+              <StatusPill tone={toneOf(AUTHOR_VERIFICATION_STATUS_TONE, me.authorVerificationStatus)}>
+                {AUTHOR_VERIFICATION_STATUS_LABELS[me.authorVerificationStatus]}
+              </StatusPill>
+              <p style={{ marginTop: "var(--space-3)", fontSize: 13, color: "var(--uikit-slate-500)" }}>
+                Quyền tác giả của bạn đang bị tạm khoá. Liên hệ quản trị nền tảng nếu bạn cho
+                rằng đây là nhầm lẫn.
+              </p>
+            </div>
           ) : (
             <>
+              {me.authorVerificationStatus === "DECLINED" && (
+                <p style={{ fontSize: 13, color: "var(--uikit-rose-700)", marginBottom: "var(--space-3)" }}>
+                  Yêu cầu xác minh trước đó đã bị từ chối. Bạn có thể nộp lại với tài liệu khác.
+                </p>
+              )}
               <p style={{ fontSize: 13, color: "var(--uikit-slate-500)", marginBottom: "var(--space-3)" }}>
                 Xác minh danh tính tác giả để có thể đăng tài nguyên và tạo technology case.
               </p>

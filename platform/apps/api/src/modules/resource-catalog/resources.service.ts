@@ -5,7 +5,9 @@ import type {
   RequestResourceUploadRequest,
   ResourceResponse,
   ResourceUploadResponse,
+  ResourceVersionContentUrlResponse,
   ResourceVersionResponse,
+  ResourceVersionSummaryResponse,
 } from "@r2m/contracts";
 import type { ActorContext } from "@r2m/authz";
 import { assertActiveMember, assertCanManageResource, assertCanRegisterResource } from "@r2m/authz";
@@ -15,6 +17,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import { DATABASE } from "../../database/database.module";
 import { S3Service } from "../../common/storage/s3.service";
 import { getCurrentTraceparent } from "../../common/tracing/get-traceparent.util";
+import { GeminiClient } from "../assistant/gemini.client";
 import { SavesService } from "../community/saves/saves.service";
 import type { VoteInfo } from "../community/votes/votes.service";
 import { VotesService } from "../community/votes/votes.service";
@@ -23,6 +26,25 @@ import { OutboxService } from "../platform-operations/jobs/outbox.service";
 import { assertResourceTransition } from "./domain/resource.state-machine";
 import { assertResourceVersionTransition } from "./domain/resource-version.state-machine";
 import { ResourcesRepository } from "./resources.repository";
+
+/** Same system instruction shape as `assistant/assistant.service.ts` — kept local rather
+ * than shared since this one has a very different job (summarize a specific document's
+ * extracted text, not general platform Q&A) and a much narrower output contract. */
+const SUMMARY_SYSTEM_INSTRUCTION = `Bạn tóm tắt tài liệu khoa học/kỹ thuật cho nền tảng R2M
+(Research-to-Market). Người đọc là người đang lướt bảng tin tài liệu, muốn biết nhanh tài
+liệu này nói về gì trước khi quyết định xem/tải file đầy đủ.
+
+Yêu cầu:
+1. Viết bằng tiếng Việt, 3-6 câu, súc tích, đúng trọng tâm.
+2. Chỉ dựa trên nội dung được cung cấp — không suy diễn, không bịa thêm thông tin.
+3. Nêu: chủ đề chính, phương pháp/kết quả nổi bật (nếu có), và giá trị ứng dụng thực tế
+   (nếu nội dung có đề cập).
+4. Không thêm tiêu đề, không định dạng markdown, chỉ trả về đoạn văn tóm tắt thuần tuý.`;
+
+// Gemini's context window comfortably fits far more, but the summary only needs the gist —
+// capping keeps latency/cost bounded for very large documents (a full textbook's worth of
+// chunks would otherwise be sent in full on every uncached first request).
+const SUMMARY_INPUT_CHAR_LIMIT = 40_000;
 
 export type ResourceListSort = "new" | "top" | "hot";
 
@@ -103,6 +125,7 @@ export class ResourcesService {
     private readonly s3Service: S3Service,
     private readonly votesService: VotesService,
     private readonly savesService: SavesService,
+    private readonly geminiClient: GeminiClient,
     @Inject(DATABASE) private readonly db: Database,
   ) {}
 
@@ -511,6 +534,98 @@ export class ResourcesService {
     await this.assertVisible(actor, resource);
     const versions = await this.resourcesRepository.listVersionsByResource(resourceId);
     return versions.map(toVersionResponse);
+  }
+
+  /** Shared by `getVersionContentUrl`/`summarizeVersion`: resolves the version + its parent
+   * resource, applies the SAME 3-way visibility rule as `getById`/`assertVisible` (public /
+   * owning-org member / granted) — deliberately NOT the stricter `assertCanManageResource`
+   * check that gates `/access-grants`, since that was the exact class of bug fixed earlier
+   * this session (a non-member of the owning org must still be able to read a PUBLIC
+   * resource's content). Content itself is further restricted to a PUBLISHED version unless
+   * the actor is the resource's own creator — a DRAFT version's file shouldn't be servable
+   * to arbitrary org members/grantees just because the resource entity is visible. */
+  private async loadVisibleVersion(actor: ActorContext, resourceId: string, versionId: string) {
+    const version = await this.resourcesRepository.findVersionById(versionId);
+    if (!version || version.resourceId !== resourceId) {
+      throw new NotFoundError(ErrorCode.RESOURCE_VERSION_NOT_FOUND, "Resource version not found.");
+    }
+    const resource = await this.resourcesRepository.findById(resourceId);
+    if (!resource) {
+      throw new NotFoundError(ErrorCode.RESOURCE_NOT_FOUND, "Resource not found.");
+    }
+    await this.assertVisible(actor, resource);
+    if (version.status !== ResourceVersionStatus.PUBLISHED && resource.createdByUserId !== actor.userId) {
+      throw new ForbiddenError(
+        ErrorCode.RESOURCE_ACCESS_DENIED,
+        "Only a published version's content is available, unless you are the resource's creator.",
+      );
+    }
+    return { resource, version };
+  }
+
+  /** Not spec-mandated — explicit user-approved addition (2026-08-19): `resource_version.
+   * storageObjectKey` was written at upload time but never once read back into an actual
+   * downloadable URL anywhere in the app — this is the fix. `download` (optional) sets
+   * `ResponseContentDisposition: attachment` so the browser saves the file instead of
+   * rendering it inline, letting the frontend offer distinct "Xem file"/"Tải xuống"
+   * actions against the exact same object. */
+  async getVersionContentUrl(
+    actor: ActorContext,
+    resourceId: string,
+    versionId: string,
+    download: boolean,
+  ): Promise<ResourceVersionContentUrlResponse> {
+    const { version } = await this.loadVisibleVersion(actor, resourceId, versionId);
+    if (!version.storageObjectKey) {
+      throw new NotFoundError(
+        ErrorCode.RESOURCE_CONTENT_NOT_FOUND,
+        "This version has no uploaded file (source-URL-only version).",
+      );
+    }
+    const disposition = download ? `attachment; filename="${version.id}"` : undefined;
+    return this.s3Service.createResourceDownloadUrl(version.storageObjectKey, disposition);
+  }
+
+  /** Not spec-mandated — explicit user-approved addition (2026-08-19). Reuses text already
+   * extracted by the ingestion pipeline (`resource_chunk`, see [[r2m_p0_embedding_pipeline]])
+   * — never re-parses the source file. Same `ASSISTANT_UNAVAILABLE` degraded-state pattern
+   * as `assistant/assistant.service.ts` when `GEMINI_API_KEY` isn't configured or the call
+   * fails; a version with zero chunks returns `{ summary: null }` instead (not an error —
+   * "nothing to summarize yet" is a normal, expected state, e.g. ingestion still running). */
+  async summarizeVersion(
+    actor: ActorContext,
+    resourceId: string,
+    versionId: string,
+  ): Promise<ResourceVersionSummaryResponse> {
+    const { version } = await this.loadVisibleVersion(actor, resourceId, versionId);
+
+    if (version.aiSummary) {
+      return { summary: version.aiSummary };
+    }
+
+    const chunks = await this.resourcesRepository.listChunksByVersion(versionId);
+    if (chunks.length === 0) {
+      return { summary: null };
+    }
+
+    if (!this.geminiClient.isConfigured()) {
+      throw new ConflictError(ErrorCode.ASSISTANT_UNAVAILABLE, "Trợ lý AI chưa được cấu hình (thiếu GEMINI_API_KEY).");
+    }
+
+    const text = chunks
+      .map((chunk) => chunk.content)
+      .join("\n\n")
+      .slice(0, SUMMARY_INPUT_CHAR_LIMIT);
+
+    let summary: string;
+    try {
+      summary = await this.geminiClient.generate(SUMMARY_SYSTEM_INSTRUCTION, [{ role: "user", text }]);
+    } catch {
+      throw new ConflictError(ErrorCode.ASSISTANT_UNAVAILABLE, "Trợ lý AI đang gặp sự cố, thử lại sau.");
+    }
+
+    await this.resourcesRepository.updateVersionAiSummary(versionId, summary);
+    return { summary };
   }
 
   /** Public so other bounded contexts (e.g. `technology-case/evidence.service.ts`, which

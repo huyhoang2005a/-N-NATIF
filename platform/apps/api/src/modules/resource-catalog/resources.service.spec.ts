@@ -5,6 +5,7 @@ import type { ResourcesRepository } from "./resources.repository";
 import type { AuditService } from "../platform-operations/audit/audit.service";
 import type { OutboxService } from "../platform-operations/jobs/outbox.service";
 import type { S3Service } from "../../common/storage/s3.service";
+import type { GeminiClient } from "../assistant/gemini.client";
 import type { SavesService } from "../community/saves/saves.service";
 import type { VotesService } from "../community/votes/votes.service";
 
@@ -66,6 +67,10 @@ function buildService() {
     saveResource: vi.fn().mockResolvedValue(undefined),
     unsaveResource: vi.fn().mockResolvedValue(undefined),
   } as unknown as SavesService;
+  const geminiClient = {
+    isConfigured: vi.fn().mockReturnValue(false),
+    generate: vi.fn(),
+  } as unknown as GeminiClient;
 
   const service = new ResourcesService(
     resourcesRepository,
@@ -74,10 +79,11 @@ function buildService() {
     s3Service,
     votesService,
     savesService,
+    geminiClient,
     db as never,
   );
 
-  return { service, resourcesRepository, auditService, outboxService, s3Service, votesService, savesService };
+  return { service, resourcesRepository, auditService, outboxService, s3Service, votesService, savesService, geminiClient };
 }
 
 const registerInput = {

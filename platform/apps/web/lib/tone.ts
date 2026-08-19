@@ -68,6 +68,15 @@ export const VERIFICATION_REQUEST_STATUS_TONE: Record<string, Tone> = {
   CANCELLED: "gray",
 };
 
+/** `author_profile.verification_status` enum — `MeResponse.authorVerificationStatus`. */
+export const AUTHOR_VERIFICATION_STATUS_TONE: Record<string, Tone> = {
+  UNVERIFIED: "gray",
+  PENDING: "amber",
+  VERIFIED: "green",
+  DECLINED: "red",
+  SUSPENDED: "red",
+};
+
 /** GapStatus — độc lập với GapSeverity (severity = mức độ nghiêm trọng, status =
  * đang ở đâu trong vòng đời xử lý). OPEN=amber vì mới phát sinh, cần triage —
  * tín hiệu "chặn cứng" đã do GapSeverity=CRITICAL đảm nhiệm riêng. */

@@ -77,6 +77,7 @@ export class AuthController {
       displayName: profile?.displayName ?? "",
       emailVerified: user?.emailVerifiedAt !== null && user?.emailVerifiedAt !== undefined,
       avatarUrl,
+      authorVerificationStatus: actor.authorVerificationStatus,
     };
   }
 

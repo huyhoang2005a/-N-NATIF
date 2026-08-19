@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { StorageModule } from "../../common/storage/storage.module";
+import { AssistantModule } from "../assistant/assistant.module";
 import { CommunityModule } from "../community/community.module";
 import { AuditModule } from "../platform-operations/audit/audit.module";
 import { JobsModule } from "../platform-operations/jobs/jobs.module";
@@ -20,7 +21,7 @@ import { ResourceAccessGrantsService } from "./resource-access-grants.service";
  * (mirrors the `verification/` pattern: several controllers, one module, no aggregator
  * needed since there is only one real module here — see CLAUDE.md "Nguyên tắc bắt buộc"). */
 @Module({
-  imports: [AuditModule, JobsModule, StorageModule, CommunityModule],
+  imports: [AuditModule, JobsModule, StorageModule, CommunityModule, AssistantModule],
   controllers: [
     ResourcesController,
     ResourceVersionsController,

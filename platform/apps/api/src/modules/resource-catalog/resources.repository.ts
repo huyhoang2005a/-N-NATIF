@@ -147,6 +147,26 @@ export class ResourcesRepository {
     await tx.insert(schema.paperMetadata).values(values);
   }
 
+  /** Reuses text already extracted by the ingestion pipeline (`apps/worker/src/ingestion/`)
+   * — feeds the AI-summary endpoint, never re-parses the source file. Ordered by
+   * `chunkIndex` so concatenation reproduces document order. */
+  async listChunksByVersion(resourceVersionId: string) {
+    return this.db.query.resourceChunk.findMany({
+      where: eq(schema.resourceChunk.resourceVersionId, resourceVersionId),
+      orderBy: [schema.resourceChunk.chunkIndex],
+      columns: { content: true, chunkIndex: true },
+    });
+  }
+
+  /** Caches the Gemini-generated summary on the version row so repeat views don't re-call
+   * the API — see manual migration 0013. */
+  async updateVersionAiSummary(resourceVersionId: string, aiSummary: string) {
+    await this.db
+      .update(schema.resourceVersion)
+      .set({ aiSummary })
+      .where(eq(schema.resourceVersion.id, resourceVersionId));
+  }
+
   async createIngestionJob(resourceVersionId: string, tx: Database) {
     const rows = await tx
       .insert(schema.resourceIngestionJob)

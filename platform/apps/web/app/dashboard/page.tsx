@@ -126,6 +126,7 @@ function AuthorDashboardBody({ me, organizations }: { me: MeResponse; organizati
   const recentCases = cases.slice(0, 5);
   const recentResources = resources.slice(0, 3);
   const pendingProposalsCount = proposals.filter((p) => p.status === "SUBMITTED" || p.status === "UNDER_REVIEW").length;
+  const isVerifiedAuthor = me.authorVerificationStatus === "VERIFIED";
 
   return (
     <div className="uikit-stack">
@@ -170,7 +171,19 @@ function AuthorDashboardBody({ me, organizations }: { me: MeResponse; organizati
       </Card>
 
       <Card>
-        <SectionHeader title="Tài nguyên gần đây" action="Đăng tài nguyên mới" href="/resources/new" />
+        <SectionHeader
+          title="Tài nguyên gần đây"
+          action={isVerifiedAuthor ? "Đăng tài nguyên mới" : "Xác minh để đăng tài nguyên"}
+          href={isVerifiedAuthor ? "/resources/new" : "/profile"}
+        />
+        {!isVerifiedAuthor && (
+          <p style={{ fontSize: 13, color: "var(--uikit-slate-500)", marginBottom: "var(--space-3)" }}>
+            Bạn cần được xác minh là tác giả trước khi đăng tài nguyên.{" "}
+            <Link href="/profile" style={{ color: "var(--uikit-indigo-700)" }}>
+              Xác minh ngay
+            </Link>
+          </p>
+        )}
         {recentResources.length === 0 ? (
           <p className="uikit-empty">
             Chưa có tài nguyên nào. Đăng bài báo, bộ dữ liệu hoặc kết quả thực nghiệm đầu tiên

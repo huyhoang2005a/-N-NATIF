@@ -54,6 +54,15 @@ export const ORG_VERIFICATION_DOCUMENT_TYPE_LABELS: Record<string, string> = {
   ORGANIZATION_LETTER: "Thư xác nhận của tổ chức",
 };
 
+/** `author_profile.verification_status` enum — `MeResponse.authorVerificationStatus`. */
+export const AUTHOR_VERIFICATION_STATUS_LABELS: Record<string, string> = {
+  UNVERIFIED: "Chưa xác minh",
+  PENDING: "Đang chờ duyệt",
+  VERIFIED: "Đã xác minh",
+  DECLINED: "Đã bị từ chối",
+  SUSPENDED: "Tạm khoá",
+};
+
 // ---------- Phase 2: Resource ----------
 
 export const RESOURCE_TYPE_LABELS: Record<string, string> = {

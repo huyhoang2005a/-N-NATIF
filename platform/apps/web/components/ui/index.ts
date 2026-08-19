@@ -18,6 +18,7 @@ export { AssistantWidget } from "./AssistantWidget";
 export { Shell } from "./Shell";
 export type { ShellNavItem } from "./Shell";
 export { SoonPage } from "./SoonPage";
+export { AuthorVerificationGate } from "./AuthorVerificationGate";
 export { MatchScoreBadge } from "./MatchScoreBadge";
 export { WeeklyGrowthChart } from "./WeeklyGrowthChart";
 export { MonthlyTrendChart } from "./MonthlyTrendChart";

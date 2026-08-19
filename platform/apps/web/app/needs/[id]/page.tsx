@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import type {
   CaseInitiationRequestResponse,
@@ -598,7 +599,14 @@ export default function ResearchNeedDetailPage() {
         {!isMember && need.status === "OPEN" && need.visibility === "PUBLIC" && (
           <Card>
             <SectionHeader title="Gửi đề xuất" />
-            {proposalResult ? (
+            {me.authorVerificationStatus !== "VERIFIED" ? (
+              <p style={{ fontSize: 13, color: "var(--uikit-slate-500)" }}>
+                Bạn cần được xác minh là tác giả trước khi gửi đề xuất.{" "}
+                <Link href="/profile" style={{ color: "var(--uikit-indigo-700)" }}>
+                  Xác minh ngay
+                </Link>
+              </p>
+            ) : proposalResult ? (
               <StatusPill tone={toneOf(PROPOSAL_STATUS_TONE, proposalResult.status)}>
                 Đã gửi đề xuất — {PROPOSAL_STATUS_LABELS[proposalResult.status] ?? proposalResult.status}
               </StatusPill>

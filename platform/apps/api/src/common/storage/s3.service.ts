@@ -79,9 +79,16 @@ export class S3Service {
     return { url, expiresIn: this.signedUrlTtlSeconds };
   }
 
-  /** Reviewer-facing document access (UC-VER-02: "signed URL có TTL"). */
-  async createPresignedDownloadUrl(bucket: string, key: string): Promise<PresignedUrlResult> {
-    const command = new GetObjectCommand({ Bucket: bucket, Key: key });
+  /** Reviewer-facing document access (UC-VER-02: "signed URL có TTL"). `disposition`
+   * (optional) sets `ResponseContentDisposition` on the presigned GET so the browser
+   * downloads the file instead of rendering it inline — used by the resource
+   * view-vs-download actions, which otherwise hit the exact same object/key. */
+  async createPresignedDownloadUrl(bucket: string, key: string, disposition?: string): Promise<PresignedUrlResult> {
+    const command = new GetObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      ResponseContentDisposition: disposition,
+    });
     const url = await getSignedUrl(this.client, command, { expiresIn: this.signedUrlTtlSeconds });
     return { url, expiresIn: this.signedUrlTtlSeconds };
   }
@@ -152,8 +159,8 @@ export class S3Service {
 
   /** Avatars reuse the resource bucket under an `avatars/` key prefix — not worth a
    * dedicated bucket/env var for one small image per user. */
-  createResourceDownloadUrl(key: string): Promise<PresignedUrlResult> {
-    return this.createPresignedDownloadUrl(this.resourceBucket, key);
+  createResourceDownloadUrl(key: string, disposition?: string): Promise<PresignedUrlResult> {
+    return this.createPresignedDownloadUrl(this.resourceBucket, key, disposition);
   }
 
   getResourceObjectBuffer(key: string): Promise<Buffer> {

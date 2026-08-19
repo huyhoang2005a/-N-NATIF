@@ -8,7 +8,9 @@ import type {
   ResourceAccessGrantResponse,
   ResourceResponse,
   ResourceUploadResponse,
+  ResourceVersionContentUrlResponse,
   ResourceVersionResponse,
+  ResourceVersionSummaryResponse,
 } from "@r2m/contracts";
 import {
   CreateAnnotationRequestSchema,
@@ -152,6 +154,32 @@ export class ResourcesController {
     @Param("id") id: string,
   ): Promise<ResourceVersionResponse[]> {
     return this.resourcesService.listVersions(actor, id);
+  }
+
+  /** Not spec-mandated — explicit user-approved addition (2026-08-19), see
+   * resources.service.ts#getVersionContentUrl. `storageObjectKey` was write-only until now
+   * — this is the first place it's ever read back into a usable URL. */
+  @Get(":id/versions/:versionId/content-url")
+  getVersionContentUrl(
+    @CurrentActor() actor: ActorContext,
+    @Param("id") id: string,
+    @Param("versionId") versionId: string,
+    @Query("download") download?: string,
+  ): Promise<ResourceVersionContentUrlResponse> {
+    return this.resourcesService.getVersionContentUrl(actor, id, versionId, download === "true");
+  }
+
+  /** Not spec-mandated — explicit user-approved addition (2026-08-19), see
+   * resources.service.ts#summarizeVersion. `POST` (not cacheable-by-verb `GET`) because it
+   * may trigger a real Gemini call on first request — result is cached server-side on
+   * `resource_version.ai_summary` afterward, so repeat calls are cheap reads. */
+  @Post(":id/versions/:versionId/summarize")
+  summarizeVersion(
+    @CurrentActor() actor: ActorContext,
+    @Param("id") id: string,
+    @Param("versionId") versionId: string,
+  ): Promise<ResourceVersionSummaryResponse> {
+    return this.resourcesService.summarizeVersion(actor, id, versionId);
   }
 }
 
