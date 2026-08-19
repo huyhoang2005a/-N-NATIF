@@ -343,14 +343,14 @@ export default function ResourceDetailPage() {
       <div className="uikit-stack" style={{ maxWidth: 720 }}>
         <BackLink href="/resources">Quay lại danh sách tài nguyên</BackLink>
 
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-4)" }}>
+        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-4)" }}>
           <div>
             <h1 style={{ fontSize: 22 }}>{resource.title}</h1>
             <p style={{ marginTop: 4, fontSize: 13, color: "var(--uikit-slate-500)" }}>
               {RESOURCE_TYPE_LABELS[resource.type] ?? resource.type} · {RESOURCE_ACCESS_LEVEL_LABELS[resource.accessLevel] ?? resource.accessLevel}
             </p>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "flex-end", gap: "var(--space-3)" }}>
             <VoteButton
               path={`/resources/${resourceId}/votes`}
               votedByMe={resource.votedByMe}
