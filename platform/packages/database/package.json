@@ -10,7 +10,8 @@
     "migrate": "tsx src/migrate.ts",
     "seed": "tsx src/seeds/run.ts",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:integration": "vitest run -c vitest.integration.config.ts"
   },
   "dependencies": {
     "@opentelemetry/api": "1.9.1",
