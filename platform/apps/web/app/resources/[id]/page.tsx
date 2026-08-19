@@ -35,7 +35,14 @@ export default function ResourceDetailPage() {
   const [me, setMe] = useState<MeResponse | null>(null);
   const [organizations, setOrganizations] = useState<OrganizationResponse[] | null>(null);
   const [resource, setResource] = useState<ResourceResponse | null>(null);
-  const [grants, setGrants] = useState<ResourceAccessGrantResponse[] | null>(null);
+  const [grants, setGrants] = useState<ResourceAccessGrantResponse[]>([]);
+  // `GET /resources/:id/access-grants` is manager-only (ORG_OWNER/ORG_ADMIN of the
+  // resource's owning org) — most viewers 403 on it (correctly: who's been granted access
+  // is administrative info, not something every viewer should see). It used to sit in the
+  // same `Promise.all` as the resource itself, so that 403 broke the ENTIRE page for any
+  // non-manager viewer, not just the grants section. Fetched separately below instead, and
+  // this flag gates whether the "Quyền truy cập" card renders at all.
+  const [canManageGrants, setCanManageGrants] = useState(false);
   const [grantUserNames, setGrantUserNames] = useState<Record<string, string>>({});
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
@@ -54,18 +61,27 @@ export default function ResourceDetailPage() {
   }
 
   async function load() {
-    const [meResponse, myOrgs, r, grantRows] = await Promise.all([
+    const [meResponse, myOrgs, r] = await Promise.all([
       authFetch<MeResponse>("/me"),
       authFetch<OrganizationResponse[]>("/organizations"),
       authFetch<ResourceResponse>(`/resources/${resourceId}`),
-      authFetch<ResourceAccessGrantResponse[]>(`/resources/${resourceId}/access-grants`),
     ]);
     setMe(meResponse);
     setOrganizations(myOrgs);
     setResource(r);
-    setGrants(grantRows);
-    fetchUserNames(grantRows.filter((g) => g.recipientUserId).map((g) => g.recipientUserId!)).then(setGrantUserNames);
     await loadVersionsAndAnnotations();
+
+    try {
+      const grantRows = await authFetch<ResourceAccessGrantResponse[]>(`/resources/${resourceId}/access-grants`);
+      setGrants(grantRows);
+      setCanManageGrants(true);
+      fetchUserNames(grantRows.filter((g) => g.recipientUserId).map((g) => g.recipientUserId!)).then(setGrantUserNames);
+    } catch (err) {
+      if (err instanceof SessionExpiredError) throw err;
+      // Not a manager of the owning org — expected for most viewers, not a real error.
+      setGrants([]);
+      setCanManageGrants(false);
+    }
   }
 
   useEffect(() => {
@@ -223,7 +239,7 @@ export default function ResourceDetailPage() {
     );
   }
 
-  if (!resource || !grants) {
+  if (!resource) {
     return (
       <Shell brandLabel="R2M" me={me} roleLabel={roleLabel} nav={nav}>
         <PageLoader inline />
@@ -437,6 +453,7 @@ export default function ResourceDetailPage() {
           </PrimaryButton>
         </Card>
 
+        {canManageGrants && (
         <Card>
           <SectionHeader title={`Quyền truy cập (${grants.length})`} />
           {grants.length === 0 ? (
@@ -490,6 +507,7 @@ export default function ResourceDetailPage() {
             {busyKey === "grant-access" ? "Đang cấp quyền…" : "Cấp quyền"}
           </PrimaryButton>
         </Card>
+        )}
       </div>
     </Shell>
   );
