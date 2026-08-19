@@ -58,16 +58,20 @@ describe("IdentityOrganizationModule (integration)", () => {
   });
 
   describe("POST /v1/organizations/register (UC-ORG-01, @Public)", () => {
+    // Multipart, not JSON — registration carries the mandatory minimum verification
+    // document (organization.dto.ts `RegisterOrganizationWithDocumentSchema`) in the same
+    // call since the "vá lỗ hổng xác minh" fix; a plain `.send({...})` JSON body 400s here
+    // with no `file`/`documentType`.
     it("registers a new organization end-to-end", async () => {
       const response = await request(app.getHttpServer())
         .post("/v1/organizations/register")
-        .send({
-          organizationName: "Integration Test Org",
-          organizationType: "RESEARCH_UNIT",
-          ownerEmail: "integration-owner@example.test",
-          ownerPassword: "password123",
-          ownerDisplayName: "Integration Owner",
-        });
+        .field("organizationName", "Integration Test Org")
+        .field("organizationType", "RESEARCH_UNIT")
+        .field("ownerEmail", "integration-owner@example.test")
+        .field("ownerPassword", "password123")
+        .field("ownerDisplayName", "Integration Owner")
+        .field("documentType", "TAX_DOCUMENT")
+        .attach("file", Buffer.from("%PDF-1.4\n%%EOF"), { filename: "tax-document.pdf", contentType: "application/pdf" });
 
       expect(response.status).toBe(201);
       expect(response.body.name).toBe("Integration Test Org");

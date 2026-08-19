@@ -13,6 +13,10 @@ function buildDeps() {
     findUserById: vi.fn(),
     touchLastLogin: vi.fn(),
     updatePasswordHash: vi.fn(),
+    // Default: not an ORG_OWNER of any organization — matches every pre-existing test's
+    // account (none of them registered an org), so the login-gate added alongside this
+    // method (see auth.service.ts) never fires unless a test explicitly overrides it.
+    findOwnedOrganizationStatus: vi.fn().mockResolvedValue(null),
   } as unknown as AuthRepository;
 
   const tokenService = {
@@ -79,6 +83,51 @@ describe("AuthService.login", () => {
     await expect(service.login({ email: "a@b.com", password: "correct-password" })).rejects.toMatchObject({
       code: "AUTH_ACCOUNT_SUSPENDED",
     });
+  });
+
+  it("throws AUTH_ORGANIZATION_PENDING_VERIFICATION for an ORG_OWNER whose org isn't approved yet", async () => {
+    const passwordHash = await bcrypt.hash("correct-password", 4);
+    vi.mocked(deps.authRepository.findLocalIdentityByEmail).mockResolvedValue({
+      identity: { passwordHash } as never,
+      user: { id: "user-1", status: "ACTIVE" } as never,
+    });
+    vi.mocked(deps.authRepository.findOwnedOrganizationStatus).mockResolvedValue({
+      status: "PENDING_VERIFICATION",
+    } as never);
+
+    await expect(service.login({ email: "a@b.com", password: "correct-password" })).rejects.toMatchObject({
+      code: "AUTH_ORGANIZATION_PENDING_VERIFICATION",
+    });
+  });
+
+  it("throws AUTH_ORGANIZATION_REJECTED for an ORG_OWNER whose org was rejected", async () => {
+    const passwordHash = await bcrypt.hash("correct-password", 4);
+    vi.mocked(deps.authRepository.findLocalIdentityByEmail).mockResolvedValue({
+      identity: { passwordHash } as never,
+      user: { id: "user-1", status: "ACTIVE" } as never,
+    });
+    vi.mocked(deps.authRepository.findOwnedOrganizationStatus).mockResolvedValue({
+      status: "REJECTED",
+    } as never);
+
+    await expect(service.login({ email: "a@b.com", password: "correct-password" })).rejects.toMatchObject({
+      code: "AUTH_ORGANIZATION_REJECTED",
+    });
+  });
+
+  it("issues tokens for an ORG_OWNER whose organization is ACTIVE", async () => {
+    const passwordHash = await bcrypt.hash("correct-password", 4);
+    vi.mocked(deps.authRepository.findLocalIdentityByEmail).mockResolvedValue({
+      identity: { passwordHash } as never,
+      user: { id: "user-1", status: "ACTIVE" } as never,
+    });
+    vi.mocked(deps.authRepository.findOwnedOrganizationStatus).mockResolvedValue({
+      status: "ACTIVE",
+    } as never);
+
+    const result = await service.login({ email: "a@b.com", password: "correct-password" });
+
+    expect(result.accessToken).toBe("access-token");
   });
 });
 
